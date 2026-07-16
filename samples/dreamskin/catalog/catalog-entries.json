@@ -1,0 +1,90 @@
+[
+  {
+    "slug": "aurora-drift",
+    "package": {
+      "published": true,
+      "id": "codex-skin.catalog.aurora-drift",
+      "version": "1.3.0",
+      "url": "https://github.com/lixiaobaivv/Codex-Skin/releases/download/catalog-v1/aurora-drift-1.3.0.dreamskin",
+      "sha256": "b94573c48a6ad9c1ba22f366e37dabf3f88090f719b5fd35febacbaa6b92de6a",
+      "size": 669547
+    }
+  },
+  {
+    "slug": "ember-terminal",
+    "package": {
+      "published": true,
+      "id": "codex-skin.catalog.ember-terminal",
+      "version": "1.0.0",
+      "url": "https://github.com/lixiaobaivv/Codex-Skin/releases/download/catalog-v1/ember-terminal-1.0.0.dreamskin",
+      "sha256": "6c89be2ed8924601c773ba6dc59acd8b5a5ab9f220fb9831dfcc2244f93e4606",
+      "size": 244919
+    }
+  },
+  {
+    "slug": "linen-light",
+    "package": {
+      "published": true,
+      "id": "codex-skin.catalog.linen-light",
+      "version": "1.0.6",
+      "url": "https://github.com/lixiaobaivv/Codex-Skin/releases/download/catalog-v1/linen-light-1.0.6.dreamskin",
+      "sha256": "3892605f88957153e0bd775565f19757a11a05144c4798ed00c0ebe6525a415c",
+      "size": 300941
+    }
+  },
+  {
+    "slug": "midnight-grid",
+    "package": {
+      "published": true,
+      "id": "codex-skin.catalog.midnight-grid",
+      "version": "1.1.2",
+      "url": "https://github.com/lixiaobaivv/Codex-Skin/releases/download/catalog-v1/midnight-grid-1.1.2.dreamskin",
+      "sha256": "70c723637eb8a37e2734cc2769ddade7e5b68608dba5aed664fe39bcd61eed7b",
+      "size": 375547
+    }
+  },
+  {
+    "slug": "moss-and-mist",
+    "package": {
+      "published": true,
+      "id": "codex-skin.catalog.moss-and-mist",
+      "version": "1.0.1",
+      "url": "https://github.com/lixiaobaivv/Codex-Skin/releases/download/catalog-v1/moss-and-mist-1.0.1.dreamskin",
+      "sha256": "4a05a3f569bf8bf01f70c9a522a744ff867da25c83f958cfca1bafadc4dd98ac",
+      "size": 403652
+    }
+  },
+  {
+    "slug": "ocean-glass",
+    "package": {
+      "published": true,
+      "id": "codex-skin.catalog.ocean-glass",
+      "version": "1.2.1",
+      "url": "https://github.com/lixiaobaivv/Codex-Skin/releases/download/catalog-v1/ocean-glass-1.2.1.dreamskin",
+      "sha256": "22a6caca45a2688678f555e14b556d816d4445551cb96638f0b5becc355355f4",
+      "size": 301852
+    }
+  },
+  {
+    "slug": "paper-observatory",
+    "package": {
+      "published": true,
+      "id": "codex-skin.catalog.paper-observatory",
+      "version": "1.0.2",
+      "url": "https://github.com/lixiaobaivv/Codex-Skin/releases/download/catalog-v1/paper-observatory-1.0.2.dreamskin",
+      "sha256": "08daa71c0eb209e85f75ef832beb4dd9d8f2f6f2b404bb3dcfbe1e8c382b38e2",
+      "size": 219581
+    }
+  },
+  {
+    "slug": "solar-bloom",
+    "package": {
+      "published": true,
+      "id": "codex-skin.catalog.solar-bloom",
+      "version": "1.0.0",
+      "url": "https://github.com/lixiaobaivv/Codex-Skin/releases/download/catalog-v1/solar-bloom-1.0.0.dreamskin",
+      "sha256": "3a9a61d8c8fe939be8850a0d0e069c1e4503ed6decbabffe99989150b326b2ec",
+      "size": 309290
+    }
+  }
+]
