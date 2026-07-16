@@ -77,6 +77,42 @@ Store 版状态文件位于：
 %LOCALAPPDATA%\CodexThemeStore
 ```
 
+## `.dreamskin` 签名包导入
+
+Windows 客户端已开始接入 Codex-Skin-Store 的 MVP v1 包契约。当前阶段支持由受信任
+Ed25519 密钥签名的本地 `.dreamskin` 文件；导入只完成验证和安装，默认不会自动应用：
+
+```powershell
+.\Codex主题商店.exe import C:\Downloads\theme.dreamskin
+.\Codex主题商店.exe import C:\Downloads\theme.dreamskin --apply
+```
+
+安装目录为：
+
+```text
+%LOCALAPPDATA%\CodexThemeStore\themes\packages\<theme-id>\<version>\
+```
+
+仓库中的 `samples/dreamskin` 是跨平台协议测试夹具，可通过
+`node tools/dreamskin/build-sample.mjs` 重建。其私钥是公开的开发测试密钥，绝不能用于
+生产发布。
+
+签名互操作样例的发布检查、不可变 Release 规则和商店解锁步骤见
+[`docs/publish-signed-sample.md`](docs/publish-signed-sample.md)。在 Release 下载地址返回
+HTTP 200 之前，商店中的 `published` 必须保持为 `false`。
+
+为当前用户注册网页一键导入协议和文件关联：
+
+```powershell
+.\Codex主题商店.exe protocol register
+.\Codex主题商店.exe protocol status
+.\Codex主题商店.exe protocol unregister
+```
+
+`dreamskin://install` 会先显示来源、主题提示、版本和大小，用户确认后才进行受限 HTTPS
+下载；安装成功后会再次询问是否应用。下载器拒绝私网/本机地址、非 443 端口、HTTPS
+降级、超过三次的重定向、大小不符和整包哈希不符。
+
 ## 回滚
 
 ```powershell

@@ -31,6 +31,14 @@ internal static class Program
         catch (Exception ex)
         {
             Console.Error.WriteLine(ex.Message);
+            if (args.Length == 1 && args[0].StartsWith("dreamskin:", StringComparison.OrdinalIgnoreCase))
+            {
+                MessageBox.Show(
+                    ex.Message,
+                    "Dream Skin 导入失败",
+                    MessageBoxButtons.OK,
+                    MessageBoxIcon.Error);
+            }
             return 1;
         }
     }
@@ -507,6 +515,11 @@ internal sealed class ThemeStoreApp
             return 0;
         }
 
+        if (args.Length == 1 && args[0].StartsWith("dreamskin:", StringComparison.OrdinalIgnoreCase))
+        {
+            return ImportFromProtocol(args[0]);
+        }
+
         var command = args[0].ToLowerInvariant();
         switch (command)
         {
@@ -516,6 +529,26 @@ internal sealed class ThemeStoreApp
             case "apply":
                 Apply(args.Length > 1 ? string.Join(" ", args.Skip(1)) : "dilraba-star");
                 return 0;
+            case "import":
+                if (args.Length < 2)
+                {
+                    Console.Error.WriteLine("Usage: CodexThemeStore.exe import C:\\path\\theme.dreamskin [--apply]");
+                    return 1;
+                }
+                var imported = DreamSkinPackageInstaller.ImportLocal(args[1]);
+                Console.WriteLine($"已验证并安装主题: {imported.DisplayName} ({imported.Id} {imported.Version})");
+                Console.WriteLine($"包 SHA-256: {imported.PackageSha256}");
+                if (args.Skip(2).Any(value => value.Equals("--apply", StringComparison.OrdinalIgnoreCase)))
+                {
+                    Apply(imported.ManifestPath);
+                }
+                else
+                {
+                    Console.WriteLine("主题尚未应用。确认后可再次使用 import ... --apply，或使用 apply <theme.json>。");
+                }
+                return 0;
+            case "protocol":
+                return ManageProtocol(args.Skip(1).ToArray());
             case "launch":
                 LaunchStore();
                 return 0;
@@ -603,9 +636,71 @@ internal sealed class ThemeStoreApp
         Console.WriteLine("  CodexThemeStore.exe apply kun-stage");
         Console.WriteLine("  CodexThemeStore.exe apply enfp-pop");
         Console.WriteLine("  CodexThemeStore.exe apply C:\\path\\theme.json");
+        Console.WriteLine("  CodexThemeStore.exe import C:\\path\\theme.dreamskin [--apply]");
+        Console.WriteLine("  CodexThemeStore.exe protocol register|unregister|status|self-test");
         Console.WriteLine("  CodexThemeStore.exe launch");
         Console.WriteLine("  CodexThemeStore.exe status");
         Console.WriteLine("  CodexThemeStore.exe rollback");
+    }
+
+    private int ImportFromProtocol(string value)
+    {
+        var request = DreamSkinProtocol.Parse(value);
+        var hint = request.Id is null ? "未提供" : request.Id;
+        var version = request.Version is null ? "未提供" : request.Version;
+        var confirmation = MessageBox.Show(
+            $"来源：{request.PackageUri.Host}\n主题：{hint}\n版本：{version}\n大小：{request.Size:N0} 字节\n\n客户端将下载、校验签名并安装主题，但不会自动应用。是否继续？",
+            "导入 Dream Skin 主题",
+            MessageBoxButtons.YesNo,
+            MessageBoxIcon.Information,
+            MessageBoxDefaultButton.Button2);
+        if (confirmation != DialogResult.Yes)
+        {
+            Console.WriteLine("DSI_USER_CANCELLED: 用户取消导入。");
+            return 0;
+        }
+
+        var imported = DreamSkinDownloadService.DownloadAndImport(request);
+        Console.WriteLine($"已验证并安装主题: {imported.DisplayName} ({imported.Id} {imported.Version})");
+        var applyNow = MessageBox.Show(
+            $"{imported.DisplayName} 已安全安装。是否立即应用？",
+            "主题安装完成",
+            MessageBoxButtons.YesNo,
+            MessageBoxIcon.Question,
+            MessageBoxDefaultButton.Button2);
+        if (applyNow == DialogResult.Yes) Apply(imported.ManifestPath);
+        return 0;
+    }
+
+    private static int ManageProtocol(string[] args)
+    {
+        if (args.Length != 1)
+        {
+            Console.Error.WriteLine("Usage: CodexThemeStore.exe protocol register|unregister|status|self-test");
+            return 1;
+        }
+
+        switch (args[0].ToLowerInvariant())
+        {
+            case "register":
+                DreamSkinShellIntegration.Register();
+                Console.WriteLine("已为当前用户注册 dreamskin:// 和 .dreamskin 文件关联。");
+                return 0;
+            case "unregister":
+                DreamSkinShellIntegration.Unregister();
+                Console.WriteLine("已移除当前用户的 dreamskin:// 和 .dreamskin 文件关联。");
+                return 0;
+            case "status":
+                Console.WriteLine(DreamSkinShellIntegration.IsRegistered() ? "registered" : "not registered");
+                return 0;
+            case "self-test":
+                DreamSkinProtocol.RunSelfTest();
+                Console.WriteLine("dreamskin:// protocol self-test passed.");
+                return 0;
+            default:
+                Console.Error.WriteLine("Usage: CodexThemeStore.exe protocol register|unregister|status|self-test");
+                return 1;
+        }
     }
 
     private void ListThemes()
@@ -1622,24 +1717,34 @@ internal sealed class ThemeDefinition
     public string RawJson { get; }
     public string SourcePath { get; }
     public JsonNode? Copy => _root["copy"];
-    public JsonNode? Home => _root["home"];
-    public string DisplayName => GetString("displayName", GetString("codeThemeId", "theme"));
-    public string CodeThemeId => GetString("codeThemeId", "absolutely");
-    public string Variant => GetString("variant", "light").Equals("dark", StringComparison.OrdinalIgnoreCase) ? "dark" : "light";
-    public string Accent => GetThemeString("accent", "#da7756");
-    public string Ink => GetThemeString("ink", "#141413");
-    public string Surface => GetThemeString("surface", "#f5f4ee");
-    public string DiffAdded => GetSemanticString("diffAdded", "#00c853");
-    public string DiffRemoved => GetSemanticString("diffRemoved", "#ff5f38");
-    public string Skill => GetSemanticString("skill", "#cc7d5e");
+    public JsonNode? Home => _root["home"] ?? BuildDreamSkinHome();
+    public string DisplayName => GetString("displayName", GetString("name", GetString("codeThemeId", "theme")));
+    public string CodeThemeId => GetString("codeThemeId", GetString("id", "absolutely"));
+    public string Variant
+    {
+        get
+        {
+            if (_root["variant"] is not null)
+            {
+                return GetString("variant", "light").Equals("dark", StringComparison.OrdinalIgnoreCase) ? "dark" : "light";
+            }
+            return ColorUtil.Luminance(GetStoreColor("background", "#f5f4ee")) < 0.35 ? "dark" : "light";
+        }
+    }
+    public string Accent => GetThemeString("accent", GetStoreColor("accent", "#da7756"));
+    public string Ink => GetThemeString("ink", GetStoreColor("text", "#141413"));
+    public string Surface => GetThemeString("surface", GetStoreColor("panel", GetStoreColor("background", "#f5f4ee")));
+    public string DiffAdded => GetSemanticString("diffAdded", GetStoreColor("highlight", "#00c853"));
+    public string DiffRemoved => GetSemanticString("diffRemoved", GetStoreColor("accentAlt", "#ff5f38"));
+    public string Skill => GetSemanticString("skill", GetStoreColor("secondary", "#cc7d5e"));
     public string UiFont => GetFontString("ui", "ui-serif, Georgia, Cambria, \"Times New Roman\", Times, \"Noto Serif SC\", serif");
     public string DisplayFont => GetFontString("display", "ui-serif, Georgia, Cambria, \"Times New Roman\", Times, \"Noto Serif SC\", serif");
     public string CodeFont => GetFontString("code", "JetBrainsMono NFM");
     public bool OpaqueWindows => GetThemeBool("opaqueWindows", true);
     public double Contrast => Clamp(GetThemeDouble("contrast", 45), 0, 100);
-    public string? BackgroundImage => GetThemeNullableString("backgroundImage");
+    public string? BackgroundImage => GetThemeNullableString("backgroundImage") ?? _root["image"]?.GetValue<string>();
     public string? LogoImage => GetThemeNullableString("logoImage");
-    public string? PreviewImage => _root["previewImage"]?.GetValue<string>();
+    public string? PreviewImage => _root["previewImage"]?.GetValue<string>() ?? _root["assets"]?["preview"]?["path"]?.GetValue<string>();
     public double BackgroundImageOpacity => Clamp(GetThemeDouble("backgroundImageOpacity", 0.18), 0, 1);
     public double BackgroundImageBlur => Clamp(GetThemeDouble("backgroundImageBlur", 0), 0, 24);
 
@@ -1680,6 +1785,33 @@ internal sealed class ThemeDefinition
 
     private string GetString(string key, string fallback) => _root[key]?.GetValue<string>() ?? fallback;
     private string GetThemeString(string key, string fallback) => _root["theme"]?[key]?.GetValue<string>() ?? fallback;
+    private string GetStoreColor(string key, string fallback)
+    {
+        var value = _root["colors"]?[key]?.GetValue<string>();
+        if (string.IsNullOrWhiteSpace(value)) return fallback;
+        if (Regex.IsMatch(value, "^#[0-9a-fA-F]{6}$")) return value;
+        var rgba = Regex.Match(value, "^rgba\\((\\d{1,3}),[ ]*(\\d{1,3}),[ ]*(\\d{1,3}),[ ]*(?:0|1|0?\\.\\d{1,3}|1\\.0{1,3})\\)$");
+        if (!rgba.Success) return fallback;
+        return $"#{int.Parse(rgba.Groups[1].Value):x2}{int.Parse(rgba.Groups[2].Value):x2}{int.Parse(rgba.Groups[3].Value):x2}";
+    }
+    private JsonNode? BuildDreamSkinHome()
+    {
+        if (_root["packageVersion"] is null) return null;
+        return new JsonObject
+        {
+            ["brand"] = GetString("name", CodeThemeId),
+            ["eyebrow"] = GetString("brandSubtitle", "Dream Skin"),
+            ["badge"] = GetString("statusText", "已验证主题"),
+            ["title"] = GetString("tagline", "我们该构建什么？"),
+            ["subtitle"] = GetString("description", ""),
+            ["sidebarProject"] = GetString("projectLabel", GetString("name", CodeThemeId)),
+            ["footerNote"] = GetString("quote", GetString("brandSubtitle", "Dream Skin")),
+            ["quickActions"] = new JsonArray(),
+            ["tags"] = new JsonArray(),
+            ["sidebarItems"] = new JsonArray(),
+            ["tasks"] = new JsonArray(),
+        };
+    }
     private string? GetThemeNullableString(string key)
     {
         var node = _root["theme"]?[key];

@@ -1,0 +1,67 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  windows-importer:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-dotnet@v6
+        with:
+          dotnet-version: 8.0.x
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+
+      - name: Rebuild deterministic signed fixture
+        shell: pwsh
+        run: |
+          $before = (Get-FileHash samples/dreamskin/codex-skin-sample-1.0.0.dreamskin -Algorithm SHA256).Hash
+          node tools/dreamskin/build-sample.mjs
+          $after = (Get-FileHash samples/dreamskin/codex-skin-sample-1.0.0.dreamskin -Algorithm SHA256).Hash
+          if ($before -ne $after) { throw "Signed fixture is not deterministic." }
+
+      - name: Validate fixture contract
+        run: node --test tests/dreamskin-fixture.test.mjs
+
+      - name: Build Windows client
+        run: dotnet build src/CodexThemeStore/CodexThemeStore.csproj --configuration Release
+
+      - name: Publish self-contained Windows client
+        run: dotnet publish src/CodexThemeStore/CodexThemeStore.csproj --configuration Release --runtime win-x64 --self-contained true --output artifacts/CodexThemeStore-win-x64
+
+      - name: Validate protocol parser
+        run: artifacts/CodexThemeStore-win-x64/CodexThemeStore.exe protocol self-test
+
+      - name: Validate current-user shell registration
+        shell: pwsh
+        run: |
+          $client = "artifacts/CodexThemeStore-win-x64/CodexThemeStore.exe"
+          & $client protocol register
+          $status = & $client protocol status
+          if ($status -ne "registered") { throw "dreamskin protocol registration failed." }
+          & $client protocol unregister
+          $status = & $client protocol status
+          if ($status -ne "not registered") { throw "dreamskin protocol cleanup failed." }
+
+      - name: Import signed fixture into isolated library
+        shell: pwsh
+        run: |
+          $env:CODEX_THEME_LIBRARY_DIR = Join-Path $env:RUNNER_TEMP "dreamskin-library"
+          & "artifacts/CodexThemeStore-win-x64/CodexThemeStore.exe" import samples/dreamskin/codex-skin-sample-1.0.0.dreamskin
+          $manifest = Join-Path $env:CODEX_THEME_LIBRARY_DIR "codex-skin.jackson-sage-sample/1.0.0/theme.json"
+          if (-not (Test-Path -LiteralPath $manifest)) { throw "Signed fixture was not installed." }
+
+      - uses: actions/upload-artifact@v7
+        with:
+          name: CodexThemeStore-win-x64
+          path: artifacts/CodexThemeStore-win-x64
+          if-no-files-found: error

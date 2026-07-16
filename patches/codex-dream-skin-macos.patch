@@ -1,0 +1,1205 @@
+diff --git a/.github/workflows/dreamskin-importer-macos.yml b/.github/workflows/dreamskin-importer-macos.yml
+new file mode 100644
+index 0000000..9be7b75
+--- /dev/null
++++ b/.github/workflows/dreamskin-importer-macos.yml
+@@ -0,0 +1,34 @@
++name: macOS Dream Skin importer
++
++on:
++  push:
++    paths:
++      - "macos/**"
++      - ".github/workflows/dreamskin-importer-macos.yml"
++  pull_request:
++    paths:
++      - "macos/**"
++      - ".github/workflows/dreamskin-importer-macos.yml"
++
++permissions:
++  contents: read
++
++jobs:
++  importer:
++    runs-on: macos-14
++    steps:
++      - uses: actions/checkout@v7
++
++      - uses: actions/setup-node@v7
++        with:
++          node-version: 22
++
++      - name: Check launcher syntax
++        run: |
++          bash -n macos/Import\ Dream\ Skin.command
++          bash -n macos/scripts/import-dreamskin-macos.sh
++          bash -n macos/scripts/import-dreamskin-url-macos.sh
++          bash -n macos/scripts/install-dream-skin-macos.sh
++
++      - name: Verify signed package importer on macOS
++        run: node --test macos/tests/dreamskin-import.test.mjs
+diff --git a/macos/CHANGELOG.md b/macos/CHANGELOG.md
+index 7b91c8a..f9aa006 100644
+--- a/macos/CHANGELOG.md
++++ b/macos/CHANGELOG.md
+@@ -1,5 +1,15 @@
+ # Changelog
+ 
++## Unreleased
++
++- Add local `.dreamskin` MVP v1 import with strict ZIP limits, SHA-256 resource
++  checks, Ed25519/RFC 8785 verification, immutable version directories and
++  install/apply separation.
++- Register a per-user macOS handler for signed `.dreamskin` files and strict
++  `dreamskin://install` HTTPS links, with separate download and apply prompts.
++- Add macOS 14 CI coverage for complete `sips` image decoding, immutable
++  installation and the compatibility symlink used by existing theme switching.
++
+ ## 1.1.1 — 2026-07-16
+ 
+ ### 修复
+diff --git a/macos/Import Dream Skin.command b/macos/Import Dream Skin.command
+new file mode 100644
+index 0000000..ea449b0
+--- /dev/null
++++ b/macos/Import Dream Skin.command	
+@@ -0,0 +1,11 @@
++#!/bin/bash
++
++set -euo pipefail
++ROOT="$(cd "$(dirname "$0")" && pwd -P)"
++PACKAGE="${1:-}"
++
++if [ -z "$PACKAGE" ]; then
++  PACKAGE="$(/usr/bin/osascript -e 'POSIX path of (choose file with prompt "Choose a signed .dreamskin theme package")')" || exit 0
++fi
++
++exec "$ROOT/scripts/import-dreamskin-macos.sh" --file "$PACKAGE"
+diff --git a/macos/README.md b/macos/README.md
+index 0653f5b..59841c9 100644
+--- a/macos/README.md
++++ b/macos/README.md
+@@ -55,6 +55,29 @@ To build the “double-click install” folder layout for non-git users:
+ 
+ That ZIP contains a visible installer plus a hidden `.codex-dream-skin-studio` engine. Do not ship only CSS/images.
+ 
++## Import a signed `.dreamskin` package
++
++Double-click `Import Dream Skin.command`, or use the installed engine directly:
++
++```bash
++~/.codex/codex-dream-skin-studio/scripts/import-dreamskin-macos.sh \
++  --file "$HOME/Downloads/theme.dreamskin"
++```
++
++Import verifies the closed MVP v1 manifest, Ed25519 signature, ZIP structure,
++resource hashes, image container and decoded dimensions before committing an
++immutable version under Application Support. Installation does not apply the
++theme. Add `--apply` only after reviewing the source and package information.
++
++The installer also registers `dreamskin://install` links and `.dreamskin` files
++to a small per-user app in `~/Applications`. Store links show the source host,
++declared size and theme hint before downloading. Downloads require public HTTPS,
++are capped at 20 MiB and three redirects, and must match the declared SHA-256.
++Applying the installed theme is always a separate confirmation.
++
++The bundled `codex-skin.sample.2026-01` key is a public interoperability fixture
++key and is not production publishing authority.
++
+ ## How it works (security boundary)
+ 
+ 1. Discover `com.openai.codex` and validate signature / Team ID / arch / bundled Node.
+diff --git a/macos/assets/dreamskin-handler.applescript b/macos/assets/dreamskin-handler.applescript
+new file mode 100644
+index 0000000..d040c8b
+--- /dev/null
++++ b/macos/assets/dreamskin-handler.applescript
+@@ -0,0 +1,21 @@
++on engineScript(relativePath)
++	set homePath to POSIX path of (path to home folder)
++	return homePath & ".codex/codex-dream-skin-studio/scripts/" & relativePath
++end engineScript
++
++on open location installURL
++	set importer to engineScript("import-dreamskin-url-macos.sh")
++	do shell script quoted form of importer & " --uri " & quoted form of installURL
++end open location
++
++on open droppedItems
++	set importer to engineScript("import-dreamskin-macos.sh")
++	repeat with droppedItem in droppedItems
++		do shell script quoted form of importer & " --file " & quoted form of POSIX path of droppedItem
++	end repeat
++end open
++
++on run
++	set selectedPackage to choose file with prompt "Choose a signed .dreamskin theme package"
++	open {selectedPackage}
++end run
+diff --git a/macos/assets/dreamskin-trusted-keys.json b/macos/assets/dreamskin-trusted-keys.json
+new file mode 100644
+index 0000000..205fd00
+--- /dev/null
++++ b/macos/assets/dreamskin-trusted-keys.json
+@@ -0,0 +1,11 @@
++{
++  "schemaVersion": 1,
++  "keys": [
++    {
++      "keyId": "codex-skin.sample.2026-01",
++      "algorithm": "Ed25519",
++      "publicKey": "kuf25VngYoeAC2TDJ2kPGRfKGJZvQhZrdVnQhGvQ3fM",
++      "purpose": "development-fixture-only"
++    }
++  ]
++}
+diff --git a/macos/scripts/import-dreamskin-macos.sh b/macos/scripts/import-dreamskin-macos.sh
+new file mode 100644
+index 0000000..4734a8c
+--- /dev/null
++++ b/macos/scripts/import-dreamskin-macos.sh
+@@ -0,0 +1,49 @@
++#!/bin/bash
++
++set -euo pipefail
++. "$(cd "$(dirname "$0")" && pwd -P)/common-macos.sh"
++
++PACKAGE=""
++APPLY_NOW="false"
++while [ "$#" -gt 0 ]; do
++  case "$1" in
++    --file) PACKAGE="${2:-}"; shift 2 ;;
++    --apply) APPLY_NOW="true"; shift ;;
++    *) fail "Unknown Dream Skin import argument: $1" ;;
++  esac
++done
++
++[ -n "$PACKAGE" ] || fail "Usage: import-dreamskin-macos.sh --file <theme.dreamskin> [--apply]"
++[ -f "$PACKAGE" ] || fail "Dream Skin package not found."
++
++if ! /usr/bin/osascript <<APPLESCRIPT
++display dialog "Verify and install this Dream Skin package?\n\n$(/usr/bin/basename "$PACKAGE")" with title "Codex Dream Skin" buttons {"Cancel", "Verify and Install"} default button "Verify and Install" cancel button "Cancel" with icon caution
++APPLESCRIPT
++then
++  exit 0
++fi
++
++ensure_state_root
++ensure_node_runtime
++THEMES_ROOT="$STATE_ROOT/themes"
++/bin/mkdir -p "$THEMES_ROOT"
++/bin/chmod 700 "$THEMES_ROOT"
++
++RESULT="$("$NODE" "$SCRIPT_DIR/import-dreamskin.mjs" \
++  --file "$PACKAGE" \
++  --library-root "$THEMES_ROOT")" || fail "Dream Skin package validation or installation failed."
++
++THEME_ID="$("$NODE" -e 'const r=JSON.parse(process.argv[1]);process.stdout.write(r.id)' "$RESULT")"
++THEME_VERSION="$("$NODE" -e 'const r=JSON.parse(process.argv[1]);process.stdout.write(r.version)' "$RESULT")"
++THEME_NAME="$("$NODE" -e 'const r=JSON.parse(process.argv[1]);process.stdout.write(r.name)' "$RESULT")"
++PACKAGE_HASH="$("$NODE" -e 'const r=JSON.parse(process.argv[1]);process.stdout.write(r.packageSha256)' "$RESULT")"
++
++printf 'Installed verified Dream Skin theme: %s (%s %s)\n' "$THEME_NAME" "$THEME_ID" "$THEME_VERSION"
++printf 'Package SHA-256: %s\n' "$PACKAGE_HASH"
++/usr/bin/osascript -e "display notification \"Installed ${THEME_NAME}\" with title \"Codex Dream Skin\"" >/dev/null 2>&1 || true
++
++if [ "$APPLY_NOW" = "true" ]; then
++  exec "$SCRIPT_DIR/switch-theme-macos.sh" --id "$THEME_ID"
++fi
++
++printf 'The theme is installed but not applied. Re-run with --apply after reviewing it.\n'
+diff --git a/macos/scripts/import-dreamskin-url-macos.sh b/macos/scripts/import-dreamskin-url-macos.sh
+new file mode 100644
+index 0000000..ce925e6
+--- /dev/null
++++ b/macos/scripts/import-dreamskin-url-macos.sh
+@@ -0,0 +1,42 @@
++#!/bin/bash
++
++set -euo pipefail
++. "$(cd "$(dirname "$0")" && pwd -P)/common-macos.sh"
++
++URI=""
++while [ "$#" -gt 0 ]; do
++  case "$1" in
++    --uri) URI="${2:-}"; shift 2 ;;
++    *) fail "Unknown Dream Skin URL import argument: $1" ;;
++  esac
++done
++[ -n "$URI" ] || fail "Usage: import-dreamskin-url-macos.sh --uri <dreamskin://install?...>"
++
++ensure_state_root
++ensure_node_runtime
++REQUEST="$($NODE "$SCRIPT_DIR/import-dreamskin-url.mjs" --uri "$URI" --inspect)" || fail "The Dream Skin install link is invalid."
++HOST="$($NODE -e 'const r=JSON.parse(process.argv[1]);process.stdout.write(r.host)' "$REQUEST")"
++SIZE="$($NODE -e 'const r=JSON.parse(process.argv[1]);process.stdout.write(String(r.size))' "$REQUEST")"
++THEME_HINT="$($NODE -e 'const r=JSON.parse(process.argv[1]);process.stdout.write([r.id,r.version].filter(Boolean).join(" "))' "$REQUEST")"
++
++if ! /usr/bin/osascript <<APPLESCRIPT
++display dialog "Download and verify this signed Dream Skin theme?\n\nTheme: ${THEME_HINT:-not specified}\nSource: $HOST\nSize: $SIZE bytes" with title "Codex Dream Skin" buttons {"Cancel", "Download and Install"} default button "Download and Install" cancel button "Cancel" with icon caution
++APPLESCRIPT
++then
++  exit 0
++fi
++
++THEMES_ROOT="$STATE_ROOT/themes"
++/bin/mkdir -p "$THEMES_ROOT"
++/bin/chmod 700 "$THEMES_ROOT"
++RESULT="$($NODE "$SCRIPT_DIR/import-dreamskin-url.mjs" --uri "$URI" --state-root "$STATE_ROOT" --library-root "$THEMES_ROOT")" || fail "Download, signature validation, or installation failed."
++THEME_ID="$($NODE -e 'const r=JSON.parse(process.argv[1]);process.stdout.write(r.id)' "$RESULT")"
++THEME_NAME="$($NODE -e 'const r=JSON.parse(process.argv[1]);process.stdout.write(r.name)' "$RESULT")"
++
++if /usr/bin/osascript <<APPLESCRIPT
++display dialog "Installed and verified ${THEME_NAME}.\n\nApply it to Codex now?" with title "Codex Dream Skin" buttons {"Not Now", "Apply"} default button "Not Now"
++APPLESCRIPT
++then
++  exec "$SCRIPT_DIR/switch-theme-macos.sh" --id "$THEME_ID"
++fi
++printf 'Installed %s but did not apply it.\n' "$THEME_NAME"
+diff --git a/macos/scripts/import-dreamskin-url.mjs b/macos/scripts/import-dreamskin-url.mjs
+new file mode 100644
+index 0000000..0f740f4
+--- /dev/null
++++ b/macos/scripts/import-dreamskin-url.mjs
+@@ -0,0 +1,262 @@
++#!/usr/bin/env node
++
++import dns from "node:dns";
++import { createHash, randomUUID } from "node:crypto";
++import fsp from "node:fs/promises";
++import https from "node:https";
++import net from "node:net";
++import path from "node:path";
++import { fileURLToPath } from "node:url";
++import { installDreamSkinPackage } from "./import-dreamskin.mjs";
++
++const MAX_URI_BYTES = 4096;
++const MAX_PACKAGE_BYTES = 20 * 1024 * 1024;
++const MAX_REDIRECTS = 3;
++const allowedParameters = new Set(["url", "sha256", "size", "id", "version"]);
++const hashPattern = /^[a-f0-9]{64}$/;
++const themeIdPattern = /^[a-z0-9]+(?:[.-][a-z0-9]+)*$/;
++const semverPattern = /^(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)(?:-[0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*)?(?:\+[0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*)?$/;
++
++export function parseInstallUri(input) {
++  if (typeof input !== "string" || input.length === 0 || Buffer.byteLength(input, "utf8") > MAX_URI_BYTES) fail("DSI_URI_INVALID", "dreamskin URI is empty or exceeds 4096 bytes.");
++  let uri;
++  try { uri = new URL(input); } catch { fail("DSI_URI_INVALID", "Invalid dreamskin URI."); }
++  if (uri.protocol !== "dreamskin:" || uri.hostname.toLowerCase() !== "install" || uri.username || uri.password || uri.hash || (uri.pathname && uri.pathname !== "/")) fail("DSI_URI_INVALID", "Only dreamskin://install is accepted.");
++  const queryIndex = input.indexOf("?");
++  if (queryIndex < 0 || queryIndex === input.length - 1) fail("DSI_URI_INVALID", "Import URI has no query parameters.");
++  const rawQuery = input.slice(queryIndex + 1);
++  if (rawQuery.includes("#")) fail("DSI_URI_INVALID", "Fragments are not allowed.");
++  const values = new Map();
++  for (const pair of rawQuery.split("&")) {
++    if (!pair) fail("DSI_URI_INVALID", "Empty query parameter.");
++    const separator = pair.indexOf("=");
++    if (separator <= 0 || pair.indexOf("=", separator + 1) >= 0) fail("DSI_URI_INVALID", "Each query parameter must contain one equals sign.");
++    const rawName = pair.slice(0, separator);
++    const rawValue = pair.slice(separator + 1);
++    const name = decodePercentOnce(rawName);
++    if (!allowedParameters.has(name)) fail("DSI_URI_INVALID", `Unknown query parameter: ${name}`);
++    if (values.has(name)) fail("DSI_URI_INVALID", `Duplicate query parameter: ${name}`);
++    if (name === "url" && /[:/]/.test(rawValue)) fail("DSI_URI_INVALID", "url must be fully percent encoded.");
++    values.set(name, decodePercentOnce(rawValue));
++  }
++  for (const required of ["url", "sha256", "size"]) if (!values.get(required)) fail("DSI_URI_INVALID", `Missing query parameter: ${required}`);
++  const packageUrl = validatePackageUrl(values.get("url"));
++  const sha256 = values.get("sha256");
++  if (!hashPattern.test(sha256)) fail("DSI_URI_INVALID", "sha256 must be 64 lowercase hexadecimal characters.");
++  if (!/^[0-9]+$/.test(values.get("size"))) fail("DSI_URI_INVALID", "size must be decimal bytes.");
++  const size = Number(values.get("size"));
++  if (!Number.isSafeInteger(size) || size < 1 || size > MAX_PACKAGE_BYTES) fail("DSI_URI_INVALID", "size is outside the 1 to 20971520 byte range.");
++  const id = values.get("id");
++  if (id !== undefined && (id.length < 3 || id.length > 128 || !themeIdPattern.test(id))) fail("DSI_URI_INVALID", "Invalid id hint.");
++  const version = values.get("version");
++  if (version !== undefined && (version.length > 64 || !semverPattern.test(version))) fail("DSI_URI_INVALID", "Invalid version hint.");
++  return { packageUrl: packageUrl.href, host: packageUrl.hostname, sha256, size, id, version };
++}
++
++export async function downloadAndInstall(request, options = {}) {
++  const stateRoot = path.resolve(options.stateRoot ?? path.join(process.env.HOME ?? "", "Library", "Application Support", "CodexDreamSkinStudio"));
++  const downloadRoot = safeChild(stateRoot, "downloads", randomUUID());
++  const archivePath = path.join(downloadRoot, "archive.dreamskin");
++  await fsp.mkdir(downloadRoot, { recursive: true, mode: 0o700 });
++  try {
++    const downloaded = await downloadPackage(new URL(request.packageUrl), request);
++    await fsp.writeFile(archivePath, downloaded, { mode: 0o600, flag: "wx" });
++    await fsp.chmod(archivePath, 0o600);
++    return await installDreamSkinPackage(archivePath, {
++      libraryRoot: options.libraryRoot ?? path.join(stateRoot, "themes"),
++      expectedSha256: request.sha256,
++      expectedSize: request.size,
++      expectedId: request.id,
++      expectedVersion: request.version,
++      keyringPath: options.keyringPath,
++      allowNonDarwinInstall: options.allowNonDarwinInstall,
++      skipAlias: options.skipAlias,
++    });
++  } finally {
++    await fsp.rm(downloadRoot, { recursive: true, force: true }).catch(() => {});
++  }
++}
++
++async function downloadPackage(initial, expected) {
++  let current = validatePackageUrl(initial.href);
++  for (let redirects = 0; ; redirects += 1) {
++    const response = await requestOnce(current);
++    if ([301, 302, 303, 307, 308].includes(response.statusCode)) {
++      response.resume();
++      if (redirects >= MAX_REDIRECTS) fail("DSI_REDIRECT_LIMIT", "Package download exceeded three redirects.");
++      const location = response.headers.location;
++      if (!location) fail("DSI_DOWNLOAD_FAILED", "Redirect has no Location header.");
++      current = validatePackageUrl(new URL(location, current).href);
++      continue;
++    }
++    if (response.statusCode < 200 || response.statusCode > 299) { response.resume(); fail("DSI_DOWNLOAD_FAILED", `Package server returned HTTP ${response.statusCode}.`); }
++    const contentLength = response.headers["content-length"];
++    if (contentLength !== undefined) {
++      if (!/^[0-9]+$/.test(contentLength)) { response.resume(); fail("DSI_SIZE_LIMIT", "Invalid Content-Length header."); }
++      const length = Number(contentLength);
++      if (length < 1 || length > MAX_PACKAGE_BYTES || length !== expected.size) { response.resume(); fail("DSI_SIZE_MISMATCH", "Content-Length differs from the import request."); }
++    }
++    return await readBoundedResponse(response, expected);
++  }
++}
++
++function requestOnce(url) {
++  return new Promise((resolve, reject) => {
++    const request = https.request(url, {
++      method: "GET",
++      agent: false,
++      headers: { Accept: "application/vnd.codex-dream-skin+zip", "User-Agent": "CodexDreamSkinStudio/1.1.1" },
++      lookup: publicLookup,
++      timeout: 15000,
++    }, resolve);
++    request.once("timeout", () => request.destroy(error("DSI_DOWNLOAD_FAILED", "Package connection timed out.")));
++    request.once("error", (cause) => reject(cause.code?.startsWith?.("DSI_") ? cause : error("DSI_DOWNLOAD_FAILED", "Package request failed.")));
++    request.end();
++  });
++}
++
++function readBoundedResponse(response, expected) {
++  return new Promise((resolve, reject) => {
++    const chunks = [];
++    const hash = createHash("sha256");
++    let total = 0;
++    response.on("data", (chunk) => {
++      total += chunk.length;
++      if (total > MAX_PACKAGE_BYTES || total > expected.size) {
++        response.destroy(error("DSI_SIZE_LIMIT", "Package body exceeds declared size or 20 MiB."));
++        return;
++      }
++      hash.update(chunk);
++      chunks.push(chunk);
++    });
++    response.once("error", reject);
++    response.once("end", () => {
++      if (total !== expected.size) return reject(error("DSI_SIZE_MISMATCH", "Downloaded byte count differs from the import request."));
++      if (hash.digest("hex") !== expected.sha256) return reject(error("DSI_HASH_MISMATCH", "Downloaded package SHA-256 differs from the import request."));
++      resolve(Buffer.concat(chunks, total));
++    });
++  });
++}
++
++function publicLookup(hostname, options, callback) {
++  dns.lookup(hostname, { all: true, verbatim: true }, (cause, addresses) => {
++    if (cause) return callback(error("DSI_DOWNLOAD_FAILED", "Package host DNS lookup failed."));
++    const allowed = addresses.filter((entry) => isPublicAddress(entry.address));
++    if (allowed.length === 0) return callback(error("DSI_NETWORK_BLOCKED", "Package host did not resolve to a public address."));
++    const selected = options?.family ? allowed.find((entry) => entry.family === options.family) : allowed[0];
++    if (!selected) return callback(error("DSI_NETWORK_BLOCKED", "Package host has no public address in the requested family."));
++    if (options?.all) callback(null, allowed); else callback(null, selected.address, selected.family);
++  });
++}
++
++function validatePackageUrl(value) {
++  let url;
++  try { url = new URL(value); } catch { fail("DSI_URI_INVALID", "Package URL is invalid."); }
++  if (url.protocol !== "https:" || url.username || url.password || url.hash || (url.port && url.port !== "443") || !url.hostname) fail("DSI_URI_INVALID", "Package URL must be credential-free HTTPS on port 443.");
++  const host = url.hostname.toLowerCase();
++  if (host === "localhost" || host.endsWith(".localhost") || host.endsWith(".local")) fail("DSI_NETWORK_BLOCKED", "Local package hosts are not allowed.");
++  if (net.isIP(host) && !isPublicAddress(host)) fail("DSI_NETWORK_BLOCKED", "Private, link-local and reserved package addresses are not allowed.");
++  return url;
++}
++
++export function isPublicAddress(address) {
++  const family = net.isIP(address);
++  if (family === 4) return isPublicIpv4(address.split(".").map(Number));
++  if (family !== 6) return false;
++  const bytes = ipv6Bytes(address);
++  if (!bytes) return false;
++  if (bytes.subarray(0, 10).every((value) => value === 0) && bytes[10] === 0xff && bytes[11] === 0xff) return isPublicIpv4([...bytes.subarray(12)]);
++  if (bytes.every((value) => value === 0) || (bytes.subarray(0, 15).every((value) => value === 0) && bytes[15] === 1)) return false;
++  if ((bytes[0] & 0xfe) === 0xfc || (bytes[0] === 0xfe && (bytes[1] & 0xc0) === 0x80) || bytes[0] === 0xff) return false;
++  if (bytes[0] === 0x20 && bytes[1] === 0x02) return false;
++  if (bytes[0] === 0x20 && bytes[1] === 0x01 && bytes[2] === 0 && bytes[3] === 0) return false;
++  if (bytes[0] === 0x20 && bytes[1] === 0x01 && bytes[2] === 0x0d && bytes[3] === 0xb8) return false;
++  if (bytes.subarray(0, 12).equals(Buffer.from([0, 0x64, 0xff, 0x9b, 0, 0, 0, 0, 0, 0, 0, 0]))) return false;
++  if (bytes.subarray(0, 12).every((value) => value === 0)) return false;
++  return true;
++}
++
++function isPublicIpv4(bytes) {
++  const [a, b, c] = bytes;
++  if (bytes.length !== 4 || bytes.some((value) => !Number.isInteger(value) || value < 0 || value > 255)) return false;
++  if (a === 0 || a === 10 || a === 127 || a >= 224) return false;
++  if (a === 100 && b >= 64 && b <= 127) return false;
++  if (a === 169 && b === 254) return false;
++  if (a === 172 && b >= 16 && b <= 31) return false;
++  if (a === 192 && (b === 0 || b === 168)) return false;
++  if (a === 192 && b === 88 && c === 99) return false;
++  if (a === 198 && (b === 18 || b === 19)) return false;
++  if (a === 198 && b === 51 && c === 100) return false;
++  if (a === 203 && b === 0 && c === 113) return false;
++  return true;
++}
++
++function ipv6Bytes(input) {
++  let address = input.split("%")[0].toLowerCase();
++  if (address.includes(".")) {
++    const lastColon = address.lastIndexOf(":");
++    const ipv4 = address.slice(lastColon + 1).split(".").map(Number);
++    if (!isValidIpv4(ipv4)) return null;
++    address = `${address.slice(0, lastColon)}:${((ipv4[0] << 8) | ipv4[1]).toString(16)}:${((ipv4[2] << 8) | ipv4[3]).toString(16)}`;
++  }
++  const halves = address.split("::");
++  if (halves.length > 2) return null;
++  const left = halves[0] ? halves[0].split(":") : [];
++  const right = halves[1] ? halves[1].split(":") : [];
++  const fill = halves.length === 2 ? 8 - left.length - right.length : 0;
++  if ((halves.length === 1 && left.length !== 8) || fill < 1) return null;
++  const groups = [...left, ...Array(fill).fill("0"), ...right];
++  if (groups.length !== 8 || groups.some((group) => !/^[0-9a-f]{1,4}$/.test(group))) return null;
++  const bytes = Buffer.alloc(16);
++  groups.forEach((group, index) => bytes.writeUInt16BE(Number.parseInt(group, 16), index * 2));
++  return bytes;
++}
++
++function isValidIpv4(bytes) { return bytes.length === 4 && bytes.every((value) => Number.isInteger(value) && value >= 0 && value <= 255); }
++
++function decodePercentOnce(value) {
++  const bytes = [];
++  for (let index = 0; index < value.length; index += 1) {
++    const character = value[index];
++    if (character === "%") {
++      if (!/^[0-9A-Fa-f]{2}$/.test(value.slice(index + 1, index + 3))) fail("DSI_URI_INVALID", "Malformed percent encoding.");
++      bytes.push(Number.parseInt(value.slice(index + 1, index + 3), 16));
++      index += 2;
++    } else {
++      if (character.charCodeAt(0) > 0x7f) fail("DSI_URI_INVALID", "Non-ASCII query text must be UTF-8 percent encoded.");
++      bytes.push(character.charCodeAt(0));
++    }
++  }
++  try { return new TextDecoder("utf-8", { fatal: true }).decode(Uint8Array.from(bytes)); } catch { fail("DSI_URI_INVALID", "Query value is not strict UTF-8."); }
++}
++
++function safeChild(root, ...segments) { const base = path.resolve(root); const target = path.resolve(base, ...segments); if (!target.startsWith(`${base}${path.sep}`)) fail("DSI_ZIP_TRAVERSAL", "Temporary path escapes state root."); return target; }
++function error(code, message) { const value = new Error(`${code}: ${message}`); value.code = code; return value; }
++function fail(code, message) { throw error(code, message); }
++
++function parseCli(argv) {
++  const options = {};
++  let uri;
++  let inspect = false;
++  for (let index = 0; index < argv.length; index += 1) {
++    if (argv[index] === "--uri") uri = argv[++index];
++    else if (argv[index] === "--inspect") inspect = true;
++    else if (argv[index] === "--state-root") options.stateRoot = argv[++index];
++    else if (argv[index] === "--library-root") options.libraryRoot = argv[++index];
++    else fail("DSI_ARGUMENT_INVALID", `Unknown argument: ${argv[index]}`);
++  }
++  if (!uri) fail("DSI_ARGUMENT_INVALID", "Usage: import-dreamskin-url.mjs --uri <dreamskin://install?...> [--inspect].");
++  return { uri, inspect, options };
++}
++
++if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
++  try {
++    const { uri, inspect, options } = parseCli(process.argv.slice(2));
++    const request = parseInstallUri(uri);
++    const result = inspect ? request : await downloadAndInstall(request, options);
++    process.stdout.write(`${JSON.stringify(result)}\n`);
++  } catch (cause) {
++    process.stderr.write(`${cause.message}\n`);
++    process.exitCode = 1;
++  }
++}
+diff --git a/macos/scripts/import-dreamskin.mjs b/macos/scripts/import-dreamskin.mjs
+new file mode 100644
+index 0000000..ff27d63
+--- /dev/null
++++ b/macos/scripts/import-dreamskin.mjs
+@@ -0,0 +1,447 @@
++#!/usr/bin/env node
++
++import { createHash, createPublicKey, randomUUID, verify } from "node:crypto";
++import fs from "node:fs";
++import fsp from "node:fs/promises";
++import path from "node:path";
++import { spawnSync } from "node:child_process";
++import { fileURLToPath } from "node:url";
++import { inflateRawSync } from "node:zlib";
++
++const MAX_PACKAGE = 20 * 1024 * 1024;
++const MAX_MANIFEST = 64 * 1024;
++const MAX_BACKGROUND = 16 * 1024 * 1024;
++const MAX_PREVIEW = 2 * 1024 * 1024;
++const ENGINE_VERSION = "1.1.1";
++const KEYRING_PATH = fileURLToPath(new URL("../assets/dreamskin-trusted-keys.json", import.meta.url));
++const rootFields = new Set([
++  "$schema", "schemaVersion", "packageVersion", "id", "name", "version", "description",
++  "author", "engineVersion", "platforms", "brandSubtitle", "tagline", "projectPrefix",
++  "projectLabel", "statusText", "quote", "image", "colors", "assets", "signature",
++]);
++const requiredRoot = new Set([
++  "schemaVersion", "packageVersion", "id", "name", "version", "description", "author",
++  "engineVersion", "platforms", "image", "colors", "assets", "signature",
++]);
++const colorFields = new Set([
++  "background", "panel", "panelAlt", "accent", "accentAlt", "secondary", "highlight",
++  "text", "muted", "line",
++]);
++const themeIdPattern = /^[a-z0-9]+(?:[.-][a-z0-9]+)*$/;
++const semverPattern = /^(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)(?:-([0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*))?(?:\+[0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*)?$/;
++const hashPattern = /^[a-f0-9]{64}$/;
++const hexColorPattern = /^#[0-9A-Fa-f]{6}$/;
++const rgbaColorPattern = /^rgba\((25[0-5]|2[0-4][0-9]|1[0-9]{2}|[1-9]?[0-9]),[ ]*(25[0-5]|2[0-4][0-9]|1[0-9]{2}|[1-9]?[0-9]),[ ]*(25[0-5]|2[0-4][0-9]|1[0-9]{2}|[1-9]?[0-9]),[ ]*(0|1|0?\.[0-9]{1,3}|1\.0{1,3})\)$/;
++
++export async function verifyDreamSkinPackage(packagePath, options = {}) {
++  const absolute = path.resolve(packagePath);
++  const stat = await fsp.stat(absolute).catch(() => null);
++  if (!stat?.isFile()) fail("DSI_DOWNLOAD_FAILED", "Dream Skin package was not found.");
++  if (path.extname(absolute).toLowerCase() !== ".dreamskin") fail("DSI_PACKAGE_INVALID", "Local import only accepts .dreamskin files.");
++  if (stat.size < 1 || stat.size > MAX_PACKAGE) fail("DSI_SIZE_LIMIT", "Package size must be between 1 byte and 20 MiB.");
++
++  const archive = await fsp.readFile(absolute);
++  const packageSha256 = sha256(archive);
++  if (options.expectedSize !== undefined && stat.size !== options.expectedSize) fail("DSI_SIZE_MISMATCH", "Package size differs from the import request.");
++  if (options.expectedSha256 !== undefined && packageSha256 !== options.expectedSha256) fail("DSI_HASH_MISMATCH", "Package SHA-256 differs from the import request.");
++
++  const entries = readZip(archive);
++  const manifestBytes = entries.get("theme.json");
++  if (!manifestBytes) fail("DSI_PACKAGE_INVALID", "Package does not contain theme.json.");
++  if (manifestBytes.length > MAX_MANIFEST) fail("DSI_SIZE_LIMIT", "theme.json exceeds 64 KiB.");
++  if (manifestBytes.subarray(0, 3).equals(Buffer.from([0xef, 0xbb, 0xbf]))) fail("DSI_MANIFEST_INVALID", "theme.json must be UTF-8 without BOM.");
++  const manifestText = new TextDecoder("utf-8", { fatal: true }).decode(manifestBytes);
++  assertNoDuplicateJsonKeys(manifestText);
++  let manifest;
++  try { manifest = JSON.parse(manifestText); } catch (error) { fail("DSI_MANIFEST_INVALID", `theme.json is invalid JSON: ${error.message}`); }
++  validateManifest(manifest, options.platform ?? "macos");
++  if (options.expectedId !== undefined && manifest.id !== options.expectedId) fail("DSI_MANIFEST_INVALID", "Manifest id differs from the import request.");
++  if (options.expectedVersion !== undefined && manifest.version !== options.expectedVersion) fail("DSI_MANIFEST_INVALID", "Manifest version differs from the import request.");
++
++  const expectedNames = new Set(["theme.json", manifest.assets.background.path, manifest.assets.preview.path]);
++  if (entries.size !== expectedNames.size || [...entries.keys()].some((name) => !expectedNames.has(name))) {
++    fail("DSI_PACKAGE_INVALID", "ZIP entries do not match the manifest asset list.");
++  }
++  await verifyManifestSignature(manifest, options.keyringPath ?? KEYRING_PATH);
++  const background = verifyAsset(entries, manifest.assets.background, "background");
++  const preview = verifyAsset(entries, manifest.assets.preview, "preview");
++
++  return { absolute, archive, packageSha256, manifestBytes, manifest, background, preview };
++}
++
++export async function installDreamSkinPackage(packagePath, options = {}) {
++  const verified = await verifyDreamSkinPackage(packagePath, options);
++  if (options.verifyOnly) return resultFor(verified, null, false);
++  const libraryRoot = path.resolve(options.libraryRoot ?? defaultLibraryRoot());
++  await fsp.mkdir(libraryRoot, { recursive: true, mode: 0o700 });
++  await fsp.chmod(libraryRoot, 0o700);
++
++  const packagesRoot = path.join(libraryRoot, "packages");
++  const target = safeChild(packagesRoot, verified.manifest.id, verified.manifest.version);
++  const staging = safeChild(libraryRoot, `.staging-${randomUUID()}`);
++  await fsp.mkdir(staging, { recursive: false, mode: 0o700 });
++  let installed = false;
++  try {
++    await writePrivate(path.join(staging, "theme.json"), verified.manifestBytes);
++    await writePrivate(path.join(staging, verified.manifest.assets.background.path), verified.background);
++    await writePrivate(path.join(staging, verified.manifest.assets.preview.path), verified.preview);
++    if (process.platform === "darwin") {
++      validateWithSips(path.join(staging, verified.manifest.assets.background.path), verified.manifest.assets.background);
++      validateWithSips(path.join(staging, verified.manifest.assets.preview.path), verified.manifest.assets.preview);
++    } else if (!options.allowNonDarwinInstall) {
++      fail("DSI_UNSUPPORTED_PLATFORM", "Installation must run on macOS; use --verify-only elsewhere.");
++    }
++
++    await fsp.mkdir(path.dirname(target), { recursive: true, mode: 0o700 });
++    if (await exists(target)) {
++      if (!(await installedMatches(target, verified))) fail("DSI_THEME_ID_CONFLICT", "The same theme id and version already contains different bytes.");
++    } else {
++      await fsp.rename(staging, target);
++      installed = true;
++    }
++    try {
++      if (!options.skipAlias) await updateCompatibilityAlias(libraryRoot, verified.manifest.id, target);
++    } catch (error) {
++      if (installed) await fsp.rm(target, { recursive: true, force: true }).catch(() => {});
++      throw error;
++    }
++    return resultFor(verified, path.join(target, "theme.json"), installed);
++  } finally {
++    await fsp.rm(staging, { recursive: true, force: true }).catch(() => {});
++  }
++}
++
++function validateManifest(manifest, platform) {
++  closedObject(manifest, rootFields, requiredRoot, "theme.json");
++  if (manifest.schemaVersion !== 1 || manifest.packageVersion !== 1) fail("DSI_MANIFEST_INVALID", "Only schemaVersion=1 and packageVersion=1 are supported.");
++  if (manifest.$schema !== undefined && manifest.$schema !== "https://raw.githubusercontent.com/lixiaobaivv/Codex-Skin-Store/main/spec/theme-package.schema.json") fail("DSI_MANIFEST_INVALID", "Unsupported $schema value.");
++  text(manifest.id, 128, "id");
++  if (manifest.id.length < 3 || !themeIdPattern.test(manifest.id)) fail("DSI_MANIFEST_INVALID", "Invalid theme id.");
++  text(manifest.name, 80, "name");
++  text(manifest.description, 500, "description");
++  semver(manifest.version, "version");
++
++  closedObject(manifest.author, new Set(["name", "homepage"]), new Set(["name"]), "author");
++  text(manifest.author.name, 80, "author.name");
++  if (manifest.author.homepage !== undefined) {
++    text(manifest.author.homepage, 2048, "author.homepage");
++    let homepage;
++    try { homepage = new URL(manifest.author.homepage); } catch { fail("DSI_MANIFEST_INVALID", "author.homepage must be HTTPS."); }
++    if (homepage.protocol !== "https:") fail("DSI_MANIFEST_INVALID", "author.homepage must be HTTPS.");
++  }
++
++  closedObject(manifest.engineVersion, new Set(["min", "maxExclusive"]), new Set(["min", "maxExclusive"]), "engineVersion");
++  semver(manifest.engineVersion.min, "engineVersion.min");
++  semver(manifest.engineVersion.maxExclusive, "engineVersion.maxExclusive");
++  if (compareSemver(ENGINE_VERSION, manifest.engineVersion.min) < 0 || compareSemver(ENGINE_VERSION, manifest.engineVersion.maxExclusive) >= 0) fail("DSI_UNSUPPORTED_ENGINE", "Theme is incompatible with this engine version.");
++
++  if (!Array.isArray(manifest.platforms) || manifest.platforms.length < 1 || manifest.platforms.length > 2 || new Set(manifest.platforms).size !== manifest.platforms.length || manifest.platforms.some((value) => !["macos", "windows"].includes(value))) fail("DSI_MANIFEST_INVALID", "Invalid platforms list.");
++  if (!manifest.platforms.includes(platform)) fail("DSI_UNSUPPORTED_PLATFORM", `Theme does not support ${platform}.`);
++  for (const field of ["brandSubtitle", "projectPrefix", "projectLabel", "statusText", "quote"]) if (manifest[field] !== undefined) text(manifest[field], 80, field);
++  if (manifest.tagline !== undefined) text(manifest.tagline, 160, "tagline");
++
++  closedObject(manifest.colors, colorFields, colorFields, "colors");
++  for (const field of colorFields) {
++    text(manifest.colors[field], 32, `colors.${field}`);
++    if (!hexColorPattern.test(manifest.colors[field]) && !rgbaColorPattern.test(manifest.colors[field])) fail("DSI_MANIFEST_INVALID", `Invalid colors.${field}.`);
++  }
++  closedObject(manifest.assets, new Set(["background", "preview"]), new Set(["background", "preview"]), "assets");
++  validateAssetManifest(manifest.assets.background, "background", MAX_BACKGROUND, 8192, 8192);
++  validateAssetManifest(manifest.assets.preview, "preview", MAX_PREVIEW, 2400, 2400);
++  if (manifest.image !== manifest.assets.background.path) fail("DSI_MANIFEST_INVALID", "image must equal assets.background.path.");
++
++  closedObject(manifest.signature, new Set(["algorithm", "canonicalization", "keyId", "signedAt", "value"]), new Set(["algorithm", "canonicalization", "keyId", "signedAt", "value"]), "signature");
++  if (manifest.signature.algorithm !== "Ed25519" || manifest.signature.canonicalization !== "RFC8785") fail("DSI_MANIFEST_INVALID", "Signature must use Ed25519/RFC8785.");
++  text(manifest.signature.keyId, 64, "signature.keyId");
++  if (!/^[A-Za-z0-9._-]+$/.test(manifest.signature.keyId)) fail("DSI_MANIFEST_INVALID", "Invalid signature.keyId.");
++  text(manifest.signature.signedAt, 64, "signature.signedAt");
++  if (!Number.isFinite(Date.parse(manifest.signature.signedAt))) fail("DSI_MANIFEST_INVALID", "Invalid signature.signedAt.");
++  if (!/^[A-Za-z0-9_-]{86}$/.test(manifest.signature.value)) fail("DSI_SIGNATURE_INVALID", "Invalid Ed25519 signature encoding.");
++}
++
++function validateAssetManifest(asset, role, maxBytes, maxWidth, maxHeight) {
++  const fields = new Set(["path", "mediaType", "bytes", "width", "height", "sha256"]);
++  closedObject(asset, fields, fields, `assets.${role}`);
++  const allowed = role === "background"
++    ? { "image/png": ["background.png"], "image/jpeg": ["background.jpg", "background.jpeg"], "image/webp": ["background.webp"] }
++    : { "image/png": ["preview.png"], "image/jpeg": ["preview.jpg", "preview.jpeg"], "image/webp": ["preview.webp"] };
++  if (!allowed[asset.mediaType]?.includes(asset.path)) fail("DSI_MANIFEST_INVALID", `Invalid ${role} path/mediaType pair.`);
++  if (!Number.isSafeInteger(asset.bytes) || asset.bytes < 1 || asset.bytes > maxBytes || !Number.isSafeInteger(asset.width) || asset.width < 1 || asset.width > maxWidth || !Number.isSafeInteger(asset.height) || asset.height < 1 || asset.height > maxHeight) fail("DSI_SIZE_LIMIT", `${role} dimensions or bytes exceed limits.`);
++  if (!hashPattern.test(asset.sha256)) fail("DSI_MANIFEST_INVALID", `Invalid ${role} SHA-256.`);
++}
++
++async function verifyManifestSignature(manifest, keyringPath) {
++  let keyring;
++  try { keyring = JSON.parse(await fsp.readFile(keyringPath, "utf8")); } catch { fail("DSI_SIGNATURE_UNTRUSTED", "Trusted keyring is unavailable."); }
++  const key = keyring.keys?.find((entry) => entry.keyId === manifest.signature.keyId && entry.algorithm === "Ed25519");
++  if (!key) fail("DSI_SIGNATURE_UNTRUSTED", `Untrusted signing key: ${manifest.signature.keyId}`);
++  const signingManifest = structuredClone(manifest);
++  const signature = Buffer.from(signingManifest.signature.value, "base64url");
++  delete signingManifest.signature.value;
++  const rawKey = Buffer.from(key.publicKey, "base64url");
++  if (rawKey.length !== 32 || signature.length !== 64) fail("DSI_SIGNATURE_INVALID", "Invalid Ed25519 key or signature length.");
++  const publicKey = createPublicKey({ key: Buffer.concat([Buffer.from("302a300506032b6570032100", "hex"), rawKey]), format: "der", type: "spki" });
++  if (!verify(null, Buffer.from(canonicalize(signingManifest), "utf8"), publicKey, signature)) fail("DSI_SIGNATURE_INVALID", "Ed25519 signature verification failed.");
++}
++
++function verifyAsset(entries, asset, role) {
++  const bytes = entries.get(asset.path);
++  if (!bytes || bytes.length !== asset.bytes || sha256(bytes) !== asset.sha256) fail("DSI_HASH_MISMATCH", `${role} bytes or SHA-256 do not match the manifest.`);
++  const dimensions = imageDimensions(bytes, asset.mediaType, asset.path);
++  if (dimensions.width !== asset.width || dimensions.height !== asset.height) fail("DSI_ASSET_INVALID", `${role} dimensions do not match the manifest.`);
++  const maxPixels = role === "background" ? 40_000_000 : 8_000_000;
++  if (dimensions.width * dimensions.height > maxPixels) fail("DSI_ASSET_INVALID", `${role} pixel count exceeds the limit.`);
++  return bytes;
++}
++
++function readZip(archive) {
++  if (archive.length < 22) fail("DSI_PACKAGE_INVALID", "Truncated ZIP package.");
++  const eocd = archive.length - 22;
++  if (archive.readUInt32LE(eocd) !== 0x06054b50 || archive.readUInt16LE(eocd + 20) !== 0) fail("DSI_PACKAGE_INVALID", "ZIP comments or trailing data are not allowed.");
++  const disk = archive.readUInt16LE(eocd + 4);
++  const centralDisk = archive.readUInt16LE(eocd + 6);
++  const entriesOnDisk = archive.readUInt16LE(eocd + 8);
++  const entryCount = archive.readUInt16LE(eocd + 10);
++  const centralSize = archive.readUInt32LE(eocd + 12);
++  const centralOffset = archive.readUInt32LE(eocd + 16);
++  if (disk !== 0 || centralDisk !== 0 || entriesOnDisk !== 3 || entryCount !== 3 || centralOffset + centralSize !== eocd) fail("DSI_PACKAGE_INVALID", "Package must be a single-disk ZIP with exactly three entries.");
++
++  const entries = new Map();
++  let cursor = centralOffset;
++  for (let index = 0; index < entryCount; index += 1) {
++    if (cursor + 46 > eocd || archive.readUInt32LE(cursor) !== 0x02014b50) fail("DSI_PACKAGE_INVALID", "Invalid ZIP central directory.");
++    const madeBy = archive.readUInt16LE(cursor + 4);
++    const flags = archive.readUInt16LE(cursor + 8);
++    const method = archive.readUInt16LE(cursor + 10);
++    const checksum = archive.readUInt32LE(cursor + 16);
++    const compressedSize = archive.readUInt32LE(cursor + 20);
++    const uncompressedSize = archive.readUInt32LE(cursor + 24);
++    const nameLength = archive.readUInt16LE(cursor + 28);
++    const extraLength = archive.readUInt16LE(cursor + 30);
++    const commentLength = archive.readUInt16LE(cursor + 32);
++    const startDisk = archive.readUInt16LE(cursor + 34);
++    const external = archive.readUInt32LE(cursor + 38);
++    const localOffset = archive.readUInt32LE(cursor + 42);
++    const nameEnd = cursor + 46 + nameLength;
++    if (nameEnd + extraLength + commentLength > eocd || extraLength !== 0 || commentLength !== 0 || startDisk !== 0 || (flags & 0x0009) !== 0 || ![0, 8].includes(method)) fail("DSI_PACKAGE_INVALID", "Unsupported ZIP flags, metadata or compression.");
++    const name = new TextDecoder("utf-8", { fatal: true }).decode(archive.subarray(cursor + 46, nameEnd));
++    if (!name || name.includes("/") || name.includes("\\") || name.includes(":") || name.includes("\0") || name === "." || name === "..") fail("DSI_ZIP_TRAVERSAL", "ZIP entries must be root-level regular files.");
++    if ([...entries.keys()].some((value) => value.toLowerCase() === name.toLowerCase())) fail("DSI_PACKAGE_INVALID", "Duplicate or case-conflicting ZIP entry.");
++    if ((madeBy >> 8) === 3 && ((external >>> 16) & 0xf000) !== 0x8000) fail("DSI_ZIP_TRAVERSAL", "ZIP links and non-regular entries are not allowed.");
++    const bytes = readLocalEntry(archive, { name, flags, method, checksum, compressedSize, uncompressedSize, localOffset });
++    entries.set(name, bytes);
++    cursor = nameEnd + extraLength + commentLength;
++  }
++  if (cursor !== eocd) fail("DSI_PACKAGE_INVALID", "Unexpected central directory bytes.");
++  return entries;
++}
++
++function readLocalEntry(archive, entry) {
++  const offset = entry.localOffset;
++  if (offset + 30 > archive.length || archive.readUInt32LE(offset) !== 0x04034b50) fail("DSI_PACKAGE_INVALID", "Invalid local ZIP header.");
++  const flags = archive.readUInt16LE(offset + 6);
++  const method = archive.readUInt16LE(offset + 8);
++  const checksum = archive.readUInt32LE(offset + 14);
++  const compressedSize = archive.readUInt32LE(offset + 18);
++  const uncompressedSize = archive.readUInt32LE(offset + 22);
++  const nameLength = archive.readUInt16LE(offset + 26);
++  const extraLength = archive.readUInt16LE(offset + 28);
++  const nameStart = offset + 30;
++  const dataStart = nameStart + nameLength + extraLength;
++  const dataEnd = dataStart + compressedSize;
++  const name = new TextDecoder("utf-8", { fatal: true }).decode(archive.subarray(nameStart, nameStart + nameLength));
++  if (name !== entry.name || flags !== entry.flags || method !== entry.method || checksum !== entry.checksum || compressedSize !== entry.compressedSize || uncompressedSize !== entry.uncompressedSize || extraLength !== 0 || dataEnd > archive.length || uncompressedSize > MAX_PACKAGE) fail("DSI_PACKAGE_INVALID", "Local ZIP header differs from central directory.");
++  const compressed = archive.subarray(dataStart, dataEnd);
++  let output;
++  try { output = method === 0 ? Buffer.from(compressed) : inflateRawSync(compressed, { maxOutputLength: Math.min(uncompressedSize, MAX_PACKAGE) }); } catch { fail("DSI_PACKAGE_INVALID", `Could not decompress ${entry.name}.`); }
++  if (output.length !== uncompressedSize || crc32(output) !== checksum) fail("DSI_PACKAGE_INVALID", `ZIP CRC or size mismatch for ${entry.name}.`);
++  return output;
++}
++
++function imageDimensions(bytes, mediaType, name) {
++  if (mediaType === "image/png") {
++    if (!bytes.subarray(0, 8).equals(Buffer.from("89504e470d0a1a0a", "hex"))) fail("DSI_ASSET_INVALID", `${name} is not PNG.`);
++    let offset = 8;
++    let dimensions;
++    let ended = false;
++    while (offset + 12 <= bytes.length) {
++      const length = bytes.readUInt32BE(offset);
++      const type = bytes.subarray(offset + 4, offset + 8).toString("ascii");
++      if (offset + 12 + length > bytes.length) fail("DSI_ASSET_INVALID", `Truncated PNG chunk in ${name}.`);
++      if (!dimensions && type !== "IHDR") fail("DSI_ASSET_INVALID", `PNG ${name} does not start with IHDR.`);
++      if (type === "IHDR") {
++        if (dimensions || length !== 13) fail("DSI_ASSET_INVALID", `Invalid PNG IHDR in ${name}.`);
++        dimensions = { width: bytes.readUInt32BE(offset + 8), height: bytes.readUInt32BE(offset + 12) };
++      }
++      if (type === "acTL") fail("DSI_ASSET_INVALID", `Animated PNG is not allowed: ${name}.`);
++      offset += 12 + length;
++      if (type === "IEND") { if (length !== 0 || offset !== bytes.length) fail("DSI_ASSET_INVALID", `PNG has trailing data: ${name}.`); ended = true; break; }
++    }
++    if (!dimensions || !ended) fail("DSI_ASSET_INVALID", `PNG is incomplete: ${name}.`);
++    return dimensions;
++  }
++  if (mediaType === "image/jpeg") {
++    if (bytes[0] !== 0xff || bytes[1] !== 0xd8 || bytes.at(-2) !== 0xff || bytes.at(-1) !== 0xd9) fail("DSI_ASSET_INVALID", `Invalid or trailing JPEG data: ${name}.`);
++    let offset = 2;
++    while (offset + 9 < bytes.length) {
++      if (bytes[offset] !== 0xff) { offset += 1; continue; }
++      const marker = bytes[offset + 1];
++      if (marker === 0xd8 || marker === 0xd9 || (marker >= 0xd0 && marker <= 0xd7)) { offset += 2; continue; }
++      const length = bytes.readUInt16BE(offset + 2);
++      if (length < 2 || offset + 2 + length > bytes.length) fail("DSI_ASSET_INVALID", `Truncated JPEG segment: ${name}.`);
++      if ([0xc0, 0xc1, 0xc2, 0xc3, 0xc5, 0xc6, 0xc7, 0xc9, 0xca, 0xcb, 0xcd, 0xce, 0xcf].includes(marker)) return { height: bytes.readUInt16BE(offset + 5), width: bytes.readUInt16BE(offset + 7) };
++      offset += 2 + length;
++    }
++    fail("DSI_ASSET_INVALID", `JPEG dimensions are unavailable: ${name}.`);
++  }
++  if (mediaType === "image/webp") {
++    if (bytes.subarray(0, 4).toString("ascii") !== "RIFF" || bytes.subarray(8, 12).toString("ascii") !== "WEBP" || bytes.readUInt32LE(4) + 8 !== bytes.length) fail("DSI_ASSET_INVALID", `Invalid WebP container: ${name}.`);
++    let offset = 12;
++    let dimensions;
++    while (offset + 8 <= bytes.length) {
++      const type = bytes.subarray(offset, offset + 4).toString("ascii");
++      const length = bytes.readUInt32LE(offset + 4);
++      const data = offset + 8;
++      if (data + length > bytes.length) fail("DSI_ASSET_INVALID", `Truncated WebP chunk: ${name}.`);
++      if (type === "ANIM" || type === "ANMF") fail("DSI_ASSET_INVALID", `Animated WebP is not allowed: ${name}.`);
++      if (type === "VP8X" && length >= 10) dimensions = { width: 1 + bytes.readUIntLE(data + 4, 3), height: 1 + bytes.readUIntLE(data + 7, 3) };
++      offset = data + length + (length & 1);
++    }
++    if (!dimensions) fail("DSI_ASSET_INVALID", `WebP dimensions are unavailable: ${name}.`);
++    return dimensions;
++  }
++  fail("DSI_ASSET_INVALID", `Unsupported image media type: ${mediaType}.`);
++}
++
++function validateWithSips(file, asset) {
++  const result = spawnSync("/usr/bin/sips", ["-g", "pixelWidth", "-g", "pixelHeight", file], { encoding: "utf8", timeout: 15000 });
++  if (result.status !== 0) fail("DSI_ASSET_INVALID", `macOS could not fully decode ${asset.path}.`);
++  const width = /pixelWidth:\s*(\d+)/.exec(result.stdout)?.[1];
++  const height = /pixelHeight:\s*(\d+)/.exec(result.stdout)?.[1];
++  if (Number(width) !== asset.width || Number(height) !== asset.height) fail("DSI_ASSET_INVALID", `Decoded dimensions differ for ${asset.path}.`);
++}
++
++async function updateCompatibilityAlias(libraryRoot, id, target) {
++  const alias = safeChild(libraryRoot, id);
++  const relativeTarget = path.relative(libraryRoot, target);
++  const temporary = safeChild(libraryRoot, `.alias-${id}-${randomUUID()}`);
++  let existing;
++  try { existing = await fsp.lstat(alias); } catch (error) { if (error.code !== "ENOENT") throw error; }
++  if (existing && !existing.isSymbolicLink()) fail("DSI_THEME_ID_CONFLICT", "A legacy theme directory already uses this theme id.");
++  await fsp.symlink(relativeTarget, temporary, "dir");
++  try { await fsp.rename(temporary, alias); } catch (error) {
++    if (error.code === "EEXIST" || error.code === "ENOTEMPTY") { await fsp.unlink(alias); await fsp.rename(temporary, alias); } else { throw error; }
++  } finally { await fsp.unlink(temporary).catch(() => {}); }
++}
++
++async function installedMatches(target, verified) {
++  try {
++    const [manifest, background, preview] = await Promise.all([
++      fsp.readFile(path.join(target, "theme.json")),
++      fsp.readFile(path.join(target, verified.manifest.assets.background.path)),
++      fsp.readFile(path.join(target, verified.manifest.assets.preview.path)),
++    ]);
++    return manifest.equals(verified.manifestBytes) && sha256(background) === verified.manifest.assets.background.sha256 && sha256(preview) === verified.manifest.assets.preview.sha256;
++  } catch { return false; }
++}
++
++function closedObject(value, allowed, required, name) {
++  if (!value || typeof value !== "object" || Array.isArray(value)) fail("DSI_MANIFEST_INVALID", `${name} must be an object.`);
++  for (const key of Object.keys(value)) if (!allowed.has(key)) fail("DSI_MANIFEST_INVALID", `${name} contains unknown field ${key}.`);
++  for (const key of required) if (!Object.hasOwn(value, key)) fail("DSI_MANIFEST_INVALID", `${name} is missing ${key}.`);
++}
++
++function text(value, max, name) {
++  if (typeof value !== "string" || value.length < 1 || value.length > max || value !== value.normalize("NFC") || /[\u0000-\u001f\u007f-\u009f\u202a\u202b\u202c\u202d\u202e\u2066-\u2069]/u.test(value)) fail("DSI_MANIFEST_INVALID", `${name} contains invalid text.`);
++}
++
++function semver(value, name) { text(value, 64, name); if (!semverPattern.test(value)) fail("DSI_MANIFEST_INVALID", `${name} is not valid SemVer.`); }
++
++function compareSemver(left, right) {
++  const a = semverPattern.exec(left);
++  const b = semverPattern.exec(right);
++  for (let index = 1; index <= 3; index += 1) { const difference = Number(a[index]) - Number(b[index]); if (difference) return difference; }
++  if (!a[4] && b[4]) return 1;
++  if (a[4] && !b[4]) return -1;
++  return (a[4] ?? "").localeCompare(b[4] ?? "", "en", { numeric: true });
++}
++
++function canonicalize(value) {
++  if (value === null || ["boolean", "number", "string"].includes(typeof value)) { if (typeof value === "number" && !Number.isSafeInteger(value)) fail("DSI_MANIFEST_INVALID", "MVP v1 only permits integer number fields."); return JSON.stringify(value); }
++  if (Array.isArray(value)) return `[${value.map(canonicalize).join(",")}]`;
++  return `{${Object.keys(value).sort().map((key) => `${JSON.stringify(key)}:${canonicalize(value[key])}`).join(",")}}`;
++}
++
++function assertNoDuplicateJsonKeys(source) {
++  let index = 0;
++  const whitespace = () => { while (/\s/u.test(source[index] ?? "")) index += 1; };
++  const stringToken = () => {
++    const start = index;
++    if (source[index++] !== '"') throw new Error("Expected JSON string.");
++    while (index < source.length) {
++      if (source[index] === '"') { index += 1; return JSON.parse(source.slice(start, index)); }
++      if (source[index] === "\\") { index += 2; if (source[index - 1] === "u") index += 4; } else { index += 1; }
++    }
++    throw new Error("Unterminated JSON string.");
++  };
++  const value = () => {
++    whitespace();
++    if (source[index] === "{") {
++      index += 1; whitespace(); const keys = new Set(); if (source[index] === "}") { index += 1; return; }
++      while (true) { whitespace(); const key = stringToken(); if (keys.has(key)) fail("DSI_MANIFEST_INVALID", `Duplicate JSON key: ${key}`); keys.add(key); whitespace(); if (source[index++] !== ":") throw new Error("Expected colon."); value(); whitespace(); if (source[index] === "}") { index += 1; break; } if (source[index++] !== ",") throw new Error("Expected comma."); }
++      return;
++    }
++    if (source[index] === "[") { index += 1; whitespace(); if (source[index] === "]") { index += 1; return; } while (true) { value(); whitespace(); if (source[index] === "]") { index += 1; break; } if (source[index++] !== ",") throw new Error("Expected comma."); } return; }
++    if (source[index] === '"') { stringToken(); return; }
++    const token = /^(?:-?(?:0|[1-9]\d*)(?:\.\d+)?(?:[eE][+-]?\d+)?|true|false|null)/.exec(source.slice(index));
++    if (!token) throw new Error("Invalid JSON token."); index += token[0].length;
++  };
++  try { value(); whitespace(); if (index !== source.length) throw new Error("Trailing JSON data."); } catch (error) { if (error.code) throw error; fail("DSI_MANIFEST_INVALID", error.message); }
++}
++
++function safeChild(root, ...segments) {
++  const base = path.resolve(root);
++  const target = path.resolve(base, ...segments);
++  if (!target.startsWith(`${base}${path.sep}`)) fail("DSI_ZIP_TRAVERSAL", "Resolved installation path escapes the theme library.");
++  return target;
++}
++
++async function writePrivate(file, bytes) { await fsp.writeFile(file, bytes, { mode: 0o600, flag: "wx" }); await fsp.chmod(file, 0o600); }
++async function exists(file) { try { await fsp.access(file); return true; } catch { return false; } }
++function sha256(bytes) { return createHash("sha256").update(bytes).digest("hex"); }
++function defaultLibraryRoot() { return path.join(process.env.HOME ?? "", "Library", "Application Support", "CodexDreamSkinStudio", "themes"); }
++function resultFor(verified, manifestPath, installed) { return { id: verified.manifest.id, version: verified.manifest.version, name: verified.manifest.name, packageSha256: verified.packageSha256, manifestPath, installed }; }
++function fail(code, message) { const error = new Error(`${code}: ${message}`); error.code = code; throw error; }
++
++const crcTable = Array.from({ length: 256 }, (_, input) => { let value = input; for (let bit = 0; bit < 8; bit += 1) value = (value >>> 1) ^ ((value & 1) ? 0xedb88320 : 0); return value >>> 0; });
++function crc32(bytes) { let value = 0xffffffff; for (const byte of bytes) value = (value >>> 8) ^ crcTable[(value ^ byte) & 0xff]; return (value ^ 0xffffffff) >>> 0; }
++
++function parseCli(argv) {
++  const options = { platform: "macos" };
++  let file;
++  for (let index = 0; index < argv.length; index += 1) {
++    const argument = argv[index];
++    if (argument === "--file") file = argv[++index];
++    else if (argument === "--verify-only") options.verifyOnly = true;
++    else if (argument === "--library-root") options.libraryRoot = argv[++index];
++    else if (argument === "--expected-sha256") options.expectedSha256 = argv[++index];
++    else if (argument === "--expected-size") options.expectedSize = Number(argv[++index]);
++    else if (argument === "--expected-id") options.expectedId = argv[++index];
++    else if (argument === "--expected-version") options.expectedVersion = argv[++index];
++    else if (argument === "--keyring") options.keyringPath = argv[++index];
++    else fail("DSI_ARGUMENT_INVALID", `Unknown argument: ${argument}`);
++  }
++  if (!file) fail("DSI_ARGUMENT_INVALID", "Usage: import-dreamskin.mjs --file <theme.dreamskin> [--verify-only].");
++  return { file, options };
++}
++
++if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
++  try {
++    const { file, options } = parseCli(process.argv.slice(2));
++    const result = await installDreamSkinPackage(file, options);
++    process.stdout.write(`${JSON.stringify(result)}\n`);
++  } catch (error) {
++    process.stderr.write(`${error.message}\n`);
++    process.exitCode = 1;
++  }
++}
+diff --git a/macos/scripts/install-dream-skin-macos.sh b/macos/scripts/install-dream-skin-macos.sh
+index 6b1f894..770a255 100644
+--- a/macos/scripts/install-dream-skin-macos.sh
++++ b/macos/scripts/install-dream-skin-macos.sh
+@@ -73,17 +73,45 @@ write_launcher() {
+   /bin/chmod 700 "$target"
+ }
+ 
++install_import_handler() {
++  local app_root="$HOME/Applications/Codex Dream Skin Importer.app"
++  local plist="$app_root/Contents/Info.plist"
++  /bin/mkdir -p "$HOME/Applications"
++  /bin/rm -rf "$app_root"
++  /usr/bin/osacompile -o "$app_root" "$PROJECT_ROOT/assets/dreamskin-handler.applescript"
++  /usr/libexec/PlistBuddy -c 'Set :CFBundleIdentifier io.github.lixiaobaivv.codex-dream-skin.importer' "$plist"
++  /usr/libexec/PlistBuddy -c 'Add :CFBundleURLTypes array' "$plist"
++  /usr/libexec/PlistBuddy -c 'Add :CFBundleURLTypes:0 dict' "$plist"
++  /usr/libexec/PlistBuddy -c 'Add :CFBundleURLTypes:0:CFBundleURLName string Dream Skin Install Link' "$plist"
++  /usr/libexec/PlistBuddy -c 'Add :CFBundleURLTypes:0:CFBundleURLSchemes array' "$plist"
++  /usr/libexec/PlistBuddy -c 'Add :CFBundleURLTypes:0:CFBundleURLSchemes:0 string dreamskin' "$plist"
++  /usr/libexec/PlistBuddy -c 'Add :CFBundleDocumentTypes array' "$plist"
++  /usr/libexec/PlistBuddy -c 'Add :CFBundleDocumentTypes:0 dict' "$plist"
++  /usr/libexec/PlistBuddy -c 'Add :CFBundleDocumentTypes:0:CFBundleTypeName string Dream Skin Theme Package' "$plist"
++  /usr/libexec/PlistBuddy -c 'Add :CFBundleDocumentTypes:0:CFBundleTypeExtensions array' "$plist"
++  /usr/libexec/PlistBuddy -c 'Add :CFBundleDocumentTypes:0:CFBundleTypeExtensions:0 string dreamskin' "$plist"
++  /usr/libexec/PlistBuddy -c 'Add :CFBundleDocumentTypes:0:CFBundleTypeRole string Viewer' "$plist"
++  /usr/libexec/PlistBuddy -c 'Add :CFBundleDocumentTypes:0:LSHandlerRank string Owner' "$plist"
++  /usr/bin/codesign --force --sign - "$app_root" >/dev/null
++  local lsregister="/System/Library/Frameworks/CoreServices.framework/Frameworks/LaunchServices.framework/Support/lsregister"
++  [ -x "$lsregister" ] && "$lsregister" -f "$app_root"
++}
++
++install_import_handler
++
+ if [ "$CREATE_LAUNCHERS" = "true" ]; then
+   /bin/mkdir -p "$HOME/Desktop"
+   start_script="$(shell_quote "$SCRIPT_DIR/start-dream-skin-macos.sh")"
+   customize_script="$(shell_quote "$SCRIPT_DIR/customize-theme-macos.sh")"
+   verify_script="$(shell_quote "$SCRIPT_DIR/verify-dream-skin-macos.sh")"
+   restore_script="$(shell_quote "$SCRIPT_DIR/restore-dream-skin-macos.sh")"
++  import_command="$(shell_quote "$PROJECT_ROOT/Import Dream Skin.command")"
+   screenshot="$(shell_quote "$HOME/Desktop/Codex Dream Skin Verification.png")"
+   write_launcher "$HOME/Desktop/Codex Dream Skin.command" "exec $start_script --port $PORT --prompt-restart"
+   write_launcher "$HOME/Desktop/Codex Dream Skin - Customize.command" "exec $customize_script"
+   write_launcher "$HOME/Desktop/Codex Dream Skin - Verify.command" "$verify_script --screenshot $screenshot && /usr/bin/open $screenshot"
+   write_launcher "$HOME/Desktop/Codex Dream Skin - Restore.command" "exec $restore_script --restore-base-theme --restart-codex"
++  write_launcher "$HOME/Desktop/Codex Dream Skin - Import.command" "exec $import_command"
+ fi
+ 
+ printf 'Codex Dream Skin Studio %s installed at %s for Codex %s using its signed Node.js %s.\n' \
+diff --git a/macos/tests/dreamskin-import.test.mjs b/macos/tests/dreamskin-import.test.mjs
+new file mode 100644
+index 0000000..2d96525
+--- /dev/null
++++ b/macos/tests/dreamskin-import.test.mjs
+@@ -0,0 +1,158 @@
++import assert from "node:assert/strict";
++import { createHash, createPrivateKey, createPublicKey, sign } from "node:crypto";
++import { mkdtemp, readFile, readlink, rm, writeFile } from "node:fs/promises";
++import os from "node:os";
++import path from "node:path";
++import test from "node:test";
++import { installDreamSkinPackage, verifyDreamSkinPackage } from "../scripts/import-dreamskin.mjs";
++import { isPublicAddress, parseInstallUri } from "../scripts/import-dreamskin-url.mjs";
++
++const seed = Buffer.from("7f9b1c4a2d6e8f1032547698badcfe0123456789abcdef001122334455667788", "hex");
++const privateKey = createPrivateKey({ key: Buffer.concat([Buffer.from("302e020100300506032b657004220420", "hex"), seed]), format: "der", type: "pkcs8" });
++const publicKey = createPublicKey(privateKey).export({ format: "der", type: "spki" }).subarray(-32);
++const png = Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=", "base64");
++
++test("macOS importer verifies, installs and rejects tampered Dream Skin packages", async () => {
++  const root = await mkdtemp(path.join(os.tmpdir(), "dreamskin-import-test-"));
++  try {
++    const keyring = path.join(root, "keys.json");
++    await writeFile(keyring, JSON.stringify({ schemaVersion: 1, keys: [{ keyId: "codex-skin.sample.2026-01", algorithm: "Ed25519", publicKey: publicKey.toString("base64url") }] }));
++    const fixture = createFixture();
++    const validPath = path.join(root, "valid.dreamskin");
++    await writeFile(validPath, fixture.package);
++
++    const verified = await verifyDreamSkinPackage(validPath, { keyringPath: keyring });
++    assert.equal(verified.manifest.id, "codex-skin.test-fixture");
++    assert.equal(verified.packageSha256, sha256(fixture.package));
++
++    const installed = await installDreamSkinPackage(validPath, {
++      keyringPath: keyring,
++      libraryRoot: path.join(root, "library"),
++      allowNonDarwinInstall: true,
++      skipAlias: process.platform !== "darwin",
++    });
++    assert.equal(installed.installed, true);
++    assert.equal(JSON.parse(await readFile(installed.manifestPath, "utf8")).id, "codex-skin.test-fixture");
++    if (process.platform === "darwin") {
++      assert.equal(
++        await readlink(path.join(root, "library", "codex-skin.test-fixture")),
++        path.join("packages", "codex-skin.test-fixture", "1.0.0"),
++      );
++    }
++
++    const badSignature = structuredClone(fixture.manifest);
++    badSignature.signature.value = `${badSignature.signature.value[0] === "A" ? "B" : "A"}${badSignature.signature.value.slice(1)}`;
++    const badSignaturePath = path.join(root, "bad-signature.dreamskin");
++    await writeFile(badSignaturePath, createZip([["theme.json", Buffer.from(JSON.stringify(badSignature))], ["background.png", png], ["preview.png", png]]));
++    await assert.rejects(() => verifyDreamSkinPackage(badSignaturePath, { keyringPath: keyring }), /DSI_SIGNATURE_INVALID/);
++
++    const changedPng = Buffer.from(png);
++    changedPng[changedPng.length - 20] ^= 1;
++    const badAssetPath = path.join(root, "bad-asset.dreamskin");
++    await writeFile(badAssetPath, createZip([["theme.json", Buffer.from(JSON.stringify(fixture.manifest))], ["background.png", png], ["preview.png", changedPng]]));
++    await assert.rejects(() => verifyDreamSkinPackage(badAssetPath, { keyringPath: keyring }), /DSI_HASH_MISMATCH/);
++
++    const duplicate = JSON.stringify(fixture.manifest).replace('"schemaVersion":1', '"schemaVersion":1,"schemaVersion":1');
++    const duplicatePath = path.join(root, "duplicate.dreamskin");
++    await writeFile(duplicatePath, createZip([["theme.json", Buffer.from(duplicate)], ["background.png", png], ["preview.png", png]]));
++    await assert.rejects(() => verifyDreamSkinPackage(duplicatePath, { keyringPath: keyring }), /Duplicate JSON key/);
++  } finally {
++    await rm(root, { recursive: true, force: true });
++  }
++});
++
++test("dreamskin install links are strict and preserve exactly-once decoding", () => {
++  const source = "https://github.com/lixiaobaivv/Codex-Skin/releases/download/sample-v1/codex-skin-sample-1.0.0.dreamskin";
++  const link = `dreamskin://install?url=${encodeURIComponent(source)}&sha256=${"a".repeat(64)}&size=2041227&id=codex-skin.sample&version=1.0.0`;
++  assert.deepEqual(parseInstallUri(link), {
++    packageUrl: source,
++    host: "github.com",
++    sha256: "a".repeat(64),
++    size: 2041227,
++    id: "codex-skin.sample",
++    version: "1.0.0",
++  });
++
++  assert.throws(() => parseInstallUri(`${link}&size=1`), /DSI_URI_INVALID.*Duplicate/);
++  assert.throws(() => parseInstallUri(link.replace("url=https%3A", "url=https:")), /DSI_URI_INVALID.*fully percent encoded/);
++  assert.throws(() => parseInstallUri(link.replace("github.com", "127.0.0.1")), /DSI_NETWORK_BLOCKED/);
++  assert.throws(() => parseInstallUri(link.replace("github.com", "localhost")), /DSI_NETWORK_BLOCKED/);
++  assert.throws(() => parseInstallUri(link.replace("sha256=", "unknown=x&sha256=")), /DSI_URI_INVALID.*Unknown/);
++  assert.throws(() => parseInstallUri(link.replace("version=1.0.0", "version=01.0.0")), /DSI_URI_INVALID.*version/);
++});
++
++test("download address policy rejects local and reserved IP ranges", () => {
++  for (const address of ["0.0.0.0", "10.0.0.1", "100.64.0.1", "127.0.0.1", "169.254.1.1", "172.16.0.1", "192.168.0.1", "198.51.100.1", "203.0.113.1", "224.0.0.1", "::", "::1", "fc00::1", "fe80::1", "ff02::1", "2001:db8::1", "::ffff:127.0.0.1"]) {
++    assert.equal(isPublicAddress(address), false, address);
++  }
++  for (const address of ["1.1.1.1", "8.8.8.8", "2606:4700:4700::1111", "2001:4860:4860::8888"]) {
++    assert.equal(isPublicAddress(address), true, address);
++  }
++});
++
++function createFixture() {
++  const manifest = {
++    schemaVersion: 1,
++    packageVersion: 1,
++    id: "codex-skin.test-fixture",
++    name: "Signed test fixture",
++    version: "1.0.0",
++    description: "Cross-platform importer test fixture.",
++    author: { name: "Codex-Skin tests" },
++    engineVersion: { min: "1.0.0", maxExclusive: "2.0.0" },
++    platforms: ["macos", "windows"],
++    image: "background.png",
++    colors: {
++      background: "#101010", panel: "#202020", panelAlt: "#303030", accent: "#44aa88",
++      accentAlt: "#cc6677", secondary: "#6688aa", highlight: "#ddbb55", text: "#f0f0f0",
++      muted: "#999999", line: "#555555",
++    },
++    assets: {
++      background: { path: "background.png", mediaType: "image/png", bytes: png.length, width: 1, height: 1, sha256: sha256(png) },
++      preview: { path: "preview.png", mediaType: "image/png", bytes: png.length, width: 1, height: 1, sha256: sha256(png) },
++    },
++    signature: {
++      algorithm: "Ed25519", canonicalization: "RFC8785", keyId: "codex-skin.sample.2026-01",
++      signedAt: "2026-07-16T12:00:00.000Z", value: "",
++    },
++  };
++  const signing = structuredClone(manifest);
++  delete signing.signature.value;
++  manifest.signature.value = sign(null, Buffer.from(canonicalize(signing)), privateKey).toString("base64url");
++  return { manifest, package: createZip([["theme.json", Buffer.from(JSON.stringify(manifest))], ["background.png", png], ["preview.png", png]]) };
++}
++
++function canonicalize(value) {
++  if (value === null || ["boolean", "number", "string"].includes(typeof value)) return JSON.stringify(value);
++  if (Array.isArray(value)) return `[${value.map(canonicalize).join(",")}]`;
++  return `{${Object.keys(value).sort().map((key) => `${JSON.stringify(key)}:${canonicalize(value[key])}`).join(",")}}`;
++}
++
++function sha256(bytes) { return createHash("sha256").update(bytes).digest("hex"); }
++
++function createZip(files) {
++  const local = [];
++  const central = [];
++  let offset = 0;
++  for (const [name, data] of files) {
++    const encoded = Buffer.from(name);
++    const checksum = crc32(data);
++    const header = Buffer.alloc(30);
++    header.writeUInt32LE(0x04034b50, 0); header.writeUInt16LE(20, 4); header.writeUInt16LE(0x0800, 6);
++    header.writeUInt32LE(checksum, 14); header.writeUInt32LE(data.length, 18); header.writeUInt32LE(data.length, 22); header.writeUInt16LE(encoded.length, 26);
++    local.push(header, encoded, data);
++    const directory = Buffer.alloc(46);
++    directory.writeUInt32LE(0x02014b50, 0); directory.writeUInt16LE((3 << 8) | 20, 4); directory.writeUInt16LE(20, 6); directory.writeUInt16LE(0x0800, 8);
++    directory.writeUInt32LE(checksum, 16); directory.writeUInt32LE(data.length, 20); directory.writeUInt32LE(data.length, 24); directory.writeUInt16LE(encoded.length, 28);
++    directory.writeUInt32LE((0o100644 * 0x10000) >>> 0, 38); directory.writeUInt32LE(offset, 42);
++    central.push(directory, encoded);
++    offset += header.length + encoded.length + data.length;
++  }
++  const directory = Buffer.concat(central);
++  const end = Buffer.alloc(22);
++  end.writeUInt32LE(0x06054b50, 0); end.writeUInt16LE(files.length, 8); end.writeUInt16LE(files.length, 10); end.writeUInt32LE(directory.length, 12); end.writeUInt32LE(offset, 16);
++  return Buffer.concat([...local, directory, end]);
++}
++
++const table = Array.from({ length: 256 }, (_, input) => { let value = input; for (let bit = 0; bit < 8; bit += 1) value = (value >>> 1) ^ ((value & 1) ? 0xedb88320 : 0); return value >>> 0; });
++function crc32(bytes) { let value = 0xffffffff; for (const byte of bytes) value = (value >>> 8) ^ table[(value ^ byte) & 0xff]; return (value ^ 0xffffffff) >>> 0; }
+diff --git a/macos/tests/run-tests.sh b/macos/tests/run-tests.sh
+index ae99ba2..b0aae93 100644
+--- a/macos/tests/run-tests.sh
++++ b/macos/tests/run-tests.sh
+@@ -24,6 +24,7 @@ if /usr/bin/grep -R -n -E '(writeFile|rename|copyFile|rm).*app\.asar' "$ROOT/scr
+ fi
+ 
+ "$NODE" "$ROOT/scripts/injector.mjs" --check-payload >/dev/null
++"$NODE" --test "$ROOT/tests/dreamskin-import.test.mjs"
+ 
+ TMP="$(/usr/bin/mktemp -d /tmp/codex-dream-skin-tests.XXXXXX)"
+ trap '/bin/rm -rf "$TMP"' EXIT

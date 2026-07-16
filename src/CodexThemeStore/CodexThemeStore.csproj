@@ -9,6 +9,10 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <PackageReference Include="NSec.Cryptography" Version="24.4.0" />
+  </ItemGroup>
+
+  <ItemGroup>
     <None Include="..\..\themes\*.json" Link="themes\%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
     <None Include="..\..\previews\*.png" Link="previews\%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
     <None Include="..\..\backgrounds\*.jpg" Link="backgrounds\%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
