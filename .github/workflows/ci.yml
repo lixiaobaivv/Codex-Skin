@@ -30,21 +30,21 @@ jobs:
           if ($before -ne $after) { throw "Signed fixture is not deterministic." }
 
       - name: Validate fixture contract
-        run: node --test tests/dreamskin-fixture.test.mjs
+        run: node --test tests/*.test.mjs
 
       - name: Build Windows client
         run: dotnet build src/CodexThemeStore/CodexThemeStore.csproj --configuration Release
 
       - name: Publish self-contained Windows client
-        run: dotnet publish src/CodexThemeStore/CodexThemeStore.csproj --configuration Release --runtime win-x64 --self-contained true --output artifacts/CodexThemeStore-win-x64
+        run: dotnet publish src/CodexThemeStore/CodexThemeStore.csproj --configuration Release --runtime win-x64 --self-contained true --output artifacts/Codex-Skin-win-x64
 
       - name: Validate protocol parser
-        run: artifacts/CodexThemeStore-win-x64/CodexThemeStore.exe protocol self-test
+        run: artifacts/Codex-Skin-win-x64/Codex-Skin.exe protocol self-test
 
       - name: Validate current-user shell registration
         shell: pwsh
         run: |
-          $client = "artifacts/CodexThemeStore-win-x64/CodexThemeStore.exe"
+          $client = "artifacts/Codex-Skin-win-x64/Codex-Skin.exe"
           & $client protocol register
           $status = & $client protocol status
           if ($status -ne "registered") { throw "dreamskin protocol registration failed." }
@@ -56,12 +56,12 @@ jobs:
         shell: pwsh
         run: |
           $env:CODEX_THEME_LIBRARY_DIR = Join-Path $env:RUNNER_TEMP "dreamskin-library"
-          & "artifacts/CodexThemeStore-win-x64/CodexThemeStore.exe" import samples/dreamskin/codex-skin-sample-1.0.0.dreamskin
+          & "artifacts/Codex-Skin-win-x64/Codex-Skin.exe" import samples/dreamskin/codex-skin-sample-1.0.0.dreamskin
           $manifest = Join-Path $env:CODEX_THEME_LIBRARY_DIR "codex-skin.jackson-sage-sample/1.0.0/theme.json"
           if (-not (Test-Path -LiteralPath $manifest)) { throw "Signed fixture was not installed." }
 
       - uses: actions/upload-artifact@v7
         with:
-          name: CodexThemeStore-win-x64
-          path: artifacts/CodexThemeStore-win-x64
+          name: Codex-Skin-win-x64
+          path: artifacts/Codex-Skin-win-x64
           if-no-files-found: error

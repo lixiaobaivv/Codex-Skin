@@ -5,7 +5,9 @@
     <UseWindowsForms>true</UseWindowsForms>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
-    <AssemblyName>CodexThemeStore</AssemblyName>
+    <AssemblyName>Codex-Skin</AssemblyName>
+    <Product>Codex-Skin</Product>
+    <Description>Codex-Skin theme client and signed .dreamskin importer</Description>
   </PropertyGroup>
 
   <ItemGroup>

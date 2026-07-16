@@ -1,0 +1,113 @@
+name: Publish Codex-Skin client
+
+on:
+  push:
+    tags:
+      - "v*"
+  workflow_dispatch:
+    inputs:
+      release_tag:
+        description: Client release tag (for example v0.1.0)
+        required: true
+        default: v0.1.0
+
+permissions:
+  contents: write
+
+jobs:
+  windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-dotnet@v6
+        with:
+          dotnet-version: 8.0.x
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+
+      - name: Validate signed package fixtures
+        run: node --test tests/*.test.mjs
+
+      - name: Publish self-contained single-file Windows client
+        shell: pwsh
+        run: |
+          dotnet publish src/CodexThemeStore/CodexThemeStore.csproj `
+            --configuration Release `
+            --runtime win-x64 `
+            --self-contained true `
+            --output artifacts/publish `
+            -p:PublishSingleFile=true `
+            -p:IncludeNativeLibrariesForSelfExtract=true `
+            -p:IncludeAllContentForSelfExtract=true `
+            -p:EnableCompressionInSingleFile=true `
+            -p:DebugType=None `
+            -p:DebugSymbols=false
+
+      - name: Verify standalone executable
+        shell: pwsh
+        run: |
+          $source = Resolve-Path "artifacts/publish/Codex-Skin.exe"
+          New-Item -ItemType Directory -Force artifacts/release, $env:RUNNER_TEMP/codex-skin-standalone | Out-Null
+          Copy-Item -LiteralPath $source -Destination artifacts/release/Codex-Skin-win-x64.exe
+          Copy-Item -LiteralPath $source -Destination $env:RUNNER_TEMP/codex-skin-standalone/Codex-Skin-win-x64.exe
+          & "$env:RUNNER_TEMP/codex-skin-standalone/Codex-Skin-win-x64.exe" protocol self-test
+
+      - name: Create archive and checksums
+        shell: pwsh
+        run: |
+          Compress-Archive -LiteralPath artifacts/release/Codex-Skin-win-x64.exe -DestinationPath artifacts/release/Codex-Skin-win-x64.zip
+          $assets = @(
+            "Codex-Skin-win-x64.exe",
+            "Codex-Skin-win-x64.zip"
+          )
+          $lines = foreach ($name in $assets) {
+            $hash = (Get-FileHash "artifacts/release/$name" -Algorithm SHA256).Hash.ToLowerInvariant()
+            "$hash  $name"
+          }
+          Set-Content -LiteralPath artifacts/release/SHA256SUMS.txt -Value $lines -Encoding utf8NoBOM
+
+      - uses: actions/upload-artifact@v7
+        with:
+          name: Codex-Skin-win-x64-release
+          path: artifacts/release/*
+          if-no-files-found: error
+
+      - name: Create or verify immutable client release
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ github.event_name == 'workflow_dispatch' && inputs.release_tag || github.ref_name }}
+        run: |
+          if ($env:RELEASE_TAG -notmatch '^v[0-9]+\.[0-9]+\.[0-9]+(?:-[0-9A-Za-z.-]+)?$') {
+            throw "Release tag must be SemVer with a v prefix, for example v0.1.0."
+          }
+          $assets = @(
+            "artifacts/release/Codex-Skin-win-x64.exe",
+            "artifacts/release/Codex-Skin-win-x64.zip",
+            "artifacts/release/SHA256SUMS.txt"
+          )
+          gh release view $env:RELEASE_TAG *> $null
+          if ($LASTEXITCODE -ne 0) {
+            gh release create $env:RELEASE_TAG @assets `
+              --target $env:GITHUB_SHA `
+              --title "Codex-Skin $env:RELEASE_TAG" `
+              --notes "Windows x64 self-contained client with signed .dreamskin import and dreamskin:// protocol support. macOS executable is planned after the macOS client source is integrated and validated on a real macOS runner."
+            exit 0
+          }
+
+          New-Item -ItemType Directory -Force $env:RUNNER_TEMP/existing-release | Out-Null
+          gh release download $env:RELEASE_TAG --dir $env:RUNNER_TEMP/existing-release
+          foreach ($asset in $assets) {
+            $name = Split-Path $asset -Leaf
+            $existing = Join-Path $env:RUNNER_TEMP/existing-release $name
+            if (Test-Path -LiteralPath $existing) {
+              $newHash = (Get-FileHash $asset -Algorithm SHA256).Hash
+              $oldHash = (Get-FileHash $existing -Algorithm SHA256).Hash
+              if ($newHash -ne $oldHash) { throw "Release asset $name already exists with different bytes." }
+            } else {
+              gh release upload $env:RELEASE_TAG $asset
+            }
+          }
