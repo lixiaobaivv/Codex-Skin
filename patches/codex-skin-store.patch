@@ -60,10 +60,7 @@ diff --git a/README.md b/README.md
 index d4de0e3..3195ca7 100644
 --- a/README.md
 +++ b/README.md
-@@ -78,6 +78,14 @@ npm ci
- npm run dev
- ```
- 
+@@ -80,0 +81,8 @@ npm run dev
 +## GitHub Pages
 +
 +`main` 分支会通过 `.github/workflows/pages.yml` 构建纯静态站点并发布到：
@@ -72,30 +69,19 @@ index d4de0e3..3195ca7 100644
 +
 +页面和签名主题包都由 GitHub 托管，不需要应用服务器、数据库或对象存储。
 +
- 浏览器地址以终端输出为准，默认通常为 `http://localhost:3000`。
- 
- 提交前建议运行：
 diff --git a/app/globals.css b/app/globals.css
 index 6b0cebf..e4be06f 100644
 --- a/app/globals.css
 +++ b/app/globals.css
-@@ -1432,6 +1432,7 @@ footer > div a:hover {
-   cursor: pointer;
-   font-size: 9px;
-   font-weight: 700;
+@@ -1434,0 +1435 @@ footer > div a:hover {
 +  text-decoration: none;
- }
- 
- .icon-button:hover {
 diff --git a/app/layout.tsx b/app/layout.tsx
 index edcefd7..9f26aec 100644
 --- a/app/layout.tsx
 +++ b/app/layout.tsx
-@@ -1,54 +1,36 @@
- import type { Metadata } from "next";
+@@ -2 +1,0 @@ import type { Metadata } from "next";
 -import { headers } from "next/headers";
- import "./globals.css";
- 
+@@ -5,13 +4,4 @@ import "./globals.css";
 -function safeOrigin(requestHeaders: Headers): URL {
 -  const forwardedHost = requestHeaders.get("x-forwarded-host")?.split(",")[0]?.trim();
 -  const directHost = requestHeaders.get("host")?.trim();
@@ -113,7 +99,7 @@ index edcefd7..9f26aec 100644
 +  ?? "https://lixiaobaivv.github.io/Codex-Skin-Store/";
 +const metadataBase = new URL(siteUrl);
 +const socialImage = new URL("og.png", metadataBase).href;
- 
+@@ -19,33 +9,25 @@ function safeOrigin(requestHeaders: Headers): URL {
 -  return new URL(`${protocol}://${host}`);
 -}
 -
@@ -172,33 +158,15 @@ index edcefd7..9f26aec 100644
 +    images: [socialImage],
 +  },
 +};
- 
- export default function RootLayout({
-   children,
 diff --git a/components/storefront.tsx b/components/storefront.tsx
 index 2a6a566..2ed4e0b 100644
 --- a/components/storefront.tsx
 +++ b/components/storefront.tsx
-@@ -2,6 +2,7 @@
- 
- import type { CSSProperties } from "react";
- import { useEffect, useMemo, useState } from "react";
+@@ -4,0 +5 @@ import { useEffect, useMemo, useState } from "react";
 +import { createDreamSkinInstallLink } from "@/lib/dreamskin-link";
- import {
-   COLOR_OPTIONS,
-   PLATFORM_OPTIONS,
-@@ -158,6 +159,7 @@ function ThemeCard({
- }
- 
- function ThemeDetail({ theme, onClose }: { theme: Theme; onClose: () => void }) {
+@@ -160,0 +162 @@ function ThemeDetail({ theme, onClose }: { theme: Theme; onClose: () => void })
 +  const installLink = theme.package?.published ? createDreamSkinInstallLink(theme.package) : undefined;
-   return (
-     <div className="theme-dialog-backdrop" role="presentation" onMouseDown={onClose}>
-       <section
-@@ -213,14 +215,31 @@ function ThemeDetail({ theme, onClose }: { theme: Theme; onClose: () => void })
-             <p>声明式主题 · {theme.license.name} · 引擎 {theme.engineRange}</p>
-           </div>
-           <div className="dialog-actions">
+@@ -216,3 +218,14 @@ function ThemeDetail({ theme, onClose }: { theme: Theme; onClose: () => void })
 -            <button className="primary-button primary-button--wide" type="button" disabled>
 -              一键导入开发中 <span>↗</span>
 -            </button>
@@ -216,10 +184,7 @@ index 2a6a566..2ed4e0b 100644
 +                手动下载
 +              </a>
 +            )}
-             <a className="icon-button" href={PROTOCOL_SPEC_URL} target="_blank" rel="noreferrer">
-               查看协议规范
-             </a>
-           </div>
+@@ -223 +236,7 @@ function ThemeDetail({ theme, onClose }: { theme: Theme; onClose: () => void })
 -          <p className="dialog-helper">示例主题尚未发布真实包；客户端导入器与系统协议接入完成后开放。</p>
 +          <p className="dialog-helper">
 +            {theme.package?.published
@@ -228,18 +193,9 @@ index 2a6a566..2ed4e0b 100644
 +                ? "签名样例已经准备完成，GitHub Release 发布后即可开放一键导入。"
 +                : "该预览还没有经过签名和发布，因此不提供导入链接。"}
 +          </p>
-         </div>
-       </section>
-     </div>
-@@ -455,7 +474,7 @@ export function Storefront() {
-         <div className="protocol-chip">
-           <span>PROTOCOL</span>
-           <code>dreamskin://install?url=…&amp;sha256=…&amp;size=…</code>
+@@ -458 +477 @@ export function Storefront() {
 -          <i>真实包、哈希与大小就绪后开放</i>
 +          <i>首个双平台签名示例已开放</i>
-         </div>
-       </section>
- 
 diff --git a/lib/dreamskin-link.ts b/lib/dreamskin-link.ts
 new file mode 100644
 index 0000000..330a50b
@@ -262,10 +218,7 @@ diff --git a/lib/themes.ts b/lib/themes.ts
 index 11204fd..b33ddd8 100644
 --- a/lib/themes.ts
 +++ b/lib/themes.ts
-@@ -59,6 +59,15 @@ export interface ThemePreviewStyle {
-   readonly pattern: "aurora" | "grid" | "paper" | "horizon" | "mist" | "orb" | "stars" | "embers";
- }
- 
+@@ -61,0 +62,9 @@ export interface ThemePreviewStyle {
 +export interface ThemePackage {
 +  readonly published: boolean;
 +  readonly id: string;
@@ -275,21 +228,9 @@ index 11204fd..b33ddd8 100644
 +  readonly size: number;
 +}
 +
- export interface Theme {
-   readonly slug: string;
-   readonly name: string;
-@@ -76,6 +85,7 @@ export interface Theme {
-   readonly publishedAt: string;
-   readonly license: ThemeLicense;
-   readonly previewStyle: ThemePreviewStyle;
+@@ -78,0 +88 @@ export interface Theme {
 +  readonly package?: ThemePackage;
- }
- 
- export interface ThemeFilterOptions {
-@@ -137,6 +147,44 @@ const SAMPLE_LICENSE: ThemeLicense = {
- };
- 
- export const THEMES = [
+@@ -139,0 +150,38 @@ export const THEMES = [
 +  {
 +    slug: "jackson-sage-signed-sample",
 +    name: "千玺星球签名示例",
@@ -328,22 +269,17 @@ index 11204fd..b33ddd8 100644
 +      pattern: "mist",
 +    },
 +  },
-   {
-     slug: "aurora-drift",
-     name: "极光漫游",
 diff --git a/next.config.ts b/next.config.ts
 index e9ffa30..9692b56 100644
 --- a/next.config.ts
 +++ b/next.config.ts
-@@ -1,7 +1,19 @@
- import type { NextConfig } from "next";
- 
+@@ -2,0 +3,5 @@ import type { NextConfig } from "next";
 +const isPagesBuild = process.env.GITHUB_ACTIONS === "true";
 +const pagesBasePath = isPagesBuild
 +  ? "/Codex-Skin-Store"
 +  : "";
 +
- const nextConfig: NextConfig = {
+@@ -4 +9,8 @@ const nextConfig: NextConfig = {
 -  /* config options here */
 +  output: "export",
 +  trailingSlash: true,
@@ -353,21 +289,12 @@ index e9ffa30..9692b56 100644
 +  typescript: isPagesBuild
 +    ? { tsconfigPath: "tsconfig.pages.json" }
 +    : undefined,
- };
- 
- export default nextConfig;
 diff --git a/package.json b/package.json
 index c9ff8e9..76620c6 100644
 --- a/package.json
 +++ b/package.json
-@@ -9,6 +9,7 @@
-   "scripts": {
-     "dev": "cross-env WRANGLER_LOG_PATH=.wrangler/wrangler.log vinext dev",
-     "build": "cross-env WRANGLER_LOG_PATH=.wrangler/wrangler.log vinext build",
+@@ -11,0 +12 @@
 +    "build:pages": "next build",
-     "start": "cross-env WRANGLER_LOG_PATH=.wrangler/wrangler.log vinext start",
-     "test": "npm run build && node --test tests/*.test.mjs",
-     "lint": "eslint . --ignore-pattern dist --ignore-pattern .next"
 diff --git a/public/.nojekyll b/public/.nojekyll
 new file mode 100644
 index 0000000..ff07611
@@ -379,23 +306,18 @@ diff --git a/tests/theme-contract.test.mjs b/tests/theme-contract.test.mjs
 index 1c323e2..d653308 100644
 --- a/tests/theme-contract.test.mjs
 +++ b/tests/theme-contract.test.mjs
-@@ -19,13 +19,36 @@ test("theme package schema stays declarative and closed", async () => {
-   assert.match(source, /Ed25519/);
- });
- 
+@@ -22,2 +22,2 @@ test("theme package schema stays declarative and closed", async () => {
 -test("storefront does not expose placeholder install links", async () => {
 -  const [storefront, themes] = await Promise.all([
 +test("storefront catalogs and enables the published signed sample", async () => {
 +  const [storefront, themes, links] = await Promise.all([
-     readFile(new URL("../components/storefront.tsx", import.meta.url), "utf8"),
-     readFile(new URL("../lib/themes.ts", import.meta.url), "utf8"),
+@@ -25,0 +26 @@ test("storefront does not expose placeholder install links", async () => {
 +    readFile(new URL("../lib/dreamskin-link.ts", import.meta.url), "utf8"),
-   ]);
- 
+@@ -28 +29,2 @@ test("storefront does not expose placeholder install links", async () => {
 -  assert.match(storefront, /一键导入开发中/);
 +  assert.match(storefront, /一键导入/);
 +  assert.match(storefront, /手动下载/);
-   assert.doesNotMatch(storefront, /PROTOCOL_PREVIEW_SHA256|dreamskin\.store\/packages/);
+@@ -30 +32,22 @@ test("storefront does not expose placeholder install links", async () => {
 -  assert.doesNotMatch(themes, /packageUrl/);
 +  assert.match(themes, /releases\/download\/sample-v1\/codex-skin-sample-1\.0\.0\.dreamskin/);
 +  assert.match(themes, /7a75fff8086fe6949ef9e37e82c161a8e015a1e00e02181938cd479e9ae41387/);
@@ -419,7 +341,6 @@ index 1c323e2..d653308 100644
 +  assert.match(config, /Codex-Skin-Store/);
 +  assert.match(packageJson, /build:pages/);
 +  assert.match(workflow, /deploy-pages@v5/);
- });
 diff --git a/tsconfig.pages.json b/tsconfig.pages.json
 new file mode 100644
 index 0000000..5a6650b
