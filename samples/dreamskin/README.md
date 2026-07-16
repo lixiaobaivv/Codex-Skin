@@ -23,3 +23,14 @@ preview.png
 
 `catalog-entry.json` contains the package SHA-256, size and future GitHub
 Release URL used by `dreamskin://install`.
+
+`catalog/` contains eight additional deterministic, procedural catalog themes.
+They use the same public development fixture key and exist only to exercise the
+complete store-to-client import path. Regenerate them with:
+
+```powershell
+node tools/dreamskin/build-catalog-samples.mjs
+```
+
+Their immutable Release tag is `catalog-v1`. They are signed interoperability
+samples, not proof of a production publisher identity.
