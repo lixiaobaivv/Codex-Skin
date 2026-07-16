@@ -1,0 +1,1076 @@
+<!doctype html>
+<html lang="zh-CN" data-codex-window-type="electron" class="electron-opaque">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Codex QA Fixture</title>
+  <style>
+    :root {
+      color-scheme: light;
+      --color-background-surface: #f7f7f4;
+      --color-background-surface-under: #efefeb;
+      --color-background-panel: #f3f3ef;
+      --color-background-elevated-primary: #ffffff;
+      --color-background-elevated-secondary: #fbfbf8;
+      --color-background-control: #eeeef0;
+      --color-background-accent: #ececf8;
+      --color-background-button-primary: #30303a;
+      --color-text-foreground: #222226;
+      --color-text-foreground-secondary: rgb(34 34 38 / 0.66);
+      --color-text-foreground-tertiary: rgb(34 34 38 / 0.46);
+      --color-text-accent: #5852a4;
+      --color-text-button-primary: #ffffff;
+      --color-border: rgb(34 34 38 / 0.13);
+      --color-border-light: rgb(34 34 38 / 0.07);
+      --color-border-heavy: rgb(34 34 38 / 0.22);
+      --color-border-focus: #5852a4;
+      --color-icon-primary: #222226;
+      --color-icon-secondary: rgb(34 34 38 / 0.66);
+      --color-icon-accent: #5852a4;
+      --vscode-font-family: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", "Microsoft YaHei UI", sans-serif;
+      --font-sans-default: var(--vscode-font-family);
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    html,
+    body {
+      width: 100%;
+      height: 100%;
+      margin: 0;
+      overflow: hidden;
+      background: var(--color-background-surface-under);
+      color: var(--color-text-foreground);
+      font-family: var(--vscode-font-family);
+      -webkit-font-smoothing: antialiased;
+    }
+
+    button {
+      color: inherit;
+      font: inherit;
+    }
+
+    button:focus-visible,
+    [contenteditable="true"]:focus-visible {
+      outline: 2px solid var(--color-border-focus);
+      outline-offset: 2px;
+    }
+
+    .fixture-window {
+      width: 100%;
+      height: 100%;
+      min-width: 760px;
+      display: grid;
+      grid-template-rows: 42px minmax(0, 1fr);
+      background: var(--color-background-surface-under);
+    }
+
+    .fixture-menubar {
+      display: grid;
+      grid-template-columns: 294px 1fr auto;
+      align-items: center;
+      gap: 18px;
+      min-width: 0;
+      padding: 0 16px;
+      border-bottom: 1px solid var(--color-border-light);
+      background: var(--color-background-surface-under);
+      user-select: none;
+    }
+
+    .fixture-history,
+    .fixture-menu,
+    .fixture-window-actions,
+    .fixture-header-actions,
+    .fixture-view-switch,
+    .fixture-composer-tools,
+    .fixture-account-main {
+      display: flex;
+      align-items: center;
+    }
+
+    .fixture-history {
+      gap: 8px;
+    }
+
+    .fixture-app-mark,
+    .fixture-arrow,
+    .fixture-window-button,
+    .fixture-icon-button,
+    .fixture-tool-button,
+    .fixture-send,
+    .fixture-view-button {
+      border: 0;
+      background: transparent;
+      cursor: pointer;
+    }
+
+    .fixture-app-mark {
+      width: 28px;
+      height: 28px;
+      border: 1px solid var(--color-border-heavy);
+      border-radius: 8px;
+      color: var(--color-text-accent);
+      font-size: 10px;
+      font-weight: 800;
+    }
+
+    .fixture-arrow {
+      min-width: 32px;
+      height: 28px;
+      border-radius: 8px;
+      color: var(--color-text-foreground-secondary);
+      font-size: 18px;
+    }
+
+    .fixture-arrow:hover,
+    .fixture-window-button:hover,
+    .fixture-icon-button:hover,
+    .fixture-view-button:hover,
+    .fixture-tool-button:hover {
+      background: var(--color-background-control);
+    }
+
+    .fixture-menu {
+      gap: 24px;
+      min-width: 0;
+      font-size: 14px;
+      font-weight: 560;
+    }
+
+    .fixture-window-actions {
+      justify-content: flex-end;
+      gap: 4px;
+    }
+
+    .fixture-window-button {
+      width: 38px;
+      height: 28px;
+      border-radius: 7px;
+      color: var(--color-text-foreground-secondary);
+      font-size: 13px;
+    }
+
+    .fixture-body {
+      min-height: 0;
+      display: grid;
+      grid-template-columns: 294px minmax(0, 1fr);
+    }
+
+    .app-shell-left-panel {
+      position: relative;
+      min-width: 0;
+      min-height: 0;
+      overflow: hidden;
+      border-right: 1px solid var(--color-border);
+      background: var(--color-background-panel);
+    }
+
+    .fixture-sidebar-scroll {
+      position: absolute;
+      inset: 0 0 116px;
+      overflow-y: auto;
+      padding: 18px 14px 28px;
+      scrollbar-width: thin;
+      scrollbar-color: var(--color-border-heavy) transparent;
+    }
+
+    .fixture-brand-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 14px;
+      padding: 0 8px 18px;
+    }
+
+    .fixture-brand {
+      min-width: 0;
+      color: var(--color-text-accent);
+      font-family: ui-serif, Georgia, "Noto Serif SC", serif;
+      font-size: 29px;
+      line-height: 1;
+      font-weight: 780;
+      letter-spacing: -0.7px;
+    }
+
+    .fixture-status-dot {
+      width: 8px;
+      height: 8px;
+      flex: none;
+      border-radius: 50%;
+      background: var(--color-text-accent);
+      box-shadow: 0 0 0 4px var(--color-background-accent);
+    }
+
+    .fixture-nav {
+      display: grid;
+      gap: 4px;
+    }
+
+    .fixture-nav-item,
+    .fixture-list-item {
+      width: 100%;
+      min-width: 0;
+      display: grid;
+      grid-template-columns: 28px minmax(0, 1fr);
+      align-items: center;
+      gap: 9px;
+      border: 0;
+      border-radius: 9px;
+      background: transparent;
+      color: var(--color-text-foreground);
+      text-align: left;
+      cursor: pointer;
+    }
+
+    .fixture-nav-item {
+      min-height: 38px;
+      padding: 6px 10px;
+      font-size: 14px;
+      font-weight: 610;
+    }
+
+    .fixture-nav-item:hover,
+    .fixture-list-item:hover {
+      background: var(--color-background-control);
+    }
+
+    .fixture-nav-item[data-active="true"] {
+      background: var(--color-background-accent);
+      color: var(--color-text-accent);
+    }
+
+    .fixture-nav-token,
+    .fixture-list-token {
+      width: 26px;
+      height: 26px;
+      display: grid;
+      place-items: center;
+      border: 1px solid var(--color-border);
+      border-radius: 8px;
+      color: var(--color-icon-accent);
+      font-size: 10px;
+      font-weight: 760;
+    }
+
+    .fixture-nav-icon {
+      width: 20px;
+      height: 20px;
+      flex: 0 0 auto;
+    }
+
+    .fixture-icon-source {
+      position: fixed;
+      width: 1px;
+      height: 1px;
+      overflow: hidden;
+      clip-path: inset(50%);
+      white-space: nowrap;
+    }
+
+    .fixture-group {
+      margin-top: 17px;
+    }
+
+    .fixture-group-title {
+      display: grid;
+      grid-template-columns: auto minmax(18px, 1fr);
+      align-items: center;
+      gap: 10px;
+      margin: 0 6px 7px;
+      color: var(--color-text-accent);
+      font-size: 12px;
+      font-weight: 740;
+      letter-spacing: 0.08em;
+    }
+
+    .fixture-group-title::after {
+      content: "";
+      height: 1px;
+      background: var(--color-border);
+    }
+
+    .fixture-list {
+      display: grid;
+      gap: 1px;
+    }
+
+    .fixture-list-item {
+      min-height: 34px;
+      padding: 5px 10px;
+      color: var(--color-text-foreground-secondary);
+      font-size: 13px;
+    }
+
+    .fixture-list-token {
+      width: 24px;
+      height: 24px;
+      border-color: transparent;
+      color: var(--color-icon-secondary);
+      font-size: 9px;
+    }
+
+    .fixture-setup-card {
+      display: grid;
+      grid-template-columns: 1fr auto;
+      align-items: center;
+      gap: 12px;
+      margin: 18px 2px 0;
+      padding: 10px 12px;
+      border: 1px solid var(--color-border);
+      border-radius: 12px;
+      background: var(--color-background-elevated-secondary);
+      color: var(--color-text-foreground-secondary);
+      font-size: 12px;
+      font-weight: 650;
+    }
+
+    .fixture-progress {
+      color: var(--color-text-accent);
+      font-variant-numeric: tabular-nums;
+    }
+
+    .absolute.bottom-0.z-20.inset-x-0.fixture-account {
+      position: absolute;
+      z-index: 20;
+      right: 0;
+      bottom: 0;
+      left: 0;
+      height: 116px;
+      display: grid;
+      align-content: end;
+      padding: 26px 14px 14px;
+      border-top: 1px solid var(--color-border);
+      background: var(--color-background-panel);
+    }
+
+    .fixture-account-main {
+      gap: 10px;
+      min-width: 0;
+    }
+
+    .fixture-avatar {
+      width: 36px;
+      height: 36px;
+      flex: none;
+      display: grid;
+      place-items: center;
+      border: 1px solid var(--color-border-heavy);
+      border-radius: 50%;
+      background: var(--color-background-accent);
+      color: var(--color-text-accent);
+      font-size: 10px;
+      font-weight: 800;
+    }
+
+    .fixture-account-copy {
+      min-width: 0;
+      flex: 1;
+    }
+
+    .fixture-account-name {
+      overflow: hidden;
+      color: var(--color-text-foreground);
+      font-size: 13px;
+      font-weight: 690;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .fixture-account-note {
+      margin-top: 2px;
+      color: var(--color-text-foreground-tertiary);
+      font-size: 11px;
+    }
+
+    .fixture-icon-button {
+      width: 34px;
+      height: 34px;
+      flex: none;
+      border: 1px solid transparent;
+      border-radius: 9px;
+      color: var(--color-icon-secondary);
+      font-size: 10px;
+      font-weight: 760;
+    }
+
+    .fixture-more-button {
+      display: grid;
+      place-items: center;
+    }
+
+    .fixture-more-icon {
+      width: 20px;
+      height: 20px;
+      display: block;
+      object-fit: contain;
+      opacity: 0.74;
+    }
+
+    .fixture-workspace {
+      min-width: 0;
+      min-height: 0;
+      padding: 0 12px 12px 0;
+      background: var(--color-background-surface-under);
+    }
+
+    .main-surface {
+      position: relative;
+      width: 100%;
+      height: 100%;
+      min-width: 0;
+      min-height: 0;
+      overflow: hidden;
+      border: 1px solid var(--color-border);
+      border-radius: 16px;
+      background: var(--color-background-surface);
+      box-shadow: 0 14px 42px rgb(20 20 28 / 0.08);
+    }
+
+    .app-header-tint {
+      position: absolute !important;
+      z-index: 12 !important;
+      top: 0;
+      right: 0;
+      left: 0;
+      height: 52px;
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) auto auto;
+      align-items: center;
+      gap: 14px;
+      padding: 0 18px 0 22px;
+      border-bottom: 1px solid var(--color-border);
+      background: var(--color-background-surface);
+    }
+
+    .fixture-title-block {
+      min-width: 0;
+      display: flex;
+      align-items: baseline;
+      gap: 10px;
+    }
+
+    .fixture-task-title {
+      overflow: hidden;
+      font-size: 13px;
+      font-weight: 720;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .fixture-task-state {
+      color: var(--color-text-foreground-tertiary);
+      font-size: 11px;
+      white-space: nowrap;
+    }
+
+    .fixture-view-switch {
+      gap: 3px;
+      padding: 3px;
+      border: 1px solid var(--color-border);
+      border-radius: 10px;
+      background: var(--color-background-elevated-secondary);
+    }
+
+    .fixture-view-button {
+      height: 27px;
+      padding: 0 10px;
+      border-radius: 7px;
+      color: var(--color-text-foreground-secondary);
+      font-size: 11px;
+      font-weight: 650;
+    }
+
+    .fixture-view-button[aria-pressed="true"] {
+      background: var(--color-background-accent);
+      color: var(--color-text-accent);
+    }
+
+    .fixture-header-actions {
+      gap: 6px;
+    }
+
+    .fixture-theme-readout {
+      max-width: 190px;
+      overflow: hidden;
+      padding: 6px 9px;
+      border: 1px solid var(--color-border);
+      border-radius: 999px;
+      color: var(--color-text-foreground-secondary);
+      font-size: 10px;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .fixture-thread {
+      position: absolute !important;
+      z-index: 2 !important;
+      inset: 52px 0 150px;
+      overflow-y: auto;
+      padding: 28px clamp(24px, 7vw, 104px) 48px;
+      scrollbar-width: thin;
+      scrollbar-color: var(--color-border-heavy) transparent;
+    }
+
+    .fixture-thread-inner {
+      width: min(920px, 100%);
+      min-height: 100%;
+      margin: 0 auto;
+    }
+
+    .fixture-date {
+      margin: 2px 0 24px;
+      color: var(--color-text-foreground-tertiary);
+      font-size: 11px;
+      text-align: center;
+    }
+
+    .fixture-message-row {
+      display: grid;
+      gap: 7px;
+      margin-bottom: 18px;
+    }
+
+    .fixture-message-row.user {
+      justify-items: end;
+    }
+
+    .fixture-message-meta {
+      color: var(--color-text-foreground-tertiary);
+      font-size: 11px;
+      font-weight: 630;
+    }
+
+    [data-user-message-bubble="true"] {
+      max-width: min(680px, 84%);
+      padding: 12px 15px;
+      border: 1px solid var(--color-border);
+      border-radius: 16px 16px 4px 16px;
+      background: var(--color-background-accent);
+      color: var(--color-text-foreground);
+      font-size: 14px;
+      line-height: 1.65;
+      box-shadow: 0 7px 20px rgb(20 20 28 / 0.06);
+    }
+
+    [data-content-search-unit-key$=":assistant"] {
+      padding: 15px 17px;
+      border: 1px solid var(--color-border);
+      border-radius: 16px;
+      background: var(--color-background-elevated-primary);
+      box-shadow: 0 9px 26px rgb(20 20 28 / 0.07);
+    }
+
+    .fixture-assistant-head {
+      display: flex;
+      align-items: center;
+      gap: 9px;
+      margin-bottom: 10px;
+      color: var(--color-text-accent);
+      font-size: 12px;
+      font-weight: 760;
+    }
+
+    .fixture-assistant-mark {
+      width: 24px;
+      height: 24px;
+      display: grid;
+      place-items: center;
+      border-radius: 8px;
+      background: var(--color-background-accent);
+      font-size: 9px;
+      letter-spacing: -0.02em;
+    }
+
+    .fixture-assistant-body {
+      color: var(--color-text-foreground);
+      font-size: 14px;
+      line-height: 1.72;
+    }
+
+    .fixture-assistant-body p {
+      margin: 0 0 10px;
+    }
+
+    .fixture-assistant-body p:last-child {
+      margin-bottom: 0;
+    }
+
+    .fixture-code {
+      margin: 12px 0;
+      overflow-x: auto;
+      padding: 12px 14px;
+      border: 1px solid var(--color-border);
+      border-radius: 10px;
+      background: var(--color-background-surface-under);
+      color: var(--color-text-foreground-secondary);
+      font-family: ui-monospace, "SFMono-Regular", Consolas, monospace;
+      font-size: 12px;
+      line-height: 1.6;
+      white-space: pre;
+    }
+
+    .fixture-empty {
+      display: none;
+      min-height: 100%;
+      place-items: center;
+      text-align: center;
+    }
+
+    .fixture-empty[aria-hidden="false"] {
+      display: grid;
+    }
+
+    .codex-theme-home-active .fixture-empty {
+      display: none !important;
+    }
+
+    .fixture-empty-card {
+      width: min(600px, 90%);
+      padding: 30px;
+      border: 1px solid var(--color-border);
+      border-radius: 18px;
+      background: var(--color-background-elevated-primary);
+      box-shadow: 0 16px 42px rgb(20 20 28 / 0.08);
+    }
+
+    .fixture-empty-kicker {
+      margin-bottom: 12px;
+      color: var(--color-text-accent);
+      font-size: 12px;
+      font-weight: 760;
+      letter-spacing: 0.08em;
+    }
+
+    .fixture-empty h1 {
+      margin: 0 0 12px;
+      font-family: ui-serif, Georgia, "Noto Serif SC", serif;
+      font-size: clamp(28px, 4vw, 46px);
+      letter-spacing: -0.04em;
+    }
+
+    .fixture-empty p {
+      margin: 0;
+      color: var(--color-text-foreground-secondary);
+      font-size: 14px;
+      line-height: 1.7;
+    }
+
+    .fixture-composer-wrap {
+      position: absolute !important;
+      z-index: 10 !important;
+      right: clamp(18px, 5vw, 72px);
+      bottom: 18px;
+      left: clamp(18px, 5vw, 72px);
+      display: grid;
+      justify-items: center;
+    }
+
+    .composer-surface-chrome {
+      width: min(940px, 100%);
+      min-height: 112px;
+      display: grid;
+      grid-template-rows: 1fr auto;
+      gap: 10px;
+      padding: 15px 14px 12px;
+      border: 1px solid var(--color-border-heavy);
+      border-radius: 20px;
+      background: var(--color-background-elevated-primary);
+      box-shadow: 0 16px 44px rgb(20 20 28 / 0.12);
+    }
+
+    .ProseMirror {
+      min-height: 38px;
+      max-height: 110px;
+      overflow-y: auto;
+      padding: 1px 4px;
+      border-radius: 8px;
+      color: var(--color-text-foreground);
+      font-size: 14px;
+      line-height: 1.62;
+      white-space: pre-wrap;
+    }
+
+    .ProseMirror:empty::before {
+      content: attr(data-placeholder);
+      color: var(--color-text-foreground-tertiary);
+      pointer-events: none;
+    }
+
+    .fixture-composer-bottom {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+    }
+
+    .fixture-composer-tools {
+      min-width: 0;
+      gap: 6px;
+    }
+
+    .fixture-tool-button {
+      height: 31px;
+      padding: 0 11px;
+      border: 1px solid var(--color-border);
+      border-radius: 999px;
+      color: var(--color-text-foreground-secondary);
+      font-size: 11px;
+      font-weight: 650;
+    }
+
+    .fixture-tool-button.primary {
+      width: 32px;
+      padding: 0;
+      border-color: var(--color-border-heavy);
+      color: var(--color-text-accent);
+      font-size: 19px;
+      font-weight: 420;
+    }
+
+    .fixture-composer-submit {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      color: var(--color-text-foreground-tertiary);
+      font-size: 10px;
+    }
+
+    .fixture-send {
+      width: 36px;
+      height: 36px;
+      border-radius: 50%;
+      background: var(--color-background-button-primary);
+      color: var(--color-text-button-primary);
+      font-size: 15px;
+      font-weight: 780;
+      box-shadow: 0 7px 18px rgb(20 20 28 / 0.18);
+    }
+
+    .fixture-send:hover {
+      transform: translateY(-1px);
+    }
+
+    .placeholder-probe {
+      position: fixed !important;
+      width: 1px;
+      height: 1px;
+      overflow: hidden;
+      clip-path: inset(50%);
+      white-space: nowrap;
+    }
+
+    @media (max-width: 1080px) {
+      .fixture-window {
+        min-width: 680px;
+      }
+
+      .fixture-menubar {
+        grid-template-columns: 230px 1fr auto;
+      }
+
+      .fixture-body {
+        grid-template-columns: 230px minmax(0, 1fr);
+      }
+
+      .fixture-sidebar-scroll {
+        padding-inline: 10px;
+      }
+
+      .fixture-menu {
+        gap: 16px;
+      }
+
+      .fixture-theme-readout,
+      .fixture-task-state {
+        display: none;
+      }
+
+      .fixture-thread {
+        padding-inline: 24px;
+      }
+    }
+
+    @media (max-height: 700px) {
+      .fixture-thread {
+        bottom: 132px;
+        padding-top: 18px;
+      }
+
+      .fixture-composer-wrap {
+        bottom: 12px;
+      }
+
+      .composer-surface-chrome {
+        min-height: 96px;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="fixture-window">
+    <header class="fixture-menubar" aria-label="应用菜单栏">
+      <div class="fixture-history">
+        <button class="fixture-app-mark" type="button" aria-label="侧边栏">CDX</button>
+        <button class="fixture-arrow" type="button" aria-label="后退">‹</button>
+        <button class="fixture-arrow" type="button" aria-label="前进">›</button>
+      </div>
+      <nav class="fixture-menu" aria-label="主菜单">
+        <span>文件</span>
+        <span>编辑</span>
+        <span>视图</span>
+        <span>帮助</span>
+      </nav>
+      <div class="fixture-window-actions" aria-label="窗口按钮">
+        <button class="fixture-window-button" type="button" aria-label="最小化">—</button>
+        <button class="fixture-window-button" type="button" aria-label="最大化">□</button>
+        <button class="fixture-window-button" type="button" aria-label="关闭">×</button>
+      </div>
+    </header>
+
+    <div class="fixture-body">
+      <aside class="app-shell-left-panel" aria-label="Codex 侧边栏">
+        <div class="fixture-sidebar-scroll">
+          <div class="fixture-brand-row">
+            <div class="fixture-brand">Codex</div>
+            <span class="fixture-status-dot" title="CDP 测试页就绪"></span>
+          </div>
+
+          <nav class="fixture-nav" aria-label="主要导航">
+            <button class="fixture-nav-item" type="button" data-active="true"><img class="fixture-nav-icon" src="icons/star.svg" alt=""><span>新建任务</span></button>
+            <button class="fixture-nav-item" type="button"><img class="fixture-nav-icon" src="icons/calendar.svg" alt=""><span>已安排</span></button>
+            <button class="fixture-nav-item" type="button"><img class="fixture-nav-icon" src="icons/box.svg" alt=""><span>技能</span></button>
+            <button class="fixture-nav-item" type="button"><img class="fixture-nav-icon" src="icons/world.svg" alt=""><span>站点</span></button>
+            <button class="fixture-nav-item" type="button"><img class="fixture-nav-icon" src="icons/git-pull-request.svg" alt=""><span>拉取请求</span></button>
+            <button class="fixture-nav-item" type="button"><img class="fixture-nav-icon" src="icons/message-circle.svg" alt=""><span>聊天</span></button>
+          </nav>
+
+          <div class="fixture-icon-source" aria-hidden="true">
+            <button type="button" tabindex="-1"><img src="icons/code.svg" alt="">探索并理解代码 灵感脑暴</button>
+            <button type="button" tabindex="-1"><img src="icons/puzzle.svg" alt="">构建新功能、应用或工具 快速原型</button>
+            <button type="button" tabindex="-1"><img src="icons/clipboard-check.svg" alt="">审查代码并提出修改建议 边玩边改</button>
+            <button type="button" tabindex="-1"><img src="icons/tools.svg" alt="">修复问题和失败 欢乐修 Bug</button>
+          </div>
+
+          <section class="fixture-group" aria-labelledby="projects-heading">
+            <h2 class="fixture-group-title" id="projects-heading">项目</h2>
+            <div class="fixture-list">
+              <button class="fixture-list-item" type="button"><span class="fixture-list-token">01</span><span>主题商店</span></button>
+              <button class="fixture-list-item" type="button"><span class="fixture-list-token">02</span><span>动态注入实验室</span></button>
+              <button class="fixture-list-item" type="button"><span class="fixture-list-token">03</span><span>四种风格素材库</span></button>
+              <button class="fixture-list-item" type="button"><span class="fixture-list-token">04</span><span>预览图还原计划</span></button>
+              <button class="fixture-list-item" type="button"><span class="fixture-list-token">05</span><span>本机回环验证</span></button>
+            </div>
+          </section>
+
+          <section class="fixture-group" aria-labelledby="tasks-heading">
+            <h2 class="fixture-group-title" id="tasks-heading">任务</h2>
+            <div class="fixture-list">
+              <button class="fixture-list-item" type="button"><span class="fixture-list-token">A</span><span>解析前端结构与选择器</span></button>
+              <button class="fixture-list-item" type="button"><span class="fixture-list-token">B</span><span>校验背景图覆盖范围</span></button>
+              <button class="fixture-list-item" type="button"><span class="fixture-list-token">C</span><span>对比消息气泡样式</span></button>
+              <button class="fixture-list-item" type="button"><span class="fixture-list-token">D</span><span>检查输入框交互状态</span></button>
+              <button class="fixture-list-item" type="button"><span class="fixture-list-token">E</span><span>记录四套主题差异</span></button>
+            </div>
+          </section>
+
+          <div class="fixture-setup-card">
+            <span>继续设置</span>
+            <span class="fixture-progress">3/4</span>
+          </div>
+        </div>
+
+        <div class="absolute bottom-0 z-20 inset-x-0 fixture-account">
+          <div class="fixture-account-main">
+            <div class="fixture-avatar" aria-hidden="true">QA</div>
+            <div class="fixture-account-copy">
+              <div class="fixture-account-name">本地主题验证</div>
+              <div class="fixture-account-note">127.0.0.1 · CDP 9229</div>
+            </div>
+            <button class="fixture-icon-button" type="button" aria-label="打开设置">设置</button>
+          </div>
+        </div>
+      </aside>
+
+      <main class="fixture-workspace">
+        <section class="main-surface" aria-label="Codex 主界面">
+          <header class="app-header-tint">
+            <div class="fixture-title-block">
+              <span class="fixture-task-title">主题注入视觉回归</span>
+              <span class="fixture-task-state">自包含测试夹具</span>
+            </div>
+            <div class="fixture-view-switch" aria-label="测试视图">
+              <button class="fixture-view-button" id="view-chat" type="button" aria-pressed="true">对话视图</button>
+              <button class="fixture-view-button" id="view-empty" type="button" aria-pressed="false">空白主页</button>
+            </div>
+            <div class="fixture-header-actions">
+              <span class="fixture-theme-readout" id="theme-readout">主题：未注入</span>
+              <button class="fixture-icon-button fixture-more-button" type="button" aria-label="更多选项"><img class="fixture-more-icon" src="icons/dots-vertical.svg" alt=""></button>
+            </div>
+          </header>
+
+          <div class="fixture-thread" id="thread-scroll">
+            <div class="fixture-thread-inner">
+              <div class="fixture-date">今天 · 本地回环测试</div>
+              <div id="message-list">
+                <div class="fixture-message-row user" data-content-search-unit-key="qa-fixture-001:user">
+                  <div class="fixture-message-meta">你</div>
+                  <div data-user-message-bubble="true">请解析当前项目，并通过本机回环 CDP 注入主题。重点检查侧边栏、背景图、消息气泡和输入框是否完整覆盖。</div>
+                </div>
+                <div class="fixture-message-row assistant" data-content-search-unit-key="qa-fixture-002:assistant">
+                  <div class="fixture-assistant-head"><span class="fixture-assistant-mark">CDX</span><span>Codex</span></div>
+                  <div class="fixture-assistant-body">
+                    <p>已识别主题注入所需的核心结构。当前页面同时暴露主面板、标题栏、编辑器、用户消息和助手消息选择器。</p>
+                    <div class="fixture-code">.app-shell-left-panel
+.main-surface
+.app-header-tint
+.composer-surface-chrome .ProseMirror</div>
+                    <p>切换到“空白主页”可验证主题首页；继续保留对话视图则可比较消息卡片、背景可读性与底部输入区。</p>
+                  </div>
+                </div>
+                <div class="fixture-message-row user" data-content-search-unit-key="qa-fixture-003:user">
+                  <div class="fixture-message-meta">你</div>
+                  <div data-user-message-bubble="true">很好，再确认侧栏底部用户区和“打开设置”按钮也能被主题命中。</div>
+                </div>
+                <div class="fixture-message-row assistant" data-content-search-unit-key="qa-fixture-004:assistant">
+                  <div class="fixture-assistant-head"><span class="fixture-assistant-mark">CDX</span><span>Codex</span></div>
+                  <div class="fixture-assistant-body"><p>已覆盖。侧栏底部保留了注入 CSS 使用的组合类名，设置按钮也带有对应的中文 aria-label。</p></div>
+                </div>
+              </div>
+              <div class="fixture-empty" id="fixture-empty" aria-hidden="true">
+                <div class="fixture-empty-card">
+                  <div class="fixture-empty-kicker">CODEX THEME QA</div>
+                  <h1>我们该构建什么？</h1>
+                  <p>当前没有消息。应用主题后，这里会切换为主题主页，展示背景、标题与四个快捷操作卡片。</p>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="fixture-composer-wrap">
+            <div class="composer-surface-chrome">
+              <div class="ProseMirror" id="composer" contenteditable="true" role="textbox" aria-multiline="true" aria-label="向 Codex 询问任何问题" data-placeholder="向 Codex 询问任何问题"></div>
+              <div class="fixture-composer-bottom">
+                <div class="fixture-composer-tools">
+                  <button class="fixture-tool-button primary" type="button" aria-label="添加内容">＋</button>
+                  <button class="fixture-tool-button" type="button">选择项目</button>
+                  <button class="fixture-tool-button" type="button">完全访问</button>
+                </div>
+                <div class="fixture-composer-submit">
+                  <span>Ctrl + Enter</span>
+                  <button class="fixture-send" id="send-message" type="button" aria-label="发送消息">↑</button>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <textarea class="placeholder-probe" id="placeholder-probe" tabindex="-1" aria-hidden="true" placeholder="向 Codex 询问任何问题"></textarea>
+        </section>
+      </main>
+    </div>
+  </div>
+
+  <script>
+    (() => {
+      const main = document.querySelector('.main-surface');
+      const list = document.getElementById('message-list');
+      const empty = document.getElementById('fixture-empty');
+      const composer = document.getElementById('composer');
+      const probe = document.getElementById('placeholder-probe');
+      const chatButton = document.getElementById('view-chat');
+      const emptyButton = document.getElementById('view-empty');
+      const threadScroll = document.getElementById('thread-scroll');
+      const readout = document.getElementById('theme-readout');
+      let messageIndex = 10;
+      const initialMessages = list.innerHTML;
+
+      function syncPlaceholder() {
+        composer.dataset.placeholder = probe.getAttribute('placeholder') || '向 Codex 询问任何问题';
+      }
+
+      function setView(mode) {
+        const showChat = mode === 'chat';
+        chatButton.setAttribute('aria-pressed', String(showChat));
+        emptyButton.setAttribute('aria-pressed', String(!showChat));
+        if (showChat) {
+          if (!list.children.length) list.innerHTML = initialMessages;
+          empty.setAttribute('aria-hidden', 'true');
+        } else {
+          list.replaceChildren();
+          empty.setAttribute('aria-hidden', 'false');
+        }
+      }
+
+      function appendMessage() {
+        const text = composer.textContent.trim();
+        if (!text) return;
+        setView('chat');
+        messageIndex += 1;
+
+        const row = document.createElement('div');
+        row.className = 'fixture-message-row user';
+        row.dataset.contentSearchUnitKey = `qa-fixture-${messageIndex}:user`;
+
+        const meta = document.createElement('div');
+        meta.className = 'fixture-message-meta';
+        meta.textContent = '你';
+
+        const bubble = document.createElement('div');
+        bubble.dataset.userMessageBubble = 'true';
+        bubble.textContent = text;
+
+        row.append(meta, bubble);
+        list.appendChild(row);
+        composer.replaceChildren();
+        requestAnimationFrame(() => {
+          threadScroll.scrollTop = threadScroll.scrollHeight;
+        });
+      }
+
+      function updateThemeReadout() {
+        const value = getComputedStyle(document.documentElement).getPropertyValue('--codex-theme-id').trim();
+        const clean = value.replace(/^['\"]|['\"]$/g, '');
+        readout.textContent = clean ? `主题：${clean}` : '主题：未注入';
+        readout.title = readout.textContent;
+      }
+
+      syncPlaceholder();
+      updateThemeReadout();
+
+      chatButton.addEventListener('click', () => setView('chat'));
+      emptyButton.addEventListener('click', () => setView('empty'));
+      document.getElementById('send-message').addEventListener('click', appendMessage);
+      composer.addEventListener('keydown', event => {
+        if (event.key === 'Enter' && event.ctrlKey) {
+          event.preventDefault();
+          appendMessage();
+        }
+      });
+
+      new MutationObserver(syncPlaceholder).observe(probe, {
+        attributes: true,
+        attributeFilter: ['placeholder']
+      });
+
+      new MutationObserver(updateThemeReadout).observe(document.head, {
+        childList: true,
+        subtree: true,
+        characterData: true
+      });
+
+      new MutationObserver(() => {
+        const injectedHome = document.getElementById('codex-theme-home');
+        if (injectedHome && main.classList.contains('codex-theme-home-active')) {
+          empty.setAttribute('aria-hidden', 'true');
+        }
+      }).observe(main, {
+        childList: true,
+        subtree: false,
+        attributes: true,
+        attributeFilter: ['class']
+      });
+    })();
+  </script>
+</body>
+</html>

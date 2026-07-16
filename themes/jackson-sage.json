@@ -1,0 +1,120 @@
+{
+  "displayName": "Jackson Sage",
+  "codeThemeId": "jackson-sage",
+  "variant": "light",
+  "previewImage": "../previews/jackson-sage.png",
+  "theme": {
+    "accent": "#879966",
+    "contrast": 45,
+    "fonts": {
+      "code": "JetBrainsMono NFM",
+      "ui": "\"Microsoft YaHei UI\", \"PingFang SC\", \"Noto Sans SC\", \"Segoe UI\", sans-serif",
+      "display": "\"Noto Serif SC\", \"Source Han Serif SC\", STSong, SimSun, Georgia, serif"
+    },
+    "ink": "#3d4a31",
+    "opaqueWindows": true,
+    "semanticColors": {
+      "diffAdded": "#7da866",
+      "diffRemoved": "#c98665",
+      "skill": "#b99b68"
+    },
+    "surface": "#f6f4ea",
+    "backgroundImage": "../backgrounds/jackson-sage-hero-v2.jpg",
+    "logoImage": "../logos/jackson-sage-logo-ui-v1.png",
+    "backgroundImageOpacity": 1,
+    "backgroundImageBlur": 0
+  },
+  "home": {
+    "brand": "Jackson Yee",
+    "eyebrow": "易烊千玺专属定制皮肤",
+    "badge": "集美最喜欢",
+    "title": "我们该构建什么？",
+    "subtitle": "与千玺一起，用代码创造无限可能",
+    "tags": [
+      "安静生长",
+      "松弛留白",
+      "细节主义",
+      "温柔落地"
+    ],
+    "sidebarProject": "Jackson 星球",
+    "sidebarItems": [
+      "千玺电影清单",
+      "今日穿搭灵感",
+      "手账与拍立得收藏",
+      "一起练字打卡"
+    ],
+    "sidebarLabels": {
+      "newTask": "新建手账",
+      "scheduled": "已安排",
+      "plugins": "插件",
+      "projects": "项目",
+      "tasks": "任务",
+      "settings": "设置"
+    },
+    "tasks": [
+      "听千玺歌单",
+      "看一部喜欢的电影",
+      "练舞 or 运动打卡",
+      "拍一张氛围感照片",
+      "做今日手账",
+      "学习一点新技能",
+      "晚安留言给千玺"
+    ],
+    "progressLabel": "继续设置 · 0/4",
+    "profileLabel": "千纸鹤",
+    "composerHint": "随心输入，让千玺陪你一起写代码吧～",
+    "footerNote": "Be Better · Be Jackson Yee",
+    "quickActions": [
+      {
+        "icon": "</>",
+        "title": "探索并理解代码",
+        "description": "安静梳理结构与关键模块",
+        "prompt": "请帮我探索并理解当前代码库，先概览结构、关键模块和主要流程。"
+      },
+      {
+        "icon": "+",
+        "title": "构建新功能、应用或工具",
+        "description": "把想法稳稳落成实现",
+        "prompt": "请根据当前项目构建一个新功能，先确认需求并给出可运行的实现。"
+      },
+      {
+        "icon": "✓",
+        "title": "审查代码并提出修改建议",
+        "description": "细致检查风险与质量",
+        "prompt": "请审查当前代码，优先查找缺陷、回归风险和缺失测试，并提出修改建议。"
+      },
+      {
+        "icon": "!",
+        "title": "修复问题和失败",
+        "description": "定位根因并完成验证",
+        "prompt": "请诊断当前问题或失败，找到根因、完成修复并验证结果。"
+      }
+    ]
+  },
+  "copy": {
+    "title": "Codex 千玺星球",
+    "replaceText": {
+      "Codex": "Codex 千玺",
+      "New Task": "New Note",
+      "New task": "New Note",
+      "Skills": "Studio",
+      "Chat": "Quiet Chat",
+      "新建任务": "新建手账",
+      "已安排": "已安排",
+      "技能": "千玺技能",
+      "站点": "收藏站点",
+      "拉取请求": "练字请求",
+      "聊天": "安静聊天",
+      "项目": "项目",
+      "任务": "任务",
+      "选择项目": "选择项目",
+      "继续设置": "继续设置"
+    },
+    "replacePlaceholders": {
+      "Ask Codex": "Write calmly...",
+      "Ask Codex anything": "随心输入，让千玺陪你一起写代码吧~",
+      "向 Codex 询问任何问题": "随心输入，让千玺陪你一起写代码吧~",
+      "给 Codex 发送消息": "随心输入，让千玺陪你一起写代码吧~"
+    }
+  }
+}

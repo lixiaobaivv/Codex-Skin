@@ -1,0 +1,120 @@
+{
+  "displayName": "Dilraba Star",
+  "codeThemeId": "dilraba-star",
+  "variant": "light",
+  "previewImage": "../previews/dilraba-star.png",
+  "theme": {
+    "accent": "#7b49ff",
+    "contrast": 52,
+    "fonts": {
+      "code": "JetBrainsMono NFM",
+      "ui": "\"Microsoft YaHei UI\", \"PingFang SC\", \"Noto Sans SC\", \"Segoe UI\", sans-serif",
+      "display": "\"Noto Serif SC\", \"Source Han Serif SC\", STSong, SimSun, Georgia, serif"
+    },
+    "ink": "#151b72",
+    "opaqueWindows": true,
+    "semanticColors": {
+      "diffAdded": "#2be7c8",
+      "diffRemoved": "#ff5f8f",
+      "skill": "#b459ff"
+    },
+    "surface": "#f4f1ff",
+    "backgroundImage": "../backgrounds/dilraba-star-hero-v3.jpg",
+    "logoImage": "../logos/dilraba-star-logo-ui-v1.png",
+    "backgroundImageOpacity": 1,
+    "backgroundImageBlur": 0
+  },
+  "home": {
+    "brand": "Dilraba",
+    "eyebrow": "迪丽热巴专属定制皮肤",
+    "badge": "集帅最喜欢",
+    "title": "我们该构建什么？",
+    "subtitle": "与热巴一起，用灵感创造无限可能",
+    "tags": [
+      "星光灵感",
+      "甜酷创作",
+      "热巴同频",
+      "高光时刻"
+    ],
+    "sidebarProject": "热巴星球",
+    "sidebarItems": [
+      "热巴影视清单",
+      "红毯造型收藏",
+      "甜妹穿搭灵感",
+      "一起追剧打卡"
+    ],
+    "sidebarLabels": {
+      "newTask": "新建灵感",
+      "scheduled": "已安排",
+      "plugins": "插件",
+      "projects": "项目",
+      "tasks": "任务",
+      "settings": "设置"
+    },
+    "tasks": [
+      "每一部热巴主演作品",
+      "嗑追剧 BGM 歌单",
+      "收藏一张热巴氛围照",
+      "写一句今日灵感",
+      "学一个拍照姿势",
+      "做今日追星手账",
+      "晚安留言给热巴"
+    ],
+    "progressLabel": "继续设置 · 0/4",
+    "profileLabel": "热巴星球",
+    "composerHint": "随心输入，让灵感陪你一起写代码吧～",
+    "footerNote": "Be Your Light · Dilraba",
+    "quickActions": [
+      {
+        "icon": "</>",
+        "title": "探索并理解代码",
+        "description": "快速梳理结构与关键模块",
+        "prompt": "请帮我探索并理解当前代码库，先概览结构、关键模块和主要流程。"
+      },
+      {
+        "icon": "+",
+        "title": "构建新功能、应用或工具",
+        "description": "把灵感变成可运行的实现",
+        "prompt": "请根据当前项目构建一个新功能，先确认需求并给出可运行的实现。"
+      },
+      {
+        "icon": "✓",
+        "title": "审查代码并提出修改建议",
+        "description": "定位风险并改善代码质量",
+        "prompt": "请审查当前代码，优先查找缺陷、回归风险和缺失测试，并提出修改建议。"
+      },
+      {
+        "icon": "!",
+        "title": "修复问题和失败",
+        "description": "诊断原因并完成修复验证",
+        "prompt": "请诊断当前问题或失败，找到根因、完成修复并验证结果。"
+      }
+    ]
+  },
+  "copy": {
+    "title": "Codex 热巴星球",
+    "replaceText": {
+      "Codex": "Codex 热巴",
+      "New Task": "Star Task",
+      "New task": "Star Task",
+      "Skills": "Star Skills",
+      "Chat": "Inspiration Chat",
+      "新建任务": "新建灵感",
+      "已安排": "已安排",
+      "技能": "热巴技能",
+      "站点": "星球站点",
+      "拉取请求": "灵感请求",
+      "聊天": "灵感聊天",
+      "项目": "项目",
+      "任务": "任务",
+      "选择项目": "选择星球",
+      "继续设置": "继续追星"
+    },
+    "replacePlaceholders": {
+      "Ask Codex": "Write with inspiration...",
+      "Ask Codex anything": "随心输入，让灵感陪你一起写代码吧~",
+      "向 Codex 询问任何问题": "随心输入，让灵感陪你一起写代码吧~",
+      "给 Codex 发送消息": "随心输入，让灵感陪你一起写代码吧~"
+    }
+  }
+}

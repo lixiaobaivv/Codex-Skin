@@ -1,0 +1,120 @@
+{
+  "displayName": "ENFP Pop",
+  "codeThemeId": "enfp-pop",
+  "variant": "light",
+  "previewImage": "../previews/enfp-pop.png",
+  "theme": {
+    "accent": "#12bfa5",
+    "contrast": 50,
+    "fonts": {
+      "code": "JetBrainsMono NFM",
+      "ui": "\"Microsoft YaHei UI\", \"PingFang SC\", \"Noto Sans SC\", \"Segoe UI\", sans-serif",
+      "display": "ui-rounded, \"Arial Rounded MT Bold\", \"Microsoft YaHei UI\", \"Noto Sans SC\", sans-serif"
+    },
+    "ink": "#202335",
+    "opaqueWindows": true,
+    "semanticColors": {
+      "diffAdded": "#22c55e",
+      "diffRemoved": "#ff6a57",
+      "skill": "#ffb31a"
+    },
+    "surface": "#fffaf0",
+    "backgroundImage": "../backgrounds/enfp-pop-hero-v2.jpg",
+    "logoImage": "../logos/enfp-pop-logo-ui-v1.png",
+    "backgroundImageOpacity": 1,
+    "backgroundImageBlur": 0
+  },
+  "home": {
+    "brand": "ENFP",
+    "eyebrow": "灵感发动机已启动",
+    "badge": "今天适合开脑洞",
+    "title": "先有灵感，再把它变成真的",
+    "subtitle": "脑暴、试错、灵感乱飞，但最后都能落地",
+    "tags": [
+      "自由探索",
+      "创意无限",
+      "热情驱动",
+      "趣味至上"
+    ],
+    "sidebarProject": "ENFP 小宇宙项目",
+    "sidebarItems": [
+      "灵感收集站",
+      "脑暴草稿箱",
+      "创意实验室",
+      "组件游乐场",
+      "最终落地版"
+    ],
+    "sidebarLabels": {
+      "newTask": "新建点子",
+      "scheduled": "灵感排期",
+      "plugins": "插件",
+      "projects": "项目",
+      "tasks": "任务",
+      "settings": "设置"
+    },
+    "tasks": [
+      "做一个会说话的按钮",
+      "把想法倒成小 Demo",
+      "重构一下更丝滑",
+      "加点动效吧",
+      "修复那个烦人的 Bug",
+      "写文档（晚点再说）"
+    ],
+    "progressLabel": "ENFP 能量值 · 100%",
+    "profileLabel": "小宇宙发射中",
+    "composerHint": "随便输入一个想法吧～ 我陪你一起把它变成酷炫的作品！",
+    "footerNote": "今日心情：创意 +100 · 动力 +100 · 乐趣 +100",
+    "quickActions": [
+      {
+        "icon": "✦",
+        "title": "灵感脑暴",
+        "description": "把脑子里的一万种可能都倒出来",
+        "prompt": "和我一起进行灵感脑暴，先自由发散多个方向，再整理成最值得尝试的方案。"
+      },
+      {
+        "icon": "↗",
+        "title": "快速原型",
+        "description": "想法不等人，先跑起来再说",
+        "prompt": "请把这个想法快速做成可运行的原型，优先完成核心体验。"
+      },
+      {
+        "icon": "↻",
+        "title": "边玩边改",
+        "description": "改到爽为止，体验即正义",
+        "prompt": "请和我一起迭代当前功能，根据实际体验边测试边修改。"
+      },
+      {
+        "icon": "!",
+        "title": "欢乐修 Bug",
+        "description": "把问题拆开，逐个解决",
+        "prompt": "请诊断并修复当前 Bug，说明根因并验证修复结果。"
+      }
+    ]
+  },
+  "copy": {
+    "title": "Codex ENFP 小宇宙",
+    "replaceText": {
+      "Codex": "Codex ENFP",
+      "New Task": "New Spark",
+      "New task": "New Spark",
+      "Skills": "Playground",
+      "Chat": "Idea Chat",
+      "新建任务": "新建点子",
+      "已安排": "灵感排期",
+      "技能": "技能游乐场",
+      "站点": "小宇宙站点",
+      "拉取请求": "边玩边改",
+      "聊天": "灵感聊天",
+      "项目": "项目",
+      "任务": "任务",
+      "选择项目": "选择灵感图",
+      "继续设置": "ENFP 能量值"
+    },
+    "replacePlaceholders": {
+      "Ask Codex": "Turn the idea into something real...",
+      "Ask Codex anything": "随便输入一个想法吧~ 我陪你一起把它变成酷炫的作品！",
+      "向 Codex 询问任何问题": "随便输入一个想法吧~ 我陪你一起把它变成酷炫的作品！",
+      "给 Codex 发送消息": "随便输入一个想法吧~ 我陪你一起把它变成酷炫的作品！"
+    }
+  }
+}
