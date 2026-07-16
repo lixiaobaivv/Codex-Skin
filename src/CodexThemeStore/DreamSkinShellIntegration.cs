@@ -12,7 +12,7 @@ internal static class DreamSkinShellIntegration
             ?? throw new InvalidOperationException("无法确定当前程序路径。");
         if (Path.GetFileNameWithoutExtension(executable).Equals("dotnet", StringComparison.OrdinalIgnoreCase))
         {
-            throw new InvalidOperationException("DSI_PROTOCOL_INVALID_HOST: 请使用已发布的 CodexThemeStore.exe 注册协议，不能注册 dotnet.exe 宿主。");
+            throw new InvalidOperationException("DSI_PROTOCOL_INVALID_HOST: 请使用已发布的 Codex-Skin.exe 注册协议，不能注册 dotnet.exe 宿主。");
         }
         using (var existingCommand = Registry.CurrentUser.OpenSubKey($@"{ProtocolKey}\shell\open\command"))
         {
