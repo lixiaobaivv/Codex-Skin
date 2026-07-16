@@ -1,0 +1,11 @@
+{
+  "schemaVersion": 1,
+  "keys": [
+    {
+      "keyId": "codex-skin.sample.2026-01",
+      "algorithm": "Ed25519",
+      "publicKey": "kuf25VngYoeAC2TDJ2kPGRfKGJZvQhZrdVnQhGvQ3fM",
+      "purpose": "development-fixture-only"
+    }
+  ]
+}

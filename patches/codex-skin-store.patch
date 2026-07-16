@@ -1,0 +1,198 @@
+diff --git a/app/globals.css b/app/globals.css
+index 6b0cebf..e4be06f 100644
+--- a/app/globals.css
++++ b/app/globals.css
+@@ -1432,6 +1432,7 @@ footer > div a:hover {
+   cursor: pointer;
+   font-size: 9px;
+   font-weight: 700;
++  text-decoration: none;
+ }
+ 
+ .icon-button:hover {
+diff --git a/components/storefront.tsx b/components/storefront.tsx
+index 2a6a566..77c1541 100644
+--- a/components/storefront.tsx
++++ b/components/storefront.tsx
+@@ -2,6 +2,7 @@
+ 
+ import type { CSSProperties } from "react";
+ import { useEffect, useMemo, useState } from "react";
++import { createDreamSkinInstallLink } from "@/lib/dreamskin-link";
+ import {
+   COLOR_OPTIONS,
+   PLATFORM_OPTIONS,
+@@ -158,6 +159,7 @@ function ThemeCard({
+ }
+ 
+ function ThemeDetail({ theme, onClose }: { theme: Theme; onClose: () => void }) {
++  const installLink = theme.package?.published ? createDreamSkinInstallLink(theme.package) : undefined;
+   return (
+     <div className="theme-dialog-backdrop" role="presentation" onMouseDown={onClose}>
+       <section
+@@ -213,14 +215,31 @@ function ThemeDetail({ theme, onClose }: { theme: Theme; onClose: () => void })
+             <p>声明式主题 · {theme.license.name} · 引擎 {theme.engineRange}</p>
+           </div>
+           <div className="dialog-actions">
+-            <button className="primary-button primary-button--wide" type="button" disabled>
+-              一键导入开发中 <span>↗</span>
+-            </button>
++            {installLink ? (
++              <a className="primary-button primary-button--wide" href={installLink}>
++                一键导入 <span>↗</span>
++              </a>
++            ) : (
++              <button className="primary-button primary-button--wide" type="button" disabled>
++                暂无可验证包
++              </button>
++            )}
++            {theme.package?.published && (
++              <a className="icon-button" href={theme.package.url}>
++                手动下载
++              </a>
++            )}
+             <a className="icon-button" href={PROTOCOL_SPEC_URL} target="_blank" rel="noreferrer">
+               查看协议规范
+             </a>
+           </div>
+-          <p className="dialog-helper">示例主题尚未发布真实包；客户端导入器与系统协议接入完成后开放。</p>
++          <p className="dialog-helper">
++            {theme.package?.published
++              ? `客户端将校验 ${theme.package.size.toLocaleString("zh-CN")} 字节、SHA-256 与 Ed25519 签名；安装后仍需单独确认应用。`
++              : theme.package
++                ? "签名样例已经准备完成，GitHub Release 发布后即可开放一键导入。"
++                : "该预览还没有经过签名和发布，因此不提供导入链接。"}
++          </p>
+         </div>
+       </section>
+     </div>
+@@ -455,7 +474,7 @@ export function Storefront() {
+         <div className="protocol-chip">
+           <span>PROTOCOL</span>
+           <code>dreamskin://install?url=…&amp;sha256=…&amp;size=…</code>
+-          <i>真实包、哈希与大小就绪后开放</i>
++          <i>首个双平台签名示例待 Release 发布</i>
+         </div>
+       </section>
+ 
+diff --git a/lib/dreamskin-link.ts b/lib/dreamskin-link.ts
+new file mode 100644
+index 0000000..330a50b
+--- /dev/null
++++ b/lib/dreamskin-link.ts
+@@ -0,0 +1,12 @@
++import type { ThemePackage } from "@/lib/themes";
++
++export function createDreamSkinInstallLink(packageInfo: ThemePackage): string {
++  const parameters = new URLSearchParams({
++    url: packageInfo.url,
++    sha256: packageInfo.sha256,
++    size: String(packageInfo.size),
++    id: packageInfo.id,
++    version: packageInfo.version,
++  });
++  return `dreamskin://install?${parameters.toString()}`;
++}
+diff --git a/lib/themes.ts b/lib/themes.ts
+index 11204fd..c554213 100644
+--- a/lib/themes.ts
++++ b/lib/themes.ts
+@@ -59,6 +59,15 @@ export interface ThemePreviewStyle {
+   readonly pattern: "aurora" | "grid" | "paper" | "horizon" | "mist" | "orb" | "stars" | "embers";
+ }
+ 
++export interface ThemePackage {
++  readonly published: boolean;
++  readonly id: string;
++  readonly version: string;
++  readonly url: `https://${string}`;
++  readonly sha256: string;
++  readonly size: number;
++}
++
+ export interface Theme {
+   readonly slug: string;
+   readonly name: string;
+@@ -76,6 +85,7 @@ export interface Theme {
+   readonly publishedAt: string;
+   readonly license: ThemeLicense;
+   readonly previewStyle: ThemePreviewStyle;
++  readonly package?: ThemePackage;
+ }
+ 
+ export interface ThemeFilterOptions {
+@@ -137,6 +147,44 @@ const SAMPLE_LICENSE: ThemeLicense = {
+ };
+ 
+ export const THEMES = [
++  {
++    slug: "jackson-sage-signed-sample",
++    name: "千玺星球签名示例",
++    summary: "首个可真实下载的双平台签名样例，用同一份信任契约验证 Windows 与 macOS 导入流程。",
++    author: { name: "Codex-Skin contributors", handle: "codex-skin", curated: true },
++    category: "nature",
++    platforms: ["macos", "windows"],
++    colors: ["green", "neutral", "orange"],
++    tags: ["签名示例", "双平台", "Ed25519", "开源"],
++    stats: { downloads: 0, rating: 5, reviews: 0 },
++    featured: true,
++    isNew: true,
++    version: "1.0.0",
++    engineRange: ">=1.0.0 <2.0.0",
++    publishedAt: "2026-07-16T12:00:00.000Z",
++    license: SAMPLE_LICENSE,
++    package: {
++      published: false,
++      id: "codex-skin.jackson-sage-sample",
++      version: "1.0.0",
++      url: "https://github.com/lixiaobaivv/Codex-Skin/releases/download/sample-v1/codex-skin-sample-1.0.0.dreamskin",
++      sha256: "7a75fff8086fe6949ef9e37e82c161a8e015a1e00e02181938cd479e9ae41387",
++      size: 2041227,
++    },
++    previewStyle: {
++      backgroundColor: "#cbd7ca",
++      backgroundImage: "radial-gradient(circle at 80% 12%, rgba(215, 180, 106, .5), transparent 24%), linear-gradient(145deg, #dfe8dc, #78937b 55%, #516b54)",
++      panelColor: "rgba(244, 245, 239, .86)",
++      panelBorder: "rgba(81, 107, 84, .22)",
++      textColor: "#1d2a20",
++      mutedTextColor: "#647066",
++      accentColor: "#516b54",
++      accentSoft: "rgba(81, 107, 84, .14)",
++      codeColor: "#9d694f",
++      shadow: "0 28px 72px rgba(29, 42, 32, .24)",
++      pattern: "mist",
++    },
++  },
+   {
+     slug: "aurora-drift",
+     name: "极光漫游",
+diff --git a/tests/theme-contract.test.mjs b/tests/theme-contract.test.mjs
+index 1c323e2..377648e 100644
+--- a/tests/theme-contract.test.mjs
++++ b/tests/theme-contract.test.mjs
+@@ -19,13 +19,21 @@ test("theme package schema stays declarative and closed", async () => {
+   assert.match(source, /Ed25519/);
+ });
+ 
+-test("storefront does not expose placeholder install links", async () => {
+-  const [storefront, themes] = await Promise.all([
++test("storefront catalogs the signed sample and gates unpublished links", async () => {
++  const [storefront, themes, links] = await Promise.all([
+     readFile(new URL("../components/storefront.tsx", import.meta.url), "utf8"),
+     readFile(new URL("../lib/themes.ts", import.meta.url), "utf8"),
++    readFile(new URL("../lib/dreamskin-link.ts", import.meta.url), "utf8"),
+   ]);
+ 
+-  assert.match(storefront, /一键导入开发中/);
++  assert.match(storefront, /一键导入/);
++  assert.match(storefront, /手动下载/);
+   assert.doesNotMatch(storefront, /PROTOCOL_PREVIEW_SHA256|dreamskin\.store\/packages/);
+-  assert.doesNotMatch(themes, /packageUrl/);
++  assert.match(themes, /releases\/download\/sample-v1\/codex-skin-sample-1\.0\.0\.dreamskin/);
++  assert.match(themes, /7a75fff8086fe6949ef9e37e82c161a8e015a1e00e02181938cd479e9ae41387/);
++  assert.match(themes, /size: 2041227/);
++  assert.match(themes, /published: false/);
++  assert.match(storefront, /theme\.package\?\.published/);
++  assert.match(links, /URLSearchParams/);
++  assert.match(links, /dreamskin:\/\/install/);
+ });

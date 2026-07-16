@@ -1,0 +1,19 @@
+{
+  "schemaVersion": 1,
+  "id": "codex-skin.jackson-sage-sample",
+  "name": "千玺星球签名示例",
+  "version": "1.0.0",
+  "package": {
+    "url": "https://github.com/lixiaobaivv/Codex-Skin/releases/download/sample-v1/codex-skin-sample-1.0.0.dreamskin",
+    "sha256": "7a75fff8086fe6949ef9e37e82c161a8e015a1e00e02181938cd479e9ae41387",
+    "size": 2041227
+  },
+  "installUri": "dreamskin://install?url=https%3A%2F%2Fgithub.com%2Flixiaobaivv%2FCodex-Skin%2Freleases%2Fdownload%2Fsample-v1%2Fcodex-skin-sample-1.0.0.dreamskin&sha256=7a75fff8086fe6949ef9e37e82c161a8e015a1e00e02181938cd479e9ae41387&size=2041227&id=codex-skin.jackson-sage-sample&version=1.0.0",
+  "compatibility": {
+    "client": ">=1.0.0 <2.0.0",
+    "platforms": [
+      "macos",
+      "windows"
+    ]
+  }
+}

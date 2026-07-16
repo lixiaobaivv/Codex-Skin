@@ -1,0 +1,77 @@
+name: Publish signed sample package
+
+on:
+  push:
+    tags:
+      - sample-v1
+  workflow_dispatch:
+    inputs:
+      release_tag:
+        description: Immutable sample release tag
+        required: true
+        default: sample-v1
+
+permissions:
+  contents: write
+
+jobs:
+  release-fixture:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Verify deterministic fixture and contract
+        run: |
+          before="$(sha256sum samples/dreamskin/codex-skin-sample-1.0.0.dreamskin | cut -d ' ' -f 1)"
+          node tools/dreamskin/build-sample.mjs
+          after="$(sha256sum samples/dreamskin/codex-skin-sample-1.0.0.dreamskin | cut -d ' ' -f 1)"
+          test "$before" = "$after"
+          node --test tests/dreamskin-fixture.test.mjs
+
+      - name: Verify release tag matches catalog URL
+        env:
+          RELEASE_TAG: ${{ github.event_name == 'workflow_dispatch' && inputs.release_tag || github.ref_name }}
+        run: |
+          node --input-type=module -e '
+            import fs from "node:fs";
+            const catalog = JSON.parse(fs.readFileSync("samples/dreamskin/catalog-entry.json", "utf8"));
+            const expected = `/releases/download/${process.env.RELEASE_TAG}/codex-skin-sample-1.0.0.dreamskin`;
+            if (!catalog.package.url.endsWith(expected)) throw new Error(`Catalog URL does not match ${process.env.RELEASE_TAG}.`);
+          '
+
+      - name: Create or verify immutable sample release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ github.event_name == 'workflow_dispatch' && inputs.release_tag || github.ref_name }}
+        run: |
+          assets=(
+            samples/dreamskin/codex-skin-sample-1.0.0.dreamskin
+            samples/dreamskin/catalog-entry.json
+            samples/dreamskin/public-keys.json
+          )
+          if ! gh release view "$RELEASE_TAG" >/dev/null 2>&1; then
+            gh release create "$RELEASE_TAG" "${assets[@]}" \
+              --target "$GITHUB_SHA" \
+              --title "Signed Dream Skin interoperability sample v1" \
+              --notes "Development fixture for macOS/Windows importer interoperability. The signing key is public and not trusted for production publishing."
+            exit 0
+          fi
+
+          mkdir -p "$RUNNER_TEMP/existing-release"
+          gh release download "$RELEASE_TAG" --dir "$RUNNER_TEMP/existing-release"
+          for asset in "${assets[@]}"; do
+            name="$(basename "$asset")"
+            existing="$RUNNER_TEMP/existing-release/$name"
+            if [ -f "$existing" ]; then
+              cmp "$asset" "$existing" || {
+                echo "Release asset $name already exists with different bytes; refusing to overwrite immutable release." >&2
+                exit 1
+              }
+            else
+              gh release upload "$RELEASE_TAG" "$asset"
+            fi
+          done
