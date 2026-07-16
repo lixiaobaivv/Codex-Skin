@@ -1,6 +1,6 @@
 diff --git a/.github/workflows/dreamskin-importer-macos.yml b/.github/workflows/dreamskin-importer-macos.yml
 new file mode 100644
-index 0000000..9e2402a
+index 0000000..9be7b75
 --- /dev/null
 +++ b/.github/workflows/dreamskin-importer-macos.yml
 @@ -0,0 +1,34 @@
@@ -23,9 +23,9 @@ index 0000000..9e2402a
 +  importer:
 +    runs-on: macos-14
 +    steps:
-+      - uses: actions/checkout@v4
++      - uses: actions/checkout@v7
 +
-+      - uses: actions/setup-node@v4
++      - uses: actions/setup-node@v7
 +        with:
 +          node-version: 22
 +
