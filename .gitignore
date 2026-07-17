@@ -31,6 +31,12 @@ coverage.*
 packages/
 project.lock.json
 
+# Tauri / web frontend build outputs
+node_modules/
+dist/
+src-tauri/target/
+src-tauri/gen/
+
 # Logs and temporary files
 *.log
 *.tmp
