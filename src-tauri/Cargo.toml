@@ -1,6 +1,6 @@
 [package]
 name = "codex-skin"
-version = "0.1.0"
+version = "0.2.0"
 description = "Codex Desktop theme client"
 authors = ["Codex Skin"]
 edition = "2024"

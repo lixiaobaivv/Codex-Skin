@@ -2,6 +2,19 @@ import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import test from "node:test";
 
+test("application version manifests stay aligned", async () => {
+  const [npmManifest, tauriManifest, cargoManifest, cargoLock] = await Promise.all([
+    readFile(new URL("../package.json", import.meta.url), "utf8"),
+    readFile(new URL("../src-tauri/tauri.conf.json", import.meta.url), "utf8"),
+    readFile(new URL("../src-tauri/Cargo.toml", import.meta.url), "utf8"),
+    readFile(new URL("../src-tauri/Cargo.lock", import.meta.url), "utf8"),
+  ]);
+  const version = JSON.parse(npmManifest).version;
+  assert.equal(JSON.parse(tauriManifest).version, version);
+  assert.match(cargoManifest, new RegExp(`^version = "${version.replaceAll(".", "\\.")}"$`, "m"));
+  assert.match(cargoLock, new RegExp(`name = "codex-skin"\\nversion = "${version.replaceAll(".", "\\.")}"`));
+});
+
 test("Windows release publishes the Tauri graphical Setup installer", async () => {
   const [cargo, tauri, ci, build, readme, rustApp, installer, chineseMessages, icon] = await Promise.all([
     readFile(new URL("../src-tauri/Cargo.toml", import.meta.url), "utf8"),

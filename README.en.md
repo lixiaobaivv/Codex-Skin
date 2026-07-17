@@ -7,7 +7,7 @@
 
 Codex-Skin is a theme client for Codex Desktop on Windows and macOS. It provides a visual theme catalog, previews, safe application and rollback, plus signed imports from [Codex-Skin-Store](https://lixiaobaivv.github.io/Codex-Skin-Store/).
 
-This first public release focuses on a complete, auditable path from browsing and downloading a theme to validation, installation, application, and rollback.
+Codex-Skin provides a complete, auditable path from discovery and on-demand download through validation, installation, incremental updates, application, and rollback.
 
 > Codex-Skin is a community open-source project, not an OpenAI or official Codex product. It does not modify the signed Codex installation or read API keys, project files, tasks, or conversations.
 

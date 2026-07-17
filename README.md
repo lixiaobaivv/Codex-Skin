@@ -7,7 +7,7 @@
 
 Codex-Skin 是适用于 Windows 和 macOS 的 Codex Desktop 主题客户端。它提供可视化主题目录、实时预览、安全应用与回滚，并支持从 [Codex-Skin-Store](https://lixiaobaivv.github.io/Codex-Skin-Store/) 导入经过签名验证的主题。
 
-这是 Codex-Skin 的首个公开版本，重点是让主题的浏览、下载、验证、安装和应用形成一条完整且可审计的流程。
+Codex-Skin 让主题的浏览、按需下载、验证、安装、增量更新和应用形成一条完整且可审计的流程。
 
 > Codex-Skin 是社区开源项目，不是 OpenAI 或 Codex 官方产品。它不会修改 Codex 的签名安装包，也不会读取 API Key、项目文件、任务内容或聊天数据。
 
