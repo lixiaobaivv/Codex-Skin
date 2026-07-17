@@ -7,6 +7,22 @@ public sealed class ThemeRepositoryAuthoringTests : IDisposable
 {
     private readonly string _root = Path.Combine(Path.GetTempPath(), $"codex-theme-authoring-{Guid.NewGuid():N}");
 
+    [Theory]
+    [InlineData("github", "github", "gh-proxy", "ghfast")]
+    [InlineData("gh-proxy", "gh-proxy", "github", "ghfast")]
+    [InlineData("ghfast", "ghfast", "github", "gh-proxy")]
+    [InlineData("unknown", "github", "gh-proxy", "ghfast")]
+    public void OrdersCatalogSourcesFromTheSavedSuccessfulSource(
+        string preferred,
+        string first,
+        string second,
+        string third)
+    {
+        var candidates = ThemeRepositoryClient.GetSourceCandidates(preferred);
+
+        Assert.Equal([first, second, third], candidates.Select(source => source.Id));
+    }
+
     [Fact]
     public void GeneratesValidIndexAndPublishablePackage()
     {

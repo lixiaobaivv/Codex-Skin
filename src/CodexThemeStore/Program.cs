@@ -22,7 +22,18 @@ internal static class Program
         if (args.Length == 0 || externalImport)
         {
             ApplicationConfiguration.Initialize();
-            Application.Run(new ThemeStoreForm(externalImport ? args[0] : null));
+            using var instance = WindowsSingleInstance.Create();
+            var activation = externalImport ? args[0] : null;
+            if (!instance.IsPrimary)
+            {
+                if (!instance.TryForward(activation))
+                    MessageBox.Show("Codex-Skin 已在运行，但暂时无法激活现有窗口。", "Codex-Skin", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                return 0;
+            }
+
+            var window = new ThemeStoreForm(activation);
+            window.Shown += (_, _) => instance.StartListening(window, window.HandleActivationAsync);
+            Application.Run(window);
             return 0;
         }
 
@@ -67,9 +78,9 @@ internal sealed class ThemeStoreForm : Form
     private static readonly Color Muted = Color.FromArgb(103, 105, 100);
     private static readonly Color Accent = Color.FromArgb(218, 119, 86);
     private readonly List<ThemePreviewCard> _cards = [];
+    private readonly List<Button> _categoryButtons = [];
     private readonly FlowLayoutPanel _grid;
     private readonly ComboBox _sourceCombo;
-    private readonly ComboBox _categoryCombo;
     private readonly Button _refreshButton;
     private readonly Label _themeCountLabel;
     private readonly Label _selectionLabel;
@@ -79,6 +90,8 @@ internal sealed class ThemeStoreForm : Form
     private readonly Button _saveButton;
     private readonly Button _rollbackButton;
     private readonly string? _externalImport;
+    private readonly SemaphoreSlim _importGate = new(1, 1);
+    private string _selectedCategory = "全部";
     private ThemePreviewCard? _selectedCard;
 
     public ThemeStoreForm(string? externalImport = null)
@@ -115,14 +128,23 @@ internal sealed class ThemeStoreForm : Form
             ForeColor = Ink,
             Location = new Point(0, 0),
         };
-        var subtitle = new Label
+        var categoryBar = new FlowLayoutPanel
         {
             AutoSize = true,
-            Text = "选择预览，自动适配 Store 与 Patched 版本",
-            Font = new Font("Microsoft YaHei UI", 10F, FontStyle.Regular, GraphicsUnit.Point),
-            ForeColor = Muted,
-            Location = new Point(2, 48),
+            WrapContents = false,
+            FlowDirection = FlowDirection.LeftToRight,
+            BackColor = Canvas,
+            Location = new Point(0, 46),
+            Margin = Padding.Empty,
+            Padding = Padding.Empty,
         };
+        foreach (var category in new[] { "全部", "人物", "动漫", "游戏", "风景", "极简", "节日", "其他" })
+        {
+            var button = CreateCategoryButton(category);
+            button.Click += (_, _) => SelectCategory(category);
+            _categoryButtons.Add(button);
+            categoryBar.Controls.Add(button);
+        }
         _themeCountLabel = new Label
         {
             AutoSize = true,
@@ -130,17 +152,6 @@ internal sealed class ThemeStoreForm : Form
             Font = new Font("Microsoft YaHei UI", 9F, FontStyle.Bold, GraphicsUnit.Point),
             ForeColor = Accent,
         };
-        _categoryCombo = new ComboBox
-        {
-            DropDownStyle = ComboBoxStyle.DropDownList,
-            Width = 112,
-            Height = 32,
-            Font = new Font("Microsoft YaHei UI", 9F),
-        };
-        _categoryCombo.Items.AddRange(new object[] { "全部分类", "人物", "动漫", "游戏", "风景", "极简", "节日", "其他" });
-        _categoryCombo.SelectedIndex = 0;
-        _categoryCombo.SelectedIndexChanged += (_, _) => ReloadThemeCards();
-
         _sourceCombo = new ComboBox
         {
             DropDownStyle = ComboBoxStyle.DropDownList,
@@ -162,14 +173,12 @@ internal sealed class ThemeStoreForm : Form
             var right = header.ClientSize.Width;
             _refreshButton.Location = new Point(Math.Max(0, right - _refreshButton.Width), 7);
             _sourceCombo.Location = new Point(Math.Max(0, _refreshButton.Left - _sourceCombo.Width - 10), 7);
-            _categoryCombo.Location = new Point(Math.Max(0, _sourceCombo.Left - _categoryCombo.Width - 10), 7);
-            _themeCountLabel.Location = new Point(Math.Max(0, _categoryCombo.Left - _themeCountLabel.Width - 16), 14);
+            _themeCountLabel.Location = new Point(Math.Max(0, _sourceCombo.Left - _themeCountLabel.Width - 16), 14);
         }
         header.Resize += (_, _) => LayoutHeaderControls();
         header.Controls.Add(title);
-        header.Controls.Add(subtitle);
+        header.Controls.Add(categoryBar);
         header.Controls.Add(_themeCountLabel);
-        header.Controls.Add(_categoryCombo);
         header.Controls.Add(_sourceCombo);
         header.Controls.Add(_refreshButton);
         LayoutHeaderControls();
@@ -245,6 +254,7 @@ internal sealed class ThemeStoreForm : Form
         LayoutFooterButtons(footer);
 
         ReloadThemeCards();
+        SelectCategory("全部", reload: false);
         Shown += async (_, _) =>
         {
             if (_externalImport is not null) await HandleExternalImportAsync(_externalImport);
@@ -271,6 +281,39 @@ internal sealed class ThemeStoreForm : Form
         button.FlatAppearance.BorderSize = 1;
         button.FlatAppearance.MouseOverBackColor = primary ? Color.FromArgb(198, 98, 67) : Color.FromArgb(245, 245, 241);
         return button;
+    }
+
+    private static Button CreateCategoryButton(string category)
+    {
+        var button = new Button
+        {
+            Text = category,
+            Tag = category,
+            AutoSize = true,
+            MinimumSize = new Size(48, 28),
+            Height = 28,
+            Margin = new Padding(0, 0, 6, 0),
+            Padding = new Padding(10, 3, 10, 3),
+            FlatStyle = FlatStyle.Flat,
+            Cursor = Cursors.Hand,
+            Font = new Font("Microsoft YaHei UI", 8.5F, FontStyle.Bold, GraphicsUnit.Point),
+            UseVisualStyleBackColor = false,
+        };
+        button.FlatAppearance.BorderSize = 1;
+        return button;
+    }
+
+    private void SelectCategory(string category, bool reload = true)
+    {
+        _selectedCategory = category;
+        foreach (var button in _categoryButtons)
+        {
+            var selected = string.Equals(button.Tag as string, category, StringComparison.Ordinal);
+            button.BackColor = selected ? Accent : Color.White;
+            button.ForeColor = selected ? Color.White : Ink;
+            button.FlatAppearance.BorderColor = selected ? Accent : Color.FromArgb(205, 205, 198);
+        }
+        if (reload) ReloadThemeCards();
     }
 
     private void LayoutFooterButtons(Control footer)
@@ -309,9 +352,9 @@ internal sealed class ThemeStoreForm : Form
         _cards.Clear();
         _grid.Controls.Clear();
 
-        var category = _categoryCombo.SelectedItem?.ToString() ?? "全部分类";
+        var category = _selectedCategory;
         var allThemes = LoadPreviewThemes();
-        var visibleThemes = category == "全部分类"
+        var visibleThemes = category == "全部"
             ? allThemes
             : allThemes.Where(theme => theme.Category == category).ToList();
         foreach (var theme in visibleThemes)
@@ -321,7 +364,7 @@ internal sealed class ThemeStoreForm : Form
             _cards.Add(card);
             _grid.Controls.Add(card);
         }
-        _themeCountLabel.Text = category == "全部分类" ? $"{allThemes.Count} 个主题" : $"{visibleThemes.Count} / {allThemes.Count}";
+        _themeCountLabel.Text = category == "全部" ? $"{allThemes.Count} 个主题" : $"{visibleThemes.Count} / {allThemes.Count}";
         LayoutThemeCards();
         var selected = _cards.FirstOrDefault(card => card.Model.Id == selectedId) ?? _cards.FirstOrDefault();
         if (selected is not null) SelectCard(selected);
@@ -346,16 +389,17 @@ internal sealed class ThemeStoreForm : Form
         var source = _sourceCombo.SelectedItem as ThemeRepositorySource ?? ThemeRepositoryClient.Sources[0];
         var current = ThemeRepositoryClient.LoadSettings();
         var settings = current with { SourceId = source.Id };
-        SetBusy(true, silent ? "正在同步最新主题..." : $"正在通过 {source.Name} 刷新...");
+        SetBusy(true, silent ? "正在自动选择线路同步主题..." : $"正在从 {source.Name} 开始同步...");
         try
         {
             var result = await new ThemeRepositoryClient().SyncAsync(settings);
+            _sourceCombo.SelectedItem = ThemeRepositoryClient.Sources.First(item => item.Id == result.SourceId);
             ReloadThemeCards();
-            _statusLabel.Text = $"已通过 {result.SourceName} 更新 {result.ThemeCount} 个主题";
+            _statusLabel.Text = $"已自动通过 {result.SourceName} 更新 {result.ThemeCount} 个主题";
         }
         catch (Exception ex)
         {
-            _statusLabel.Text = silent && _cards.Count > 0 ? "远程同步失败，已使用本地缓存" : "同步失败，请切换线路后重试";
+            _statusLabel.Text = silent && _cards.Count > 0 ? "所有线路同步失败，已使用本地缓存" : "GitHub 和镜像线路均同步失败";
             if (!silent) MessageBox.Show(this, ex.Message, "刷新主题", MessageBoxButtons.OK, MessageBoxIcon.Error);
         }
         finally
@@ -366,6 +410,7 @@ internal sealed class ThemeStoreForm : Form
 
     private async Task HandleExternalImportAsync(string value)
     {
+        await _importGate.WaitAsync();
         try
         {
             DreamSkinImportResult imported;
@@ -443,7 +488,17 @@ internal sealed class ThemeStoreForm : Form
         finally
         {
             SetBusy(false, _statusLabel.Text);
+            _importGate.Release();
         }
+    }
+
+    internal async Task HandleActivationAsync(string? value)
+    {
+        if (WindowState == FormWindowState.Minimized) WindowState = FormWindowState.Normal;
+        Show();
+        Activate();
+        BringToFront();
+        if (!string.IsNullOrWhiteSpace(value)) await HandleExternalImportAsync(value);
     }
 
     private void UpdateDownloadProgress(DreamSkinDownloadProgress progress)
@@ -542,7 +597,7 @@ internal sealed class ThemeStoreForm : Form
         _rollbackButton.Enabled = !busy;
         _refreshButton.Enabled = !busy;
         _sourceCombo.Enabled = !busy;
-        _categoryCombo.Enabled = !busy;
+        foreach (var button in _categoryButtons) button.Enabled = !busy;
         foreach (var card in _cards) card.Enabled = !busy;
         if (!busy)
         {

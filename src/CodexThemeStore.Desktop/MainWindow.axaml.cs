@@ -15,6 +15,7 @@ public sealed partial class MainWindow : Window
     private readonly List<ThemeCardModel> _allThemes = [];
     private readonly ICodexPlatformAdapter _adapter = new MacOsCodexAdapter();
     private readonly SemaphoreSlim _importGate = new(1, 1);
+    private string _selectedCategory = "全部";
     private ThemeCardModel? _selected;
     private string? _lastImportValue;
     private DateTimeOffset _lastImportAt;
@@ -23,13 +24,15 @@ public sealed partial class MainWindow : Window
     {
         InitializeComponent();
         ThemeList.ItemsSource = _visibleThemes;
-        CategoryCombo.ItemsSource = new[] { "全部分类", "人物", "动漫", "游戏", "风景", "极简", "节日", "其他" };
-        CategoryCombo.SelectedIndex = 0;
         SourceCombo.ItemsSource = ThemeRepositoryClient.Sources;
         var settings = ThemeRepositoryClient.LoadSettings();
         SourceCombo.SelectedItem = ThemeRepositoryClient.Sources.FirstOrDefault(item => item.Id == settings.SourceId) ?? ThemeRepositoryClient.Sources[0];
 
-        CategoryCombo.SelectionChanged += (_, _) => ApplyFilter();
+        foreach (var button in CategoryBar.Children.OfType<Button>())
+        {
+            button.Click += (_, _) => SelectCategory(button.Tag as string ?? "全部");
+        }
+        SelectCategory("全部", applyFilter: false);
         ThemeList.SelectionChanged += (_, _) => SelectTheme(ThemeList.SelectedItem as ThemeCardModel);
         RefreshButton.Click += async (_, _) => await RefreshAsync(false);
         ApplyButton.Click += async (_, _) => await ApplyAsync(false);
@@ -62,7 +65,7 @@ public sealed partial class MainWindow : Window
         CatalogLabel.Text = $"{_allThemes.Count} 个主题";
         ApplyFilter();
         SelectTheme(_allThemes.FirstOrDefault(theme => theme.Id == selectedId) ?? _visibleThemes.FirstOrDefault());
-        if (_allThemes.Count == 0) StatusLabel.Text = "首次使用需要联网同步主题，请选择线路后刷新";
+        if (_allThemes.Count == 0) StatusLabel.Text = "首次使用需要联网同步主题，点击刷新会自动选择线路";
     }
 
     private static IEnumerable<string> ThemeDirectories()
@@ -74,15 +77,23 @@ public sealed partial class MainWindow : Window
 
     private void ApplyFilter()
     {
-        var category = CategoryCombo.SelectedItem as string ?? "全部分类";
+        var category = _selectedCategory;
         var previousSelection = _selected;
         _visibleThemes.Clear();
-        foreach (var theme in _allThemes.Where(theme => category == "全部分类" || theme.Category == category))
+        foreach (var theme in _allThemes.Where(theme => category == "全部" || theme.Category == category))
             _visibleThemes.Add(theme);
         SelectTheme(previousSelection is not null && _visibleThemes.Contains(previousSelection)
             ? previousSelection
             : _visibleThemes.FirstOrDefault());
-        CatalogLabel.Text = category == "全部分类" ? $"{_allThemes.Count} 个主题" : $"{_visibleThemes.Count} / {_allThemes.Count} 个主题";
+        CatalogLabel.Text = category == "全部" ? $"{_allThemes.Count} 个主题" : $"{_visibleThemes.Count} / {_allThemes.Count} 个主题";
+    }
+
+    private void SelectCategory(string category, bool applyFilter = true)
+    {
+        _selectedCategory = category;
+        foreach (var button in CategoryBar.Children.OfType<Button>())
+            button.Classes.Set("selected", string.Equals(button.Tag as string, category, StringComparison.Ordinal));
+        if (applyFilter) ApplyFilter();
     }
 
     private void SelectTheme(ThemeCardModel? theme)
@@ -98,16 +109,17 @@ public sealed partial class MainWindow : Window
     {
         var source = SourceCombo.SelectedItem as ThemeRepositorySource ?? ThemeRepositoryClient.Sources[0];
         var settings = ThemeRepositoryClient.LoadSettings() with { SourceId = source.Id };
-        SetBusy(true, $"正在通过 {source.Name} 同步主题...");
+        SetBusy(true, $"正在从 {source.Name} 开始同步...");
         try
         {
             var result = await new ThemeRepositoryClient().SyncAsync(settings);
+            SourceCombo.SelectedItem = ThemeRepositoryClient.Sources.First(item => item.Id == result.SourceId);
             LoadLocalThemes();
-            StatusLabel.Text = $"已更新 {result.ThemeCount} 个主题";
+            StatusLabel.Text = $"已自动通过 {result.SourceName} 更新 {result.ThemeCount} 个主题";
         }
         catch (Exception ex)
         {
-            StatusLabel.Text = silent && _allThemes.Count > 0 ? "同步失败，已使用本地缓存" : "同步失败，请切换线路后重试";
+            StatusLabel.Text = silent && _allThemes.Count > 0 ? "所有线路同步失败，已使用本地缓存" : "GitHub 和镜像线路均同步失败";
             if (!silent) await ShowErrorAsync(ex.Message);
         }
         finally
@@ -246,7 +258,7 @@ public sealed partial class MainWindow : Window
     {
         BusyBar.IsVisible = busy;
         StatusLabel.Text = status;
-        CategoryCombo.IsEnabled = !busy;
+        foreach (var button in CategoryBar.Children.OfType<Button>()) button.IsEnabled = !busy;
         SourceCombo.IsEnabled = !busy;
         RefreshButton.IsEnabled = !busy;
         ThemeList.IsEnabled = !busy;

@@ -27,7 +27,8 @@ test("Windows release publishes only the graphical Setup installer", async () =>
   assert.match(installer, /SetupIconFile=.*Codex-Skin\.ico/);
   assert.match(installer, /MessagesFile: "\{#SourcePath\}\\languages\\ChineseSimplified\.isl"/);
   assert.match(installer, /Parameters: "protocol register"/);
-  assert.match(program, /Application\.Run\(new ThemeStoreForm\(externalImport \? args\[0\] : null\)\)/);
+  assert.match(program, /using var instance = WindowsSingleInstance\.Create\(\)/);
+  assert.match(program, /Application\.Run\(window\)/);
   assert.doesNotMatch(shellIntegration, /command\.SetValue\(null, .* import /);
   assert.match(installer, /\[UninstallRun\][\s\S]*Parameters: "protocol unregister"/);
   assert.match(chineseMessages, /Inno Setup version 6\.5\.0\+/);
@@ -55,6 +56,22 @@ test("macOS package registers Codex-Skin URL and document activation", async () 
   assert.equal(icon.readUInt32BE(16), 1024);
   assert.equal(icon.readUInt32BE(20), 1024);
   assert.equal(icon[25], 6, "AppIcon.png must be RGBA so macOS keeps transparent corners");
+});
+
+test("desktop clients use horizontal categories and Windows single-instance activation", async () => {
+  const [windowsUi, macUi, macCode, singleInstance] = await Promise.all([
+    readFile(new URL("../src/CodexThemeStore/Program.cs", import.meta.url), "utf8"),
+    readFile(new URL("../src/CodexThemeStore.Desktop/MainWindow.axaml", import.meta.url), "utf8"),
+    readFile(new URL("../src/CodexThemeStore.Desktop/MainWindow.axaml.cs", import.meta.url), "utf8"),
+    readFile(new URL("../src/CodexThemeStore/WindowsSingleInstance.cs", import.meta.url), "utf8"),
+  ]);
+  assert.doesNotMatch(windowsUi, /_categoryCombo|选择预览，自动适配/);
+  assert.match(windowsUi, /SelectCategory\("全部", reload: false\)/);
+  assert.doesNotMatch(macUi, /CategoryCombo/);
+  assert.match(macUi, /x:Name="CategoryBar"[\s\S]*Tag="全部"[\s\S]*Tag="其他"/);
+  assert.match(macCode, /SelectCategory\("全部", applyFilter: false\)/);
+  assert.match(singleInstance, /PipeOptions\.CurrentUserOnly/);
+  assert.match(singleInstance, /TryForward/);
 });
 
 test("macOS release status documents the unsigned graphical client", async () => {

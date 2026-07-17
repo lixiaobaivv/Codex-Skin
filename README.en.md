@@ -26,7 +26,7 @@ The installers include the .NET runtime. No SDK or separate runtime is required.
 
 1. Install `Codex-Skin-Setup-win-x64.exe`.
 2. Open Codex-Skin and wait for the catalog refresh.
-3. Select a category and theme.
+3. Select **All** or a theme category from the horizontal filter at the upper left, then choose a theme.
 4. Choose **Apply and restart Codex**.
 5. Choose **Restore default** to remove the theme.
 
@@ -56,13 +56,15 @@ The client:
 
 A web click never silently installs or applies a theme. Local `.dreamskin` files can also be opened with the installed app.
 
+If Codex-Skin is already running, web and file activations are forwarded to that window and bring it to the front. A new window is created only when no client instance is running.
+
 Verified imports remain in the local theme browser after Codex-Skin restarts. When several versions of the same theme are installed, the newest semantic version is selected.
 
 ## Catalog And Mirrors
 
 The desktop catalog is fixed to the public [lixiaobaivv/Codex-Skin-Store](https://github.com/lixiaobaivv/Codex-Skin-Store) repository. Users can select direct GitHub, GH Proxy, or GHFast transport, but cannot redirect the client to an unreviewed repository.
 
-Installers no longer duplicate the online themes. The first launch requires a catalog sync; later launches retain the last validated cache. Updates are fully validated in a temporary directory before that cache is replaced.
+Installers no longer duplicate the online themes. The first launch requires a catalog sync; later launches retain the last validated cache. Sync starts with the last successful transport, automatically falls back across GitHub, GH Proxy, and GHFast, and saves the transport that actually succeeded. Updates are fully validated in a temporary directory before that cache is replaced.
 
 The web signed-package catalog and desktop theme catalog are separate contracts. Both are declarative and reject JavaScript, HTML, CSS, SVG, executable payloads, traversal, and unlisted assets.
 
@@ -76,7 +78,7 @@ Themes cannot replace project, task, progress, conversation, or account data. Pr
 
 **The theme did not appear:** use **Apply and restart Codex**. Codex-Skin only connects to the loopback CDP endpoint at `127.0.0.1:9229`.
 
-**Catalog refresh failed:** switch between GitHub, GH Proxy, and GHFast. Existing themes remain available.
+**Catalog refresh failed:** refresh automatically tries GitHub, GH Proxy, and GHFast. Existing themes remain available if every transport fails.
 
 **One-click import did nothing:** repair the Windows Setup registration, or confirm that macOS uses the PKG with URL handler support and has been opened once.
 

@@ -22,14 +22,15 @@ public sealed record ThemeRepositorySettings(string Repository, string Branch, s
         "github");
 }
 
-public sealed record ThemeSyncResult(int ThemeCount, string SourceName);
+public sealed record ThemeSyncResult(int ThemeCount, string SourceId, string SourceName);
 
 public sealed class ThemeRepositoryClient
 {
     private const long MaxArchiveBytes = 200L * 1024 * 1024;
     private const long MaxFileBytes = 20L * 1024 * 1024;
     private const int MaxFiles = 2000;
-    private static readonly HttpClient Http = new() { Timeout = TimeSpan.FromMinutes(3) };
+    private static readonly TimeSpan SourceTimeout = TimeSpan.FromSeconds(45);
+    private static readonly HttpClient Http = new() { Timeout = Timeout.InfiniteTimeSpan };
     private static readonly string StoreDirectory = Path.Combine(
         Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
         "CodexThemeStore");
@@ -70,31 +71,67 @@ public sealed class ThemeRepositoryClient
         return new ThemeRepositorySettings(ThemeRepositorySettings.OfficialRepository, ThemeRepositorySettings.OfficialBranch, sourceId);
     }
 
+    public static IReadOnlyList<ThemeRepositorySource> GetSourceCandidates(string? preferredSourceId)
+    {
+        var direct = Sources.First(source => source.Id == "github");
+        var preferred = Sources.FirstOrDefault(source => source.Id == preferredSourceId) ?? direct;
+        return new[] { preferred, direct }
+            .Concat(Sources)
+            .DistinctBy(source => source.Id)
+            .ToList();
+    }
+
     public async Task<ThemeSyncResult> SyncAsync(ThemeRepositorySettings settings, CancellationToken cancellationToken = default)
     {
         settings = NormalizeSettings(settings);
 
-        var source = Sources.FirstOrDefault(item => item.Id == settings.SourceId) ?? Sources[0];
         var upstream = $"https://github.com/{settings.Repository}/archive/refs/heads/{settings.Branch}.zip";
-        var url = source.Prefix + upstream;
         var tempArchive = Path.Combine(Path.GetTempPath(), $"codex-theme-{Guid.NewGuid():N}.zip");
         var tempDirectory = Path.Combine(StoreDirectory, $"ThemeCatalog-{Guid.NewGuid():N}");
         try
         {
             Directory.CreateDirectory(StoreDirectory);
-            await DownloadAsync(url, tempArchive, cancellationToken);
-            Directory.CreateDirectory(tempDirectory);
-            ExtractArchive(tempArchive, tempDirectory);
-            var count = ValidateDirectory(tempDirectory);
-            ReplaceCache(tempDirectory);
-            SaveSettings(settings with { SourceId = source.Id });
-            return new ThemeSyncResult(count, source.Name);
+            Exception? lastError = null;
+            foreach (var source in GetSourceCandidates(settings.SourceId))
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                DeleteTemporaryFiles(tempArchive, tempDirectory);
+                try
+                {
+                    using var timeout = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+                    timeout.CancelAfter(SourceTimeout);
+                    await DownloadAsync(source.Prefix + upstream, tempArchive, timeout.Token);
+                    Directory.CreateDirectory(tempDirectory);
+                    ExtractArchive(tempArchive, tempDirectory);
+                    var count = ValidateDirectory(tempDirectory);
+                    ReplaceCache(tempDirectory);
+                    SaveSettings(settings with { SourceId = source.Id });
+                    return new ThemeSyncResult(count, source.Id, source.Name);
+                }
+                catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
+                {
+                    lastError = new InvalidOperationException($"通过 {source.Name} 同步主题超时。");
+                }
+                catch (Exception ex) when (ex is HttpRequestException or IOException or InvalidOperationException)
+                {
+                    lastError = ex;
+                }
+            }
+
+            throw new InvalidOperationException(
+                lastError is null ? "没有可用的主题同步线路。" : $"所有主题同步线路均失败：{lastError.Message}",
+                lastError);
         }
         finally
         {
-            if (File.Exists(tempArchive)) File.Delete(tempArchive);
-            if (Directory.Exists(tempDirectory)) Directory.Delete(tempDirectory, true);
+            DeleteTemporaryFiles(tempArchive, tempDirectory);
         }
+    }
+
+    private static void DeleteTemporaryFiles(string archivePath, string directoryPath)
+    {
+        if (File.Exists(archivePath)) File.Delete(archivePath);
+        if (Directory.Exists(directoryPath)) Directory.Delete(directoryPath, true);
     }
 
     private static async Task DownloadAsync(string url, string destination, CancellationToken cancellationToken)
