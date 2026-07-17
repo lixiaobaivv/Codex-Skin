@@ -68,6 +68,9 @@ test("official theme publishing reads the Store source of truth", async () => {
   assert.match(workflow, /environment: theme-publishing/);
   assert.match(workflow, /store_commit/);
   assert.match(workflow, /theme-\$\{THEME_ID\}-v\$\{version\}/);
+  assert.match(workflow, /Install Linux verifier dependencies/);
+  assert.match(workflow, /libwebkit2gtk-4\.1-dev/);
+  assert.match(workflow, /libayatana-appindicator3-dev/);
   assert.match(builder, /CODEX_SKIN_THEME_SOURCE/);
   assert.match(builder, /theme-repository\.json/);
   assert.doesNotMatch(builder, /const ids = \["dilraba-star"/);
