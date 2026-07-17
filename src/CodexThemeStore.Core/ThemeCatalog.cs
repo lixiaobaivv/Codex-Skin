@@ -41,9 +41,11 @@ public static class ThemeCatalog
                 {
                     AddNewest(themes, DreamSkinPackageInstaller.LoadInstalledTheme(manifestPath, platform));
                 }
-                catch
+                catch (Exception ex)
                 {
                     // Ignore damaged or manually modified packages. They can be repaired by importing again.
+                    if (Environment.GetEnvironmentVariable("CODEX_THEME_CATALOG_DIAGNOSTICS") == "1")
+                        Console.Error.WriteLine($"跳过无效的已安装主题 {manifestPath}: {ex.Message}");
                 }
             }
         }
