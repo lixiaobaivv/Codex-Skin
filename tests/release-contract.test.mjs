@@ -22,7 +22,8 @@ test("Windows release publishes only the graphical Setup installer", async () =>
   assert.match(build, /Codex-Skin-installers-SHA256SUMS\.txt/);
   assert.doesNotMatch(project, /KeepThemeAssetsExternal|themes\\\*\.json|previews\\\*\.png/);
   assert.match(ci, /unexpectedly contains bundled themes/);
-  assert.match(ci, /did not load four online themes/);
+  assert.match(ci, /did not load the required official themes/);
+  assert.match(ci, /dilraba-star.*enfp-pop.*jackson-sage.*kun-stage/);
   assert.match(project, /<ApplicationIcon>.*Codex-Skin\.ico<\/ApplicationIcon>/);
   assert.match(installer, /SetupIconFile=.*Codex-Skin\.ico/);
   assert.match(installer, /MessagesFile: "\{#SourcePath\}\\languages\\ChineseSimplified\.isl"/);

@@ -52,7 +52,10 @@ jobs:
           $refresh = Invoke-CodexSkinClient $client @('refresh', 'github') $isolated
           if ($refresh.ExitCode -ne 0) { throw ($refresh.Error -join "`n") }
           $themes = Invoke-CodexSkinClient $client @('list') $isolated
-          if ($themes.ExitCode -ne 0 -or $themes.Output.Count -ne 4) { throw "Standalone client did not load four online themes." }
+          if ($themes.ExitCode -ne 0 -or $themes.Output.Count -lt 4) { throw "Standalone client did not load the required official themes." }
+          @('dilraba-star', 'enfp-pop', 'jackson-sage', 'kun-stage') | ForEach-Object {
+            if (-not ($themes.Output -match "^$_`t")) { throw "Standalone client is missing required theme: $_" }
+          }
 
       - name: Validate current-user shell registration
         shell: pwsh
