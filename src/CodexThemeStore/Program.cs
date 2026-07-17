@@ -752,8 +752,16 @@ internal sealed class ThemeStoreApp
             MessageBoxButtons.YesNo,
             MessageBoxIcon.Question,
             MessageBoxDefaultButton.Button2);
-        if (applyNow == DialogResult.Yes) Apply(imported.ManifestPath);
+        if (applyNow == DialogResult.Yes) Apply(ResolveImportedThemeForApply(imported));
         return 0;
+    }
+
+    private static string ResolveImportedThemeForApply(DreamSkinImportResult imported)
+    {
+        var official = LoadThemes().FirstOrDefault(theme =>
+            theme.CodeThemeId.Equals(imported.Id, StringComparison.Ordinal) &&
+            ThemeCatalog.CompareVersions(theme.Version, imported.Version) >= 0);
+        return official?.SourcePath ?? imported.ManifestPath;
     }
 
     private static int ManageProtocol(string[] args)

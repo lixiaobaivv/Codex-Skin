@@ -64,6 +64,14 @@ static async Task<int> RunAsync(string[] args)
                 Console.WriteLine($"已通过 {result.SourceName} 更新 {result.ThemeCount} 个主题。");
                 return 0;
             }
+            case "theme-import":
+            {
+                if (args.Length < 3) throw new ArgumentException("theme-import 需要 <package.dreamskin> <windows|macos> [library-directory]。");
+                var library = args.Length > 3 ? Path.GetFullPath(args[3]) : null;
+                var imported = DreamSkinPackageInstaller.ImportLocal(args[1], platform: args[2], libraryRoot: library);
+                Console.WriteLine($"{imported.Id}\t{imported.Version}\t{imported.PackageSha256}\t{imported.ManifestPath}");
+                return 0;
+            }
             case "list":
             {
                 foreach (var theme in LoadThemes())
@@ -195,6 +203,7 @@ static void PrintUsage()
     Console.WriteLine("  codex-theme-store theme-index [repository-directory] [repository-name]");
     Console.WriteLine("  codex-theme-store theme-pack [repository-directory] [output.zip]");
     Console.WriteLine("  codex-theme-store refresh [github|gh-proxy|ghfast]");
+    Console.WriteLine("  codex-theme-store theme-import <package.dreamskin> <windows|macos> [library-directory]");
     Console.WriteLine("  codex-theme-store list");
     Console.WriteLine("  codex-theme-store status");
     Console.WriteLine("  codex-theme-store launch");

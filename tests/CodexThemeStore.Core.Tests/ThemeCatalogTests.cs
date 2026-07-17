@@ -39,6 +39,19 @@ public sealed class ThemeCatalogTests : IDisposable
     }
 
     [Fact]
+    public void CatalogWinsWhenAnInstalledCompatibilityPackageHasTheSameVersion()
+    {
+        var package = FixturePackage();
+        var library = Path.Combine(_root, "packages");
+        DreamSkinPackageInstaller.ImportLocal(package, platform: "macos", libraryRoot: library);
+        var catalog = ExtractCatalogTheme(package, "1.0.0");
+
+        var selected = Assert.Single(ThemeCatalog.Load([catalog], library, "macos"));
+
+        Assert.StartsWith(Path.GetFullPath(catalog), selected.SourcePath, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void RejectsAnInstalledPackageWhoseAssetsWereModified()
     {
         var library = Path.Combine(_root, "packages");

@@ -118,7 +118,7 @@ public static class ThemeCatalog
     private static void AddNewest(IDictionary<string, ThemeDefinition> themes, ThemeDefinition candidate)
     {
         if (!themes.TryGetValue(candidate.CodeThemeId, out var current) ||
-            CompareVersions(candidate.Version, current.Version) >= 0)
+            CompareVersions(candidate.Version, current.Version) > 0)
         {
             themes[candidate.CodeThemeId] = candidate;
         }

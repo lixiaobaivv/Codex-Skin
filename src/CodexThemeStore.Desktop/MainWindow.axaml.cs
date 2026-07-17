@@ -206,7 +206,10 @@ public sealed partial class MainWindow : Window
             LoadLocalThemes();
             if (!await ConfirmAsync($"{imported.DisplayName} 已通过签名验证并安装。\n\n立即重启 Codex 并应用该主题？")) return;
             SetBusy(true, "正在重启 Codex 并应用主题...");
-            var payload = new ThemeStateCompiler().Compile(imported.ManifestPath, StateDirectory());
+            var selected = ThemeCatalog.Load(ThemeDirectories(), platform: "macos")
+                .FirstOrDefault(theme => theme.CodeThemeId.Equals(imported.Id, StringComparison.Ordinal) &&
+                                         ThemeCatalog.CompareVersions(theme.Version, imported.Version) >= 0);
+            var payload = new ThemeStateCompiler().Compile(selected?.SourcePath ?? imported.ManifestPath, StateDirectory());
             await new CodexThemeRuntime().RestartAndInjectAsync(_adapter, payload, TimeSpan.FromSeconds(90));
             StatusLabel.Text = $"{imported.DisplayName} 已应用";
         }

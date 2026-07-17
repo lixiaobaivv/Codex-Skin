@@ -47,12 +47,13 @@ public static class DreamSkinPackageInstaller
         "^rgba\\((25[0-5]|2[0-4][0-9]|1[0-9]{2}|[1-9]?[0-9]),[ ]*(25[0-5]|2[0-4][0-9]|1[0-9]{2}|[1-9]?[0-9]),[ ]*(25[0-5]|2[0-4][0-9]|1[0-9]{2}|[1-9]?[0-9]),[ ]*(0|1|0?\\.[0-9]{1,3}|1\\.0{1,3})\\)$",
         RegexOptions.CultureInvariant | RegexOptions.Compiled);
 
-    // Public development fixture key. The corresponding private key is only
-    // used by tools/dreamskin/build-sample.mjs and must never sign production packages.
+    // The fixture key is intentionally public and must never sign production packages.
+    // Official private keys live only in repository secrets; clients embed public keys.
     private static readonly IReadOnlyDictionary<string, byte[]> TrustedKeys =
         new Dictionary<string, byte[]>(StringComparer.Ordinal)
         {
             ["codex-skin.sample.2026-01"] = DecodeBase64Url("kuf25VngYoeAC2TDJ2kPGRfKGJZvQhZrdVnQhGvQ3fM"),
+            ["codex-skin.official.2026-01"] = DecodeBase64Url("PjtdEbIyuynRaE30OrFEB-k6jakgnL3Mzl6cyqZ-8xM"),
         };
 
     private static readonly HashSet<string> RootProperties = new(StringComparer.Ordinal)
