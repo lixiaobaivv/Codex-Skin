@@ -159,16 +159,17 @@ macOS PKG 当前未签名、未公证。CI 已在 Apple Silicon 与 Intel 目标
 
 ## 技术架构
 
-项目已完整迁移到 Tauri 2 + Rust，不再包含旧版 .NET、WinForms 或 Avalonia 客户端：
+Codex-Skin 使用 Tauri 2、Rust 和 TypeScript/Vite 构建，按界面、应用桥接、领域核心、运行时集成和发布工具分层：
 
-- `src/`：TypeScript/Vite 共享界面，负责主题浏览、筛选、预览和用户确认；
-- `src-tauri/src/`：Rust 核心，负责目录同步、严格校验、主题编译、CDP 注入、签名导入、状态持久化和平台适配；
-- `installer/windows/`：Inno Setup 安装器、`dreamskin://` 协议和 `.dreamskin` 文件关联；
-- `installer/macos/`：macOS App/PKG 打包、URL scheme 与文档类型声明；
-- `tools/` 与 `src-tauri/src/bin/`：签名主题构建、验证和目录制作工具；
-- `tests/`：DreamSkin 合同、发布配置和跨平台打包约束测试。
+- **界面层**（`src/`）：在系统 WebView 中提供主题浏览、分类筛选、预览、下载确认和应用状态反馈；
+- **应用桥接层**（`src-tauri/src/lib.rs`）：通过 Tauri Command/Event 连接界面与 Rust 核心，并处理单实例、深链接和本地文件激活；
+- **领域核心层**（`repository.rs`、`catalog.rs`、`compiler.rs`、`dreamskin.rs`、`protocol.rs`）：负责主题目录同步、Schema 与资源校验、SemVer 选择、CSS/JS 编译、签名包验签和安全下载；
+- **运行时集成层**（`cdp.rs`、`platform.rs`）：发现并启动 Codex，只连接本机回环 CDP，完成持久注入、结果验证和回滚；
+- **状态与发布工具**（`paths.rs`、`authoring.rs`、`src-tauri/src/bin/`、`installer/`）：负责原子状态持久化、目录制作、签名包诊断以及 Windows/macOS 安装包生成。
 
-Windows 与 macOS 使用同一套 WebView 界面和 Rust 业务逻辑，只有 Codex 发现、进程启动和系统激活由平台适配层处理。旧版实现暂存于 `backup/main-dotnet-20260717` 分支，待新版本长期稳定后再删除。
+桌面主题的主数据流为：从固定官方源下载到临时目录 → 校验目录、清单和图片 → 原子替换本地缓存 → 编译声明式主题 → 通过回环 CDP 应用到 Codex。网页或本地 `.dreamskin` 导入走独立链路，在安装前验证大小、SHA-256、Ed25519/RFC8785 签名、ZIP 路径和图片内容。
+
+Windows 与 macOS 共用界面和领域逻辑。平台差异集中在 Codex 发现、进程启动、窗口激活及安装器关联，避免平台代码进入主题规则和安全校验核心。
 
 ## 本地开发与验证
 

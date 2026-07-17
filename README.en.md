@@ -100,16 +100,17 @@ See [cross-platform architecture](docs/cross-platform-architecture.md), [desktop
 
 ## Architecture
 
-The project has been fully migrated to Tauri 2 and Rust. The former .NET, WinForms, and Avalonia clients are no longer part of `main`:
+Codex-Skin is built with Tauri 2, Rust, and TypeScript/Vite. Its architecture separates the interface, application bridge, domain core, runtime integration, and release tooling:
 
-- `src/` contains the shared TypeScript/Vite interface for browsing, filtering, previewing, and confirmation flows.
-- `src-tauri/src/` contains catalog synchronization, strict validation, theme compilation, CDP injection, signed imports, state persistence, and platform adapters.
-- `installer/windows/` contains the Inno Setup package and registrations for `dreamskin://` and `.dreamskin`.
-- `installer/macos/` builds the macOS app and PKG with URL and document activation declarations.
-- `tools/` and `src-tauri/src/bin/` provide signed-theme and catalog authoring diagnostics.
-- `tests/` verifies DreamSkin contracts, release configuration, and cross-platform packaging invariants.
+- **Interface** (`src/`) provides catalog browsing, category filters, previews, download confirmation, and application status inside the system WebView.
+- **Application bridge** (`src-tauri/src/lib.rs`) connects the interface to Rust through Tauri commands and events, and handles single-instance, deep-link, and local-file activation.
+- **Domain core** (`repository.rs`, `catalog.rs`, `compiler.rs`, `dreamskin.rs`, and `protocol.rs`) owns catalog synchronization, schema and asset validation, semantic-version selection, CSS/JavaScript compilation, signature verification, and safe downloads.
+- **Runtime integration** (`cdp.rs` and `platform.rs`) discovers and launches Codex, connects only to loopback CDP targets, and performs persistent injection, verification, and rollback.
+- **State and release tooling** (`paths.rs`, `authoring.rs`, `src-tauri/src/bin/`, and `installer/`) provides atomic state persistence, catalog authoring, signed-package diagnostics, and Windows/macOS packaging.
 
-Windows and macOS share the same WebView interface and Rust business logic. Only Codex discovery, process launch, and OS activation are platform-specific. The former implementation remains temporarily available on `backup/main-dotnet-20260717` until the new release has demonstrated long-term stability.
+The desktop catalog flow is: download from a fixed official source into a temporary directory → validate the catalog, manifests, and images → atomically replace the local cache → compile the declarative theme → apply it to Codex through loopback CDP. Web and local `.dreamskin` imports use a separate path that verifies size, SHA-256, Ed25519/RFC8785 signatures, ZIP paths, and decoded image content before installation.
+
+Windows and macOS share the interface and domain logic. Platform-specific code is limited to Codex discovery, process launch, window activation, and installer associations, keeping theme rules and security validation independent of the operating system.
 
 ## Development And Verification
 
