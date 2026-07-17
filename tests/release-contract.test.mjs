@@ -2,30 +2,28 @@ import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import test from "node:test";
 
-test("Windows release publishes only the graphical Setup installer", async () => {
-  const [project, ci, build, readme, program, shellIntegration, installer, chineseMessages, icon] = await Promise.all([
-    readFile(new URL("../src/CodexThemeStore/CodexThemeStore.csproj", import.meta.url), "utf8"),
+test("Windows release publishes the Tauri graphical Setup installer", async () => {
+  const [cargo, tauri, ci, build, readme, rustApp, installer, chineseMessages, icon] = await Promise.all([
+    readFile(new URL("../src-tauri/Cargo.toml", import.meta.url), "utf8"),
+    readFile(new URL("../src-tauri/tauri.conf.json", import.meta.url), "utf8"),
     readFile(new URL("../.github/workflows/ci.yml", import.meta.url), "utf8"),
     readFile(new URL("../.github/workflows/build.yml", import.meta.url), "utf8"),
     readFile(new URL("../README.md", import.meta.url), "utf8"),
-    readFile(new URL("../src/CodexThemeStore/Program.cs", import.meta.url), "utf8"),
-    readFile(new URL("../src/CodexThemeStore/DreamSkinShellIntegration.cs", import.meta.url), "utf8"),
+    readFile(new URL("../src-tauri/src/lib.rs", import.meta.url), "utf8"),
     readFile(new URL("../installer/windows/CodexThemeStore.iss", import.meta.url), "utf8"),
     readFile(new URL("../installer/windows/languages/ChineseSimplified.isl", import.meta.url), "utf8"),
     readFile(new URL("../assets/Codex-Skin.ico", import.meta.url)),
   ]);
 
-  assert.match(project, /<AssemblyName>Codex-Skin<\/AssemblyName>/);
-  assert.match(project, /<OutputType>WinExe<\/OutputType>/);
-  assert.match(ci, /Codex-Skin-win-x64\/Codex-Skin\.exe/);
+  assert.match(cargo, /name = "codex-skin"/);
+  assert.match(tauri, /"productName": "Codex-Skin"/);
+  assert.match(ci, /Codex-Skin-win-x64/);
+  assert.match(ci, /cargo test --manifest-path src-tauri\/Cargo\.toml/);
+  assert.match(ci, /Online theme assets must not be bundled/);
   assert.match(build, /Codex-Skin-Setup-win-x64\.exe/);
-  assert.match(build, /Codex-Skin-osx-arm64\.pkg|Codex-Skin-\$\{\{ matrix\.rid \}\}\.pkg/);
+  assert.match(build, /Codex-Skin-\$\{\{ matrix\.rid \}\}\.pkg/);
   assert.match(build, /Codex-Skin-installers-SHA256SUMS\.txt/);
-  assert.doesNotMatch(project, /KeepThemeAssetsExternal|themes\\\*\.json|previews\\\*\.png/);
-  assert.match(ci, /unexpectedly contains bundled themes/);
-  assert.match(ci, /did not load the required official themes/);
-  assert.match(ci, /Codex-Skin-Store\/main\/theme-repository\.json/);
-  assert.match(project, /<ApplicationIcon>.*Codex-Skin\.ico<\/ApplicationIcon>/);
+  assert.match(tauri, /icons\/icon\.ico/);
   assert.match(installer, /SetupIconFile=.*Codex-Skin\.ico/);
   assert.equal(icon.readUInt16LE(0), 0);
   assert.equal(icon.readUInt16LE(2), 1);
@@ -35,14 +33,13 @@ test("Windows release publishes only the graphical Setup installer", async () =>
   });
   assert.deepEqual(iconSizes, [16, 24, 32, 48, 64, 128, 256]);
   assert.match(installer, /MessagesFile: "\{#SourcePath\}\\languages\\ChineseSimplified\.isl"/);
-  assert.match(installer, /Parameters: "protocol register"/);
-  assert.match(program, /using var instance = WindowsSingleInstance\.Create\(\)/);
-  assert.match(program, /Application\.Run\(window\)/);
-  assert.doesNotMatch(shellIntegration, /command\.SetValue\(null, .* import /);
-  assert.match(installer, /\[UninstallRun\][\s\S]*Parameters: "protocol unregister"/);
+  assert.match(installer, /Software\\Classes\\dreamskin\\shell\\open\\command/);
+  assert.match(installer, /Software\\Classes\\\.dreamskin/);
+  assert.match(rustApp, /tauri_plugin_single_instance::init/);
+  assert.match(rustApp, /tauri_plugin_deep_link::init/);
   assert.match(chineseMessages, /Inno Setup version 6\.5\.0\+/);
   assert.doesNotMatch(readme, /Windows (?:x64 )?便携版|Windows portable|Codex-Skin-win-x64\.(?:exe|zip)/);
-  assert.doesNotMatch(`${readme}\n${program}\n${ci}\n${build}\n${installer}`, /Codex主题商店\.exe|CodexThemeStore-(?:Setup|osx)|CodexSkin-theme/);
+  assert.doesNotMatch(`${readme}\n${rustApp}\n${ci}\n${build}\n${installer}`, /Codex主题商店\.exe|CodexThemeStore-(?:Setup|osx)|CodexSkin-theme/);
 });
 
 test("official theme publishing reads the Store source of truth", async () => {
@@ -51,7 +48,6 @@ test("official theme publishing reads the Store source of truth", async () => {
     readFile(new URL("../tools/dreamskin/build-official-themes.mjs", import.meta.url), "utf8"),
     readFile(new URL("../tools/dreamskin/find-pending-official-themes.mjs", import.meta.url), "utf8"),
   ]);
-
   assert.match(workflow, /repository: lixiaobaivv\/Codex-Skin-Store/);
   assert.match(workflow, /environment: theme-publishing/);
   assert.match(workflow, /store_commit/);
@@ -63,41 +59,36 @@ test("official theme publishing reads the Store source of truth", async () => {
 });
 
 test("macOS package registers Codex-Skin URL and document activation", async () => {
-  const [plist, project, packageScript, icon] = await Promise.all([
+  const [plist, cargo, packageScript, icon] = await Promise.all([
     readFile(new URL("../installer/macos/Info.plist", import.meta.url), "utf8"),
-    readFile(new URL("../src/CodexThemeStore.Desktop/CodexThemeStore.Desktop.csproj", import.meta.url), "utf8"),
+    readFile(new URL("../src-tauri/Cargo.toml", import.meta.url), "utf8"),
     readFile(new URL("../installer/macos/build-pkg.sh", import.meta.url), "utf8"),
     readFile(new URL("../installer/macos/AppIcon.png", import.meta.url)),
   ]);
-  assert.match(project, /<AssemblyName>Codex-Skin<\/AssemblyName>/);
+  assert.match(cargo, /name = "codex-skin"/);
   assert.match(plist, /<key>CFBundleURLSchemes<\/key>[\s\S]*<string>dreamskin<\/string>/);
   assert.match(plist, /<key>CFBundleTypeExtensions<\/key>[\s\S]*<string>dreamskin<\/string>/);
   assert.match(plist, /<key>CFBundleIconFile<\/key>[\s\S]*<string>Codex-Skin\.icns<\/string>/);
   assert.match(packageScript, /Applications\/Codex-Skin\.app/);
   assert.match(packageScript, /Contents\/MacOS\/Codex-Skin/);
+  assert.match(packageScript, /npm run tauri -- build/);
   assert.match(packageScript, /iconutil -c icns/);
-  assert.match(packageScript, /installer\/macos\/AppIcon\.png/);
-  assert.match(packageScript, /Contents\/Resources\/Codex-Skin\.icns/);
   assert.equal(icon.subarray(1, 4).toString("ascii"), "PNG");
   assert.equal(icon.readUInt32BE(16), 1024);
   assert.equal(icon.readUInt32BE(20), 1024);
   assert.equal(icon[25], 6, "AppIcon.png must be RGBA so macOS keeps transparent corners");
 });
 
-test("desktop clients use horizontal categories and Windows single-instance activation", async () => {
-  const [windowsUi, macUi, macCode, singleInstance] = await Promise.all([
-    readFile(new URL("../src/CodexThemeStore/Program.cs", import.meta.url), "utf8"),
-    readFile(new URL("../src/CodexThemeStore.Desktop/MainWindow.axaml", import.meta.url), "utf8"),
-    readFile(new URL("../src/CodexThemeStore.Desktop/MainWindow.axaml.cs", import.meta.url), "utf8"),
-    readFile(new URL("../src/CodexThemeStore/WindowsSingleInstance.cs", import.meta.url), "utf8"),
+test("Tauri desktop uses horizontal categories and single-instance activation", async () => {
+  const [frontend, styles, rustApp] = await Promise.all([
+    readFile(new URL("../src/main.ts", import.meta.url), "utf8"),
+    readFile(new URL("../src/styles.css", import.meta.url), "utf8"),
+    readFile(new URL("../src-tauri/src/lib.rs", import.meta.url), "utf8"),
   ]);
-  assert.doesNotMatch(windowsUi, /_categoryCombo|选择预览，自动适配/);
-  assert.match(windowsUi, /SelectCategory\("全部", reload: false\)/);
-  assert.doesNotMatch(macUi, /CategoryCombo/);
-  assert.match(macUi, /x:Name="CategoryBar"[\s\S]*Tag="全部"[\s\S]*Tag="其他"/);
-  assert.match(macCode, /SelectCategory\("全部", applyFilter: false\)/);
-  assert.match(singleInstance, /PipeOptions\.CurrentUserOnly/);
-  assert.match(singleInstance, /TryForward/);
+  assert.match(frontend, /\["全部", "人物", "动漫", "游戏", "风景", "极简", "节日", "其他"\]/);
+  assert.match(styles, /\.categories \{[^}]*display: flex/);
+  assert.match(rustApp, /tauri_plugin_single_instance::init/);
+  assert.match(rustApp, /external-activation/);
 });
 
 test("macOS release status documents the unsigned graphical client", async () => {

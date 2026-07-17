@@ -62,8 +62,8 @@ pets/
 4. 生成索引并验证：
 
 ```bash
-dotnet run --project src/CodexThemeStore.Cli -- theme-index . "My Theme Repository"
-dotnet run --project src/CodexThemeStore.Cli -- theme-validate .
+cargo run --manifest-path src-tauri/Cargo.toml --bin catalog-tool -- index . "My Theme Repository"
+cargo run --manifest-path src-tauri/Cargo.toml --bin catalog-tool -- validate .
 ```
 
 5. 使用 QA fixture 或真实 Codex 检查空白首页、会话页、窄窗口和回滚。
@@ -74,9 +74,9 @@ dotnet run --project src/CodexThemeStore.Cli -- theme-validate .
 在 Codex-Skin-Store 工作副本中，发布前执行：
 
 ```bash
-dotnet run --project src/CodexThemeStore.Cli -- theme-index .
-dotnet run --project src/CodexThemeStore.Cli -- theme-validate .
-dotnet run --project src/CodexThemeStore.Cli -- theme-pack . artifacts/theme-catalog-v1.zip
+cargo run --manifest-path src-tauri/Cargo.toml --bin catalog-tool -- index .
+cargo run --manifest-path src-tauri/Cargo.toml --bin catalog-tool -- validate .
+cargo run --manifest-path src-tauri/Cargo.toml --bin catalog-tool -- pack . artifacts/theme-catalog-v1.zip
 ```
 
 `theme-index` 会扫描全部主题、校验资源并按 ID 生成索引。`theme-validate` 会拒绝漏索引、重复 ID、错误目录、缺失资源、未知字段和超限文件。`theme-pack` 只打包客户端允许的文件，并输出 SHA-256。

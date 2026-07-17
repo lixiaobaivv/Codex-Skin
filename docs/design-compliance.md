@@ -1,23 +1,23 @@
 # 设计符合性审查
 
-审查日期：2026-07-17。范围包括 Windows WinForms 客户端、macOS Avalonia 客户端、共享 Core、诊断 CLI、Codex-Skin-Store 主题仓库 v1、CDP 注入和 CI 安装包。
+审查日期：2026-07-17。范围包括 Windows/macOS Tauri 客户端、Rust 核心与诊断工具、Codex-Skin-Store 主题仓库 v1、CDP 注入和 CI 安装包。
 
 ## 设计要求对照
 
 | 要求 | 状态 | 证据或说明 |
 | --- | --- | --- |
 | Windows 软件选择和切换主题 | 已真实验证 | Windows 11、Store Codex 26.707.9981.0：保存、CDP 重启、实时注入、主题切换和回滚通过 |
-| macOS 软件选择和切换主题 | 已实现 | Avalonia 图形商店支持主题预览、分类、同步、应用、重启和回滚；待真实 Mac 验证 |
+| macOS 软件选择和切换主题 | 已实现 | Tauri 图形商店支持主题预览、分类、同步、应用、重启和回滚；待真实 Mac 验证 |
 | GitHub 专用主题仓库 | 符合 | 固定使用公开 `lixiaobaivv/Codex-Skin-Store/main`；客户端只允许选择下载加速源 |
 | 双击启动后同步最新目录 | Windows/macOS 符合 | 首次启动允许空目录显示并自动刷新，失败保留可重试界面；后续失败保留缓存 |
 | 手动刷新和加速源 | 符合 | GitHub、GH Proxy、GHFast；CLI 也支持 `refresh` |
-| 按主题类型选择 | 符合 | Windows WinForms 与 macOS Avalonia 均提供动态分类筛选 |
+| 按主题类型选择 | 符合 | Windows 与 macOS 共用 Tauri 动态分类筛选界面 |
 | 背景、对话框和固定侧栏视觉可更改 | 符合 | 由共享 CSS/JS 生成器应用 |
 | 宠物元素允许随主题更改 | 已实现 | 可选 `home.pet` 使用仓库本地图片，运行时限制尺寸并放置在 hero 安全区 |
 | 项目和任务不可变更 | 符合 | v1 Schema 禁止相关字段；运行时禁用通用文本替换并保留原生侧栏 |
 | 首页主题引导且不拥挤覆盖 | 符合 | 首页只在无消息状态出现；四卡默认同排、主区小于 760px 才降为两列，并为输入框动态预留空间 |
 | 主题运行性能 | 已优化 | 结构增量观察取代全页/逐帧扫描；忽略流式消息内部变化，移除主区和消息气泡大面积实时模糊 |
-| 网页一键导入 | Windows 符合，macOS 待实机验收 | Windows Setup 自动注册并清理关联；macOS PKG plist、Avalonia 激活和共享验签导入已接入 |
+| 网页一键导入 | Windows 符合，macOS 待实机验收 | Windows Setup 自动注册并清理关联；macOS PKG plist、Tauri 激活和 Rust 验签导入已接入 |
 | Windows/macOS 完整安装包 | 已实现构建链 | Windows Setup EXE、macOS arm64/x64 PKG；不再以 ZIP 作为正式产物 |
 | GitHub CI 编译与发布 | 已实现配置 | PR/main 构建安装包，`v*` 标签创建 Release |
 
@@ -40,7 +40,7 @@
 
 ## 发布前剩余项
 
-1. 在真实 Intel 与 Apple Silicon Mac 上验证 Codex `.app` 名称、Avalonia 界面、LaunchServices 启动、CDP 注入和回滚。
+1. 在真实 Intel 与 Apple Silicon Mac 上验证 Codex `.app` 名称、Tauri 界面、LaunchServices 启动、CDP 注入和回滚。
 2. 当前无法提供商业代码签名与 Apple 公证；发布说明必须明确 Windows SmartScreen 和 macOS Gatekeeper 的手动确认步骤。
 3. 在真实 Windows 安装/卸载 Setup，确认网页浏览器可拉起客户端且卸载不遗留协议关联。
 4. 在真实 macOS 上验证 `.dreamskin` 文件关联、冷启动/已运行两种 URL 激活、确认窗口和安装后应用；自动测试已覆盖共享验签安装器与 plist 契约。

@@ -66,7 +66,7 @@ The shared implementation now also includes:
 3. bounded HTTPS download with public-address DNS enforcement;
 4. manual redirect handling with a maximum of three HTTPS redirects;
 5. package size and SHA-256 checks before package parsing and installation;
-6. current-user Windows association commands and macOS Avalonia activation handling;
+6. current-user Windows installer associations and cross-platform Tauri activation handling;
 7. separate confirmation prompts for download/install and immediate application.
 
 Windows Setup registers the protocol during installation. macOS PKG declares

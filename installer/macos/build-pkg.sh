@@ -12,36 +12,23 @@ OUTPUT_DIRECTORY="$(dirname "$3")"
 mkdir -p "$OUTPUT_DIRECTORY"
 OUTPUT="$(cd "$OUTPUT_DIRECTORY" && pwd)/$(basename "$3")"
 ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
-BUILD_ROOT="${RUNNER_TEMP:-/tmp}/codex-theme-store-${RID}"
-PUBLISH_DIR="$BUILD_ROOT/publish"
+BUILD_ROOT="${RUNNER_TEMP:-/tmp}/codex-skin-${RID}"
 PAYLOAD_DIR="$BUILD_ROOT/payload"
 APP_DIR="$PAYLOAD_DIR/Applications/Codex-Skin.app"
 ICON_SOURCE="$ROOT/installer/macos/AppIcon.png"
 
 case "$RID" in
-  osx-arm64|osx-x64) ;;
+  osx-arm64) TARGET="aarch64-apple-darwin" ;;
+  osx-x64) TARGET="x86_64-apple-darwin" ;;
   *) echo "Unsupported RID: $RID" >&2; exit 2 ;;
 esac
 
 rm -rf "$BUILD_ROOT"
-mkdir -p "$PUBLISH_DIR" "$APP_DIR/Contents/MacOS" "$APP_DIR/Contents/Resources"
+mkdir -p "$APP_DIR/Contents/MacOS" "$APP_DIR/Contents/Resources"
+rustup target add "$TARGET"
+(cd "$ROOT" && npm run tauri -- build --target "$TARGET" --no-bundle --config "{\"version\":\"$VERSION\"}")
+cp "$ROOT/src-tauri/target/$TARGET/release/codex-skin" "$APP_DIR/Contents/MacOS/Codex-Skin"
 
-dotnet publish "$ROOT/src/CodexThemeStore.Desktop/CodexThemeStore.Desktop.csproj" \
-  --configuration Release \
-  --runtime "$RID" \
-  --self-contained true \
-  -p:PublishSingleFile=true \
-  -p:IncludeNativeLibrariesForSelfExtract=true \
-  -p:EnableCompressionInSingleFile=true \
-  -p:DebugType=None \
-  -p:DebugSymbols=false \
-  -p:Version="$VERSION" \
-  --output "$PUBLISH_DIR"
-
-test ! -d "$PUBLISH_DIR/themes"
-test ! -d "$PUBLISH_DIR/previews"
-
-cp -R "$PUBLISH_DIR/." "$APP_DIR/Contents/MacOS/"
 ICONSET="$BUILD_ROOT/Codex-Skin.iconset"
 mkdir -p "$ICONSET"
 test -f "$ICON_SOURCE"
@@ -59,15 +46,8 @@ iconutil -c icns "$ICONSET" -o "$APP_DIR/Contents/Resources/Codex-Skin.icns"
 sed "s/__VERSION__/$VERSION/g" "$ROOT/installer/macos/Info.plist" > "$APP_DIR/Contents/Info.plist"
 chmod 0755 "$APP_DIR/Contents/MacOS/Codex-Skin"
 plutil -lint "$APP_DIR/Contents/Info.plist"
-test "$(/usr/libexec/PlistBuddy -c 'Print :CFBundleIconFile' "$APP_DIR/Contents/Info.plist")" = "Codex-Skin.icns"
 test "$(/usr/libexec/PlistBuddy -c 'Print :CFBundleURLTypes:0:CFBundleURLSchemes:0' "$APP_DIR/Contents/Info.plist")" = "dreamskin"
 test "$(/usr/libexec/PlistBuddy -c 'Print :CFBundleDocumentTypes:0:CFBundleTypeExtensions:0' "$APP_DIR/Contents/Info.plist")" = "dreamskin"
 test -s "$APP_DIR/Contents/Resources/Codex-Skin.icns"
-find "$PAYLOAD_DIR" -name '*.pdb' -delete
 
-pkgbuild \
-  --root "$PAYLOAD_DIR" \
-  --identifier "com.codexskin.themestore" \
-  --version "$VERSION" \
-  --install-location / \
-  "$OUTPUT"
+pkgbuild --root "$PAYLOAD_DIR" --identifier "com.codexskin.themestore" --version "$VERSION" --install-location / "$OUTPUT"

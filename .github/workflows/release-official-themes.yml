@@ -81,9 +81,10 @@ jobs:
         with:
           node-version: 22
 
-      - uses: actions/setup-dotnet@v6
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: swatinem/rust-cache@v2
         with:
-          dotnet-version: 8.0.x
+          workspaces: src-tauri
 
       - name: Resolve immutable release metadata
         id: metadata
@@ -115,8 +116,8 @@ jobs:
           PACKAGE_NAME: ${{ steps.metadata.outputs.package_name }}
         run: |
           package="artifacts/official-theme/$PACKAGE_NAME"
-          dotnet run --project src/CodexThemeStore.Cli --configuration Release -- theme-import "$package" macos "$RUNNER_TEMP/theme-macos"
-          dotnet run --project src/CodexThemeStore.Cli --configuration Release -- theme-import "$package" windows "$RUNNER_TEMP/theme-windows"
+          cargo run --manifest-path src-tauri/Cargo.toml --locked --bin dreamskin-verify -- "$package" macos
+          cargo run --manifest-path src-tauri/Cargo.toml --locked --bin dreamskin-verify -- "$package" windows
 
       - name: Publish immutable release
         env:

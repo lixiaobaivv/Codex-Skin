@@ -8,19 +8,21 @@ permissions:
   contents: read
 
 jobs:
-  windows-importer:
+  tauri-windows:
     runs-on: windows-latest
     steps:
       - uses: actions/checkout@v7
-
-      - uses: actions/setup-dotnet@v6
-        with:
-          dotnet-version: 8.0.x
-
       - uses: actions/setup-node@v7
         with:
           node-version: 22
-
+          cache: npm
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: clippy, rustfmt
+      - uses: swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri
+      - run: npm ci
       - name: Rebuild deterministic signed fixture
         shell: pwsh
         run: |
@@ -28,68 +30,26 @@ jobs:
           node tools/dreamskin/build-sample.mjs
           $after = (Get-FileHash samples/dreamskin/codex-skin-sample-1.0.0.dreamskin -Algorithm SHA256).Hash
           if ($before -ne $after) { throw "Signed fixture is not deterministic." }
-
-      - name: Validate fixture contract
-        run: node --test tests/*.test.mjs
-
-      - name: Build Windows client
-        run: dotnet build src/CodexThemeStore/CodexThemeStore.csproj --configuration Release
-
-      - name: Publish self-contained Windows client
-        run: dotnet publish src/CodexThemeStore/CodexThemeStore.csproj --configuration Release --runtime win-x64 --self-contained true --output artifacts/Codex-Skin-win-x64 -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true -p:IncludeAllContentForSelfExtract=true
-
-      - name: Validate protocol parser
+      - run: node --test tests/dreamskin-catalog-fixtures.test.mjs tests/dreamskin-fixture.test.mjs tests/release-contract.test.mjs
+      - run: npm run build
+      - run: cargo fmt --manifest-path src-tauri/Cargo.toml -- --check
+      - run: cargo clippy --manifest-path src-tauri/Cargo.toml --all-targets --locked -- -D warnings
+      - run: cargo test --manifest-path src-tauri/Cargo.toml --locked
+      - name: Validate live official catalog
+        run: cargo test --manifest-path src-tauri/Cargo.toml --locked repository::tests::syncs_and_validates_official_catalog -- --ignored --exact
+      - name: Build Tauri executable
+        run: npm run tauri -- build --no-bundle
+      - name: Validate release payload
         shell: pwsh
         run: |
-          . ./tools/windows/invoke-client.ps1
-          $client = (Resolve-Path "artifacts/Codex-Skin-win-x64/Codex-Skin.exe").Path
-          $protocol = Invoke-CodexSkinClient $client @('protocol', 'self-test')
-          if ($protocol.ExitCode -ne 0) { throw ($protocol.Error -join "`n") }
-          $isolated = Join-Path $env:RUNNER_TEMP 'codex-skin-online-catalog'
-          New-Item -ItemType Directory -Force $isolated | Out-Null
-          $empty = Invoke-CodexSkinClient $client @('list') $isolated
-          if ($empty.ExitCode -eq 0) { throw "Standalone client unexpectedly contains bundled themes." }
-          $refresh = Invoke-CodexSkinClient $client @('refresh', 'github') $isolated
-          if ($refresh.ExitCode -ne 0) { throw ($refresh.Error -join "`n") }
-          $themes = Invoke-CodexSkinClient $client @('list') $isolated
-          $catalog = Invoke-RestMethod 'https://raw.githubusercontent.com/lixiaobaivv/Codex-Skin-Store/main/theme-repository.json'
-          $requiredThemes = @($catalog.themes.id)
-          if ($themes.ExitCode -ne 0 -or $themes.Output.Count -lt $requiredThemes.Count) { throw "Standalone client did not load the required official themes." }
-          $requiredThemes | ForEach-Object {
-            if (-not ($themes.Output -match "^$_`t")) { throw "Standalone client is missing required theme: $_" }
+          $output = 'artifacts/Codex-Skin-win-x64'
+          New-Item -ItemType Directory -Force $output | Out-Null
+          Copy-Item src-tauri/target/release/codex-skin.exe "$output/Codex-Skin.exe"
+          @('themes','previews','backgrounds','logos','pets') | ForEach-Object {
+            if (Test-Path (Join-Path $output $_)) { throw "Online theme assets must not be bundled: $_" }
           }
-
-      - name: Validate current-user shell registration
-        shell: pwsh
-        run: |
-          . ./tools/windows/invoke-client.ps1
-          $client = (Resolve-Path "artifacts/Codex-Skin-win-x64/Codex-Skin.exe").Path
-          $register = Invoke-CodexSkinClient $client @('protocol', 'register')
-          if ($register.ExitCode -ne 0) { throw ($register.Error -join "`n") }
-          $status = Invoke-CodexSkinClient $client @('protocol', 'status')
-          if ($status.ExitCode -ne 0 -or $status.Output -ne "registered") { throw "dreamskin protocol registration failed." }
-          $unregister = Invoke-CodexSkinClient $client @('protocol', 'unregister')
-          if ($unregister.ExitCode -ne 0) { throw ($unregister.Error -join "`n") }
-          $status = Invoke-CodexSkinClient $client @('protocol', 'status')
-          if ($status.ExitCode -ne 0 -or $status.Output -ne "not registered") { throw "dreamskin protocol cleanup failed." }
-
-      - name: Import signed fixture into isolated library
-        shell: pwsh
-        run: |
-          . ./tools/windows/invoke-client.ps1
-          $client = (Resolve-Path "artifacts/Codex-Skin-win-x64/Codex-Skin.exe").Path
-          $env:CODEX_THEME_LIBRARY_DIR = Join-Path $env:RUNNER_TEMP "dreamskin-library"
-          $import = Invoke-CodexSkinClient $client @('import', 'samples/dreamskin/codex-skin-sample-1.0.0.dreamskin') $PWD.Path
-          if ($import.ExitCode -ne 0) { throw ($import.Error -join "`n") }
-          $manifest = Join-Path $env:CODEX_THEME_LIBRARY_DIR "codex-skin.jackson-sage-sample/1.0.0/theme.json"
-          if (-not (Test-Path -LiteralPath $manifest)) { throw "Signed fixture was not installed." }
-          $env:CODEX_THEME_CATALOG_DIAGNOSTICS = "1"
-          $themes = Invoke-CodexSkinClient $client @('list') $PWD.Path
-          $themes.Output | Write-Host
-          if ($themes.ExitCode -ne 0 -or -not ($themes.Output -match "codex-skin.jackson-sage-sample")) { throw "Imported theme did not persist in the theme list." }
-
       - uses: actions/upload-artifact@v7
         with:
           name: Codex-Skin-win-x64
-          path: artifacts/Codex-Skin-win-x64
+          path: artifacts/Codex-Skin-win-x64/Codex-Skin.exe
           if-no-files-found: error

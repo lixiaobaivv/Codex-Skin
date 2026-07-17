@@ -10,7 +10,7 @@ From the repository root, run:
 ```powershell
 node tools/dreamskin/build-sample.mjs
 node --test tests/dreamskin-fixture.test.mjs
-dotnet build src/CodexThemeStore/CodexThemeStore.csproj --configuration Release
+cargo test --manifest-path src-tauri/Cargo.toml --locked
 ```
 
 The checked-in package must remain deterministic:

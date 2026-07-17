@@ -36,6 +36,16 @@ Name: "english"; MessagesFile: "compiler:Default.isl"
 [Files]
 Source: "{#MyAppSource}\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
 
+[Registry]
+Root: HKCU; Subkey: "Software\Classes\dreamskin"; ValueType: string; ValueName: ""; ValueData: "URL:Dream Skin Import Protocol"; Flags: uninsdeletekey
+Root: HKCU; Subkey: "Software\Classes\dreamskin"; ValueType: string; ValueName: "URL Protocol"; ValueData: ""; Flags: uninsdeletekey
+Root: HKCU; Subkey: "Software\Classes\dreamskin\DefaultIcon"; ValueType: string; ValueName: ""; ValueData: "{app}\Codex-Skin.exe,0"; Flags: uninsdeletekey
+Root: HKCU; Subkey: "Software\Classes\dreamskin\shell\open\command"; ValueType: string; ValueName: ""; ValueData: """{app}\Codex-Skin.exe"" ""%1"""; Flags: uninsdeletekey
+Root: HKCU; Subkey: "Software\Classes\.dreamskin"; ValueType: string; ValueName: ""; ValueData: "CodexSkin.dreamskin"; Flags: uninsdeletekey
+Root: HKCU; Subkey: "Software\Classes\CodexSkin.dreamskin"; ValueType: string; ValueName: ""; ValueData: "Codex Dream Skin Theme Package"; Flags: uninsdeletekey
+Root: HKCU; Subkey: "Software\Classes\CodexSkin.dreamskin\DefaultIcon"; ValueType: string; ValueName: ""; ValueData: "{app}\Codex-Skin.exe,0"; Flags: uninsdeletekey
+Root: HKCU; Subkey: "Software\Classes\CodexSkin.dreamskin\shell\open\command"; ValueType: string; ValueName: ""; ValueData: """{app}\Codex-Skin.exe"" ""%1"""; Flags: uninsdeletekey
+
 [Icons]
 Name: "{autoprograms}\Codex-Skin"; Filename: "{app}\Codex-Skin.exe"
 Name: "{autodesktop}\Codex-Skin"; Filename: "{app}\Codex-Skin.exe"; Tasks: desktopicon
@@ -44,8 +54,4 @@ Name: "{autodesktop}\Codex-Skin"; Filename: "{app}\Codex-Skin.exe"; Tasks: deskt
 Name: "desktopicon"; Description: "创建桌面快捷方式"; GroupDescription: "附加图标："; Flags: unchecked
 
 [Run]
-Filename: "{app}\Codex-Skin.exe"; Parameters: "protocol register"; StatusMsg: "正在注册网页主题导入协议..."; Flags: runhidden waituntilterminated
 Filename: "{app}\Codex-Skin.exe"; Description: "启动 Codex-Skin"; Flags: nowait postinstall skipifsilent
-
-[UninstallRun]
-Filename: "{app}\Codex-Skin.exe"; Parameters: "protocol unregister"; Flags: runhidden waituntilterminated skipifdoesntexist

@@ -20,7 +20,7 @@ Store/Patched/CDP     app bundle discovery/CDP
 
 平台适配器只负责四件事：发现 Codex、以本机回环 CDP 参数启动、向已验证的本机页面注入生成结果、恢复默认。仓库下载层不能启动进程，主题清单不能提供 CSS、JavaScript、HTML 或命令。
 
-共享实现位于 `src/CodexThemeStore.Core`，包含仓库同步与校验、`ThemeDefinition`、`CssBuilder`、`JsBuilder`、状态编译器、CDP 协议和平台接口。Windows WinForms 项目与 `src/CodexThemeStore.Desktop` Avalonia 图形客户端都通过项目引用复用 Core；`src/CodexThemeStore.Cli` 保留为诊断入口。
+共享实现位于 `src-tauri/src`，由 Rust 模块实现仓库同步与校验、主题编译、状态持久化、CDP 协议、安全导入和平台适配。Windows 与 macOS 共用 `src/main.ts` 和 `src/styles.css` 中的 Tauri WebView 界面，仅进程发现与启动保留平台条件编译。
 
 `MacOsCodexAdapter` 当前负责：
 
@@ -29,7 +29,7 @@ Store/Patched/CDP     app bundle discovery/CDP
 3. 使用固定回环 CDP 参数启动、停止和检测 Codex。
 4. 复用 `CdpThemeInjector` 注入主题或删除持久 new-document script 后回滚。
 
-macOS PKG 安装 `/Applications/Codex-Skin.app`，图形客户端可浏览、筛选、同步、应用和回滚主题。PKG 注册 `dreamskin://` 与 `.dreamskin`，Avalonia 激活处理器复用共享 Core 完成下载限制、Ed25519 验签、图片解码、原子安装和二次应用确认。CLI 仍可从 v1 `theme.json` 执行 `apply-theme` 或 `restart-theme`。
+macOS PKG 安装 `/Applications/Codex-Skin.app`，图形客户端可浏览、筛选、同步、应用和回滚主题。PKG 注册 `dreamskin://` 与 `.dreamskin`，Tauri 激活处理器复用 Rust 核心完成下载限制、Ed25519 验签、图片解码、原子安装和二次应用确认。`catalog-tool` 与 `dreamskin-verify` Rust 二进制保留仓库制作和发布验证能力。
 
 macOS 适配器的验收条件：
 
