@@ -299,6 +299,90 @@ pub(crate) fn set_subscription(theme_id: &str, subscribed: bool) -> Result<()> {
     save_theme_library_state(&state)
 }
 
+pub(crate) fn delete_theme(theme_id: &str) -> Result<bool> {
+    if !valid_library_id(theme_id) {
+        return Err(AppError::Message(format!("主题 ID 无效：{theme_id}")));
+    }
+
+    let theme = load_remote_catalog()?.and_then(|catalog| {
+        catalog
+            .themes
+            .into_iter()
+            .find(|theme| theme.id == theme_id)
+    });
+    let mut removed = delete_theme_files(
+        theme_id,
+        &paths::installed_root()?,
+        &paths::cache_root()?,
+        theme.as_ref(),
+    )?;
+
+    let mut state = load_theme_library_state();
+    removed |= state.downloaded_versions.remove(theme_id).is_some();
+    state.subscriptions.remove(theme_id);
+    save_theme_library_state(&state)?;
+    clear_compiled_state(theme_id, &paths::state_root()?)?;
+    Ok(removed)
+}
+
+fn delete_theme_files(
+    theme_id: &str,
+    installed_root: &Path,
+    cache_root: &Path,
+    theme: Option<&RemoteTheme>,
+) -> Result<bool> {
+    let mut removed = false;
+    let installed = installed_root.join(theme_id);
+    if installed.exists() {
+        fs::remove_dir_all(&installed)?;
+        removed = true;
+    }
+
+    if let Some(theme) = theme {
+        let resources = std::iter::once(&theme.manifest)
+            .chain(std::iter::once(&theme.preview))
+            .chain(&theme.assets);
+        for resource in resources {
+            let path = cache_root.join(&resource.path);
+            if path.is_file() {
+                fs::remove_file(path)?;
+                removed = true;
+            }
+        }
+    } else {
+        let manifest = cache_root.join("themes").join(format!("{theme_id}.json"));
+        if manifest.is_file() {
+            fs::remove_file(manifest)?;
+            removed = true;
+        }
+    }
+    Ok(removed)
+}
+
+fn clear_compiled_state(theme_id: &str, root: &Path) -> Result<()> {
+    let current = root.join("current-theme.json");
+    let is_current = fs::read(&current)
+        .ok()
+        .and_then(|bytes| serde_json::from_slice::<Value>(&bytes).ok())
+        .and_then(|manifest| {
+            manifest
+                .get("id")
+                .or_else(|| manifest.get("codeThemeId"))
+                .and_then(Value::as_str)
+                .map(|id| id == theme_id)
+        })
+        .unwrap_or(false);
+    if is_current {
+        for name in ["codex-theme.css", "codex-theme.js", "current-theme.json"] {
+            let path = root.join(name);
+            if path.is_file() {
+                fs::remove_file(path)?;
+            }
+        }
+    }
+    Ok(())
+}
+
 pub(crate) async fn sync_subscriptions() -> Result<usize> {
     let subscriptions: Vec<_> = load_theme_library_state()
         .subscriptions
@@ -751,6 +835,19 @@ fn valid_catalog_id(value: &str) -> bool {
             .all(|c| c.is_ascii_lowercase() || c.is_ascii_digit() || c == '-')
         && !value.ends_with('-')
 }
+fn valid_library_id(value: &str) -> bool {
+    value.len() >= 2
+        && value.len() <= 128
+        && value
+            .chars()
+            .next()
+            .is_some_and(|c| c.is_ascii_lowercase() || c.is_ascii_digit())
+        && value
+            .chars()
+            .all(|c| c.is_ascii_lowercase() || c.is_ascii_digit() || c == '-' || c == '.')
+        && !value.ends_with(['-', '.'])
+        && !value.contains("..")
+}
 fn validate_color(value: &str, key: &str) -> Result<()> {
     if value.len() != 7
         || !value.starts_with('#')
@@ -848,6 +945,58 @@ mod tests {
         );
         assert!(decoded.subscriptions.contains("example-theme"));
         assert!(serde_json::from_str::<ThemeLibraryState>(r#"{"unknown":true}"#).is_err());
+    }
+
+    #[test]
+    fn deleting_theme_removes_installed_cached_and_compiled_files() {
+        let temporary = tempfile::tempdir().unwrap();
+        let installed_root = temporary.path().join("installed");
+        let cache_root = temporary.path().join("cache");
+        let state_root = temporary.path().join("state");
+        let theme_id = "example-theme";
+        fs::create_dir_all(installed_root.join(theme_id).join("1.0.0")).unwrap();
+        fs::write(
+            installed_root
+                .join(theme_id)
+                .join("1.0.0")
+                .join("theme.json"),
+            b"{}",
+        )
+        .unwrap();
+        for relative in [
+            "themes/example-theme.json",
+            "previews/example-theme.png",
+            "backgrounds/example-theme.jpg",
+        ] {
+            let path = cache_root.join(relative);
+            fs::create_dir_all(path.parent().unwrap()).unwrap();
+            fs::write(path, b"resource").unwrap();
+        }
+        fs::create_dir_all(&state_root).unwrap();
+        fs::write(
+            state_root.join("current-theme.json"),
+            br#"{"codeThemeId":"example-theme"}"#,
+        )
+        .unwrap();
+        fs::write(state_root.join("codex-theme.css"), b"css").unwrap();
+        fs::write(state_root.join("codex-theme.js"), b"js").unwrap();
+
+        let mut theme = remote_catalog_fixture().themes.remove(0);
+        theme.assets.push(RemoteResource {
+            path: "backgrounds/example-theme.jpg".into(),
+            sha256: "c".repeat(64),
+            size: 128,
+        });
+        assert!(delete_theme_files(theme_id, &installed_root, &cache_root, Some(&theme)).unwrap());
+        clear_compiled_state(theme_id, &state_root).unwrap();
+
+        assert!(!installed_root.join(theme_id).exists());
+        assert!(!cache_root.join("themes/example-theme.json").exists());
+        assert!(!cache_root.join("previews/example-theme.png").exists());
+        assert!(!cache_root.join("backgrounds/example-theme.jpg").exists());
+        assert!(!state_root.join("current-theme.json").exists());
+        assert!(!state_root.join("codex-theme.css").exists());
+        assert!(!state_root.join("codex-theme.js").exists());
     }
 
     #[tokio::test]

@@ -60,6 +60,16 @@ fn set_theme_subscription(theme_id: String, subscribed: bool) -> error::Result<(
 }
 
 #[tauri::command]
+fn delete_theme(theme_id: String) -> error::Result<String> {
+    let name = catalog::find(&theme_id)?.name;
+    if repository::delete_theme(&theme_id)? {
+        Ok(format!("{name} 已从本地删除"))
+    } else {
+        Ok(format!("{name} 没有可删除的本地文件"))
+    }
+}
+
+#[tauri::command]
 async fn sync_subscribed_themes() -> error::Result<usize> {
     repository::sync_subscriptions().await
 }
@@ -199,6 +209,7 @@ pub fn run() {
             sync_catalog,
             download_theme,
             set_theme_subscription,
+            delete_theme,
             sync_subscribed_themes,
             import_local,
             install_uri,

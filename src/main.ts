@@ -36,6 +36,7 @@ async function call<T>(command: string, args?: Record<string, unknown>): Promise
   if (command === "sync_catalog") return { themeCount: qaThemes.length, sourceId: "github", sourceName: "GitHub 官方" } as T;
   if (command === "sync_subscribed_themes") return 0 as T;
   if (command === "set_theme_subscription") return undefined as T;
+  if (command === "delete_theme") return "主题已从本地删除" as T;
   return "QA 操作已完成" as T;
 }
 
@@ -60,6 +61,7 @@ document.querySelector<HTMLDivElement>("#app")!.innerHTML = `
     <footer class="command-bar">
       <section><strong id="selection">请选择主题</strong><span id="status">准备就绪</span></section>
       <button id="rollback" class="button">恢复默认</button>
+      <button id="delete" class="button danger">删除主题</button>
       <button id="subscribe" class="button">订阅</button>
       <button id="download" class="button">下载主题</button>
       <button id="apply" class="button">应用主题</button>
@@ -88,6 +90,8 @@ function updateCommands(): void {
   document.querySelector<HTMLButtonElement>("#restart")!.disabled = busy || !selectedTheme;
   const subscribe = document.querySelector<HTMLButtonElement>("#subscribe")!;
   const download = document.querySelector<HTMLButtonElement>("#download")!;
+  const remove = document.querySelector<HTMLButtonElement>("#delete")!;
+  remove.disabled = busy || !selectedTheme?.installedVersion;
   subscribe.disabled = busy || !selectedTheme?.remoteVersion;
   subscribe.textContent = selectedTheme?.subscribed ? "取消订阅" : "订阅";
   download.disabled = busy || !selectedTheme?.remoteVersion || (!!selectedTheme.installedVersion && !selectedTheme.updateAvailable);
@@ -224,6 +228,20 @@ document.querySelector<HTMLButtonElement>("#download")!.onclick = async () => {
   try {
     const result = await call<string>("download_theme", { themeId: selectedTheme.id });
     await loadState(); message(result);
+  } catch (error) { message(String(error)); }
+  finally { setBusy(false); }
+};
+
+document.querySelector<HTMLButtonElement>("#delete")!.onclick = async () => {
+  if (!selectedTheme?.installedVersion) return;
+  const { id, name } = selectedTheme;
+  if (!window.confirm(`确定删除“${name}”吗？\n\n将取消订阅并删除本地主题文件；Codex 中当前已显示的主题会保留到恢复默认或重启。`)) return;
+  setBusy(true, "正在删除本地主题…");
+  try {
+    const result = await call<string>("delete_theme", { themeId: id });
+    previewCache.clear();
+    await loadState();
+    message(result);
   } catch (error) { message(String(error)); }
   finally { setBusy(false); }
 };

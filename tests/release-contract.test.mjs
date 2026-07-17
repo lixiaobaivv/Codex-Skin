@@ -132,6 +132,8 @@ test("desktop catalog uses conditional sync and on-demand persistent resources",
   assert.match(frontend, /已下载/);
   assert.match(frontend, /有更新/);
   assert.match(frontend, /set_theme_subscription/);
+  assert.match(frontend, /delete_theme/);
+  assert.match(frontend, /删除主题/);
 });
 
 test("macOS release status documents the unsigned graphical client", async () => {
