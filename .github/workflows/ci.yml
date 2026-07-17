@@ -36,10 +36,15 @@ jobs:
         run: dotnet build src/CodexThemeStore/CodexThemeStore.csproj --configuration Release
 
       - name: Publish self-contained Windows client
-        run: dotnet publish src/CodexThemeStore/CodexThemeStore.csproj --configuration Release --runtime win-x64 --self-contained true --output artifacts/Codex-Skin-win-x64
+        run: dotnet publish src/CodexThemeStore/CodexThemeStore.csproj --configuration Release --runtime win-x64 --self-contained true --output artifacts/Codex-Skin-win-x64 -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true -p:IncludeAllContentForSelfExtract=true -p:KeepThemeAssetsExternal=false
 
       - name: Validate protocol parser
-        run: artifacts/Codex-Skin-win-x64/Codex-Skin.exe protocol self-test
+        shell: pwsh
+        run: |
+          $client = "artifacts/Codex-Skin-win-x64/Codex-Skin.exe"
+          & $client protocol self-test
+          $themes = @(& $client list)
+          if ($LASTEXITCODE -ne 0 -or $themes.Count -lt 4) { throw "Standalone client does not contain the built-in themes." }
 
       - name: Validate current-user shell registration
         shell: pwsh

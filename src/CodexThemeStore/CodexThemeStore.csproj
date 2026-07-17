@@ -9,6 +9,7 @@
     <AssemblyName>Codex-Skin</AssemblyName>
     <Product>Codex-Skin</Product>
     <Description>Codex-Skin theme client and signed .dreamskin importer</Description>
+    <KeepThemeAssetsExternal Condition="'$(KeepThemeAssetsExternal)' == ''">true</KeepThemeAssetsExternal>
   </PropertyGroup>
 
   <ItemGroup>
@@ -17,11 +18,11 @@
   </ItemGroup>
 
   <ItemGroup>
-    <None Include="..\..\themes\*.json" Link="themes\%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" ExcludeFromSingleFile="true" />
-    <None Include="..\..\previews\*.png" Link="previews\%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" ExcludeFromSingleFile="true" />
-    <None Include="..\..\backgrounds\*.jpg" Link="backgrounds\%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" ExcludeFromSingleFile="true" />
-    <None Include="..\..\backgrounds\*.png" Link="backgrounds\%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" ExcludeFromSingleFile="true" />
-    <None Include="..\..\logos\*-logo-ui-v1.png" Link="logos\%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" ExcludeFromSingleFile="true" />
-    <None Include="..\..\pets\*" Link="pets\%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" ExcludeFromSingleFile="true" />
+    <None Include="..\..\themes\*.json" Link="themes\%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" ExcludeFromSingleFile="$(KeepThemeAssetsExternal)" />
+    <None Include="..\..\previews\*.png" Link="previews\%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" ExcludeFromSingleFile="$(KeepThemeAssetsExternal)" />
+    <None Include="..\..\backgrounds\*.jpg" Link="backgrounds\%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" ExcludeFromSingleFile="$(KeepThemeAssetsExternal)" />
+    <None Include="..\..\backgrounds\*.png" Link="backgrounds\%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" ExcludeFromSingleFile="$(KeepThemeAssetsExternal)" />
+    <None Include="..\..\logos\*-logo-ui-v1.png" Link="logos\%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" ExcludeFromSingleFile="$(KeepThemeAssetsExternal)" />
+    <None Include="..\..\pets\*" Link="pets\%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" ExcludeFromSingleFile="$(KeepThemeAssetsExternal)" />
   </ItemGroup>
 </Project>

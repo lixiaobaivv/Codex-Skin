@@ -21,10 +21,14 @@ test("Windows client release uses stable English artifact names", async () => {
   assert.match(release, /PublishSingleFile=true/);
   assert.match(release, /IncludeAllContentForSelfExtract=true/);
   assert.equal(
-    (project.match(/ExcludeFromSingleFile="true"/g) ?? []).length,
+    (project.match(/ExcludeFromSingleFile="\$\(KeepThemeAssetsExternal\)"/g) ?? []).length,
     6,
     "all mutable theme resource groups must remain beside the single-file executable",
   );
+  assert.match(project, /<KeepThemeAssetsExternal Condition=.*>true<\/KeepThemeAssetsExternal>/);
+  assert.match(ci, /KeepThemeAssetsExternal=false/);
+  assert.match(ci, /Standalone client does not contain the built-in themes/);
+  assert.match(release, /KeepThemeAssetsExternal=false/);
   for (const directory of ["themes", "previews", "backgrounds", "logos", "pets"]) {
     assert.match(project, new RegExp(`\\\\${directory}\\\\`));
   }

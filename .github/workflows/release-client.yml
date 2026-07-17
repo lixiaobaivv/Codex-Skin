@@ -42,6 +42,7 @@ jobs:
             -p:PublishSingleFile=true `
             -p:IncludeNativeLibrariesForSelfExtract=true `
             -p:IncludeAllContentForSelfExtract=true `
+            -p:KeepThemeAssetsExternal=false `
             -p:EnableCompressionInSingleFile=true `
             -p:DebugType=None `
             -p:DebugSymbols=false
@@ -53,7 +54,10 @@ jobs:
           New-Item -ItemType Directory -Force artifacts/release, $env:RUNNER_TEMP/codex-skin-standalone | Out-Null
           Copy-Item -LiteralPath $source -Destination artifacts/release/Codex-Skin-win-x64.exe
           Copy-Item -LiteralPath $source -Destination $env:RUNNER_TEMP/codex-skin-standalone/Codex-Skin-win-x64.exe
-          & "$env:RUNNER_TEMP/codex-skin-standalone/Codex-Skin-win-x64.exe" protocol self-test
+          $standalone = "$env:RUNNER_TEMP/codex-skin-standalone/Codex-Skin-win-x64.exe"
+          & $standalone protocol self-test
+          $themes = @(& $standalone list)
+          if ($LASTEXITCODE -ne 0 -or $themes.Count -lt 4) { throw "Standalone client does not contain the built-in themes." }
 
       - name: Create archive and checksums
         shell: pwsh
@@ -94,7 +98,7 @@ jobs:
             gh release create $env:RELEASE_TAG @assets `
               --target $env:GITHUB_SHA `
               --title "Codex-Skin $env:RELEASE_TAG" `
-              --notes "Windows x64 self-contained client with signed .dreamskin import and dreamskin:// protocol support. macOS executable is planned after the macOS client source is integrated and validated on a real macOS runner."
+              --notes "Codex-Skin desktop theme client. Includes a self-contained Windows x64 client with signed .dreamskin import and dreamskin:// protocol support. The companion build workflow publishes the Windows Setup package and unsigned macOS arm64/x64 PKG installers."
             exit 0
           }
 
