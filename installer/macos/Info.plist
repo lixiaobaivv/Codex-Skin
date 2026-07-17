@@ -14,6 +14,8 @@
   <string>6.0</string>
   <key>CFBundleName</key>
   <string>Codex-Skin</string>
+  <key>CFBundleIconFile</key>
+  <string>Codex-Skin.icns</string>
   <key>CFBundlePackageType</key>
   <string>APPL</string>
   <key>CFBundleShortVersionString</key>

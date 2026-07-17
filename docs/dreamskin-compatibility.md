@@ -31,7 +31,7 @@ theme activation bridge.
 ## Runtime mapping
 
 Imported store manifests use a smaller cross-platform color model than the
-built-in themes. The shared renderer maps it as follows:
+official desktop catalog themes. The shared renderer maps it as follows:
 
 | Store v1 | Shared runtime |
 | --- | --- |

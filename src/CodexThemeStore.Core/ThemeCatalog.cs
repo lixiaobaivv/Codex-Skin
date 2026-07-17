@@ -11,7 +11,8 @@ public static class ThemeCatalog
     public static IReadOnlyList<ThemeDefinition> Load(
         IEnumerable<string> catalogDirectories,
         string? installedPackageDirectory = null,
-        string? platform = null)
+        string? platform = null,
+        bool allowEmpty = false)
     {
         var themes = new Dictionary<string, ThemeDefinition>(StringComparer.Ordinal);
 
@@ -50,7 +51,7 @@ public static class ThemeCatalog
             }
         }
 
-        if (themes.Count == 0) throw new DirectoryNotFoundException("找不到可用的本地主题。");
+        if (themes.Count == 0 && !allowEmpty) throw new DirectoryNotFoundException("找不到可用的本地主题，请先联网刷新官方主题商店。");
         return themes.Values
             .OrderBy(theme => theme.Category, StringComparer.Ordinal)
             .ThenBy(theme => theme.DisplayName, StringComparer.CurrentCulture)

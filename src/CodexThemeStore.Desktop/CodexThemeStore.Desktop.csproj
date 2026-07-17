@@ -17,10 +17,6 @@
     <ProjectReference Include="..\CodexThemeStore.Core\CodexThemeStore.Core.csproj" />
   </ItemGroup>
   <ItemGroup>
-    <None Include="..\..\themes\*.json" Link="themes\%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" ExcludeFromSingleFile="true" />
-    <None Include="..\..\previews\*.png" Link="previews\%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" ExcludeFromSingleFile="true" />
-    <None Include="..\..\backgrounds\*" Link="backgrounds\%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" ExcludeFromSingleFile="true" />
-    <None Include="..\..\logos\*" Link="logos\%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" ExcludeFromSingleFile="true" />
-    <None Include="..\..\pets\*" Link="pets\%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" ExcludeFromSingleFile="true" />
+    <AvaloniaResource Include="..\..\docs\images\icon.png" Link="Assets\icon.png" />
   </ItemGroup>
 </Project>

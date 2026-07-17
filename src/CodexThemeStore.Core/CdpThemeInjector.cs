@@ -143,20 +143,31 @@ public sealed class CdpThemeInjector
 
     private async Task<List<string>> GetCodexPageTargetsAsync(CancellationToken cancellationToken)
     {
-        using var response = await _http.GetAsync($"http://127.0.0.1:{DebugPort}/json/list", cancellationToken);
-        response.EnsureSuccessStatusCode();
-        using var document = JsonDocument.Parse(await response.Content.ReadAsStringAsync(cancellationToken));
-        var targets = new List<(int Priority, string Url)>();
-        foreach (var target in document.RootElement.EnumerateArray())
+        HttpResponseMessage response;
+        try
         {
-            if (!target.TryGetProperty("type", out var type) || type.GetString() != "page") continue;
-            var priority = GetTargetPriority(target);
-            if (priority < 0 || !target.TryGetProperty("webSocketDebuggerUrl", out var socketNode)) continue;
-            var socketUrl = socketNode.GetString();
-            if (IsAllowedDebuggerWebSocketUrl(socketUrl)) targets.Add((priority, socketUrl!));
+            response = await _http.GetAsync($"http://127.0.0.1:{DebugPort}/json/list", cancellationToken);
         }
-        return targets.OrderBy(item => item.Priority).ThenBy(item => item.Url, StringComparer.Ordinal)
-            .Select(item => item.Url).Distinct(StringComparer.Ordinal).ToList();
+        catch (HttpRequestException)
+        {
+            return [];
+        }
+        using (response)
+        {
+            response.EnsureSuccessStatusCode();
+            using var document = JsonDocument.Parse(await response.Content.ReadAsStringAsync(cancellationToken));
+            var targets = new List<(int Priority, string Url)>();
+            foreach (var target in document.RootElement.EnumerateArray())
+            {
+                if (!target.TryGetProperty("type", out var type) || type.GetString() != "page") continue;
+                var priority = GetTargetPriority(target);
+                if (priority < 0 || !target.TryGetProperty("webSocketDebuggerUrl", out var socketNode)) continue;
+                var socketUrl = socketNode.GetString();
+                if (IsAllowedDebuggerWebSocketUrl(socketUrl)) targets.Add((priority, socketUrl!));
+            }
+            return targets.OrderBy(item => item.Priority).ThenBy(item => item.Url, StringComparer.Ordinal)
+                .Select(item => item.Url).Distinct(StringComparer.Ordinal).ToList();
+        }
     }
 
     private static int GetTargetPriority(JsonElement target)

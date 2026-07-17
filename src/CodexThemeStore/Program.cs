@@ -76,6 +76,7 @@ internal sealed class ThemeStoreForm : Form
         BackColor = Canvas;
         Font = new Font("Microsoft YaHei UI", 9F, FontStyle.Regular, GraphicsUnit.Point);
         AutoScaleMode = AutoScaleMode.Dpi;
+        Icon = Icon.ExtractAssociatedIcon(Application.ExecutablePath) ?? Icon;
 
         var root = new TableLayoutPanel
         {
@@ -270,7 +271,7 @@ internal sealed class ThemeStoreForm : Form
 
     private static List<ThemePreviewModel> LoadPreviewThemes()
     {
-        return ThemeStoreApp.LoadThemes()
+        return ThemeStoreApp.LoadThemes(allowEmpty: true)
             .Select(theme => new ThemePreviewModel(
                 theme.CodeThemeId,
                 theme.DisplayName,
@@ -335,7 +336,7 @@ internal sealed class ThemeStoreForm : Form
         }
         catch (Exception ex)
         {
-            _statusLabel.Text = silent ? "远程同步失败，已使用本地主题" : "主题刷新失败";
+            _statusLabel.Text = silent && _cards.Count > 0 ? "远程同步失败，已使用本地缓存" : "同步失败，请切换线路后重试";
             if (!silent) MessageBox.Show(this, ex.Message, "刷新主题", MessageBoxButtons.OK, MessageBoxIcon.Error);
         }
         finally
@@ -423,8 +424,8 @@ internal sealed class ThemeStoreForm : Form
     {
         _statusLabel.Text = message;
         _progress.Visible = busy;
-        _applyButton.Enabled = !busy;
-        _saveButton.Enabled = !busy;
+        _applyButton.Enabled = !busy && _selectedCard is not null;
+        _saveButton.Enabled = !busy && _selectedCard is not null;
         _rollbackButton.Enabled = !busy;
         _refreshButton.Enabled = !busy;
         _sourceCombo.Enabled = !busy;
@@ -1098,7 +1099,7 @@ internal sealed class ThemeStoreApp
         return null;
     }
 
-    internal static IReadOnlyList<ThemeDefinition> LoadThemes()
+    internal static IReadOnlyList<ThemeDefinition> LoadThemes(bool allowEmpty = false)
     {
         return ThemeCatalog.Load(new[]
         {
@@ -1107,7 +1108,7 @@ internal sealed class ThemeStoreApp
             Path.Combine(Directory.GetCurrentDirectory(), "themes"),
             Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "..", "themes")),
             Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "..", "..", "themes")),
-        }, platform: "windows");
+        }, platform: "windows", allowEmpty: allowEmpty);
     }
 }
 

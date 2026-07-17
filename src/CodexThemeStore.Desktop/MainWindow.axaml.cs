@@ -49,7 +49,7 @@ public sealed partial class MainWindow : Window
         var selectedId = _selected?.Id;
         DisposeThemes();
         _allThemes.Clear();
-        foreach (var theme in ThemeCatalog.Load(ThemeDirectories(), platform: "macos"))
+        foreach (var theme in ThemeCatalog.Load(ThemeDirectories(), platform: "macos", allowEmpty: true))
         {
             _allThemes.Add(new ThemeCardModel(
                 theme.CodeThemeId,
@@ -62,6 +62,7 @@ public sealed partial class MainWindow : Window
         CatalogLabel.Text = $"{_allThemes.Count} 个主题";
         ApplyFilter();
         SelectTheme(_allThemes.FirstOrDefault(theme => theme.Id == selectedId) ?? _visibleThemes.FirstOrDefault());
+        if (_allThemes.Count == 0) StatusLabel.Text = "首次使用需要联网同步主题，请选择线路后刷新";
     }
 
     private static IEnumerable<string> ThemeDirectories()
@@ -106,7 +107,7 @@ public sealed partial class MainWindow : Window
         }
         catch (Exception ex)
         {
-            StatusLabel.Text = silent ? "同步失败，已使用本地主题" : "主题刷新失败";
+            StatusLabel.Text = silent && _allThemes.Count > 0 ? "同步失败，已使用本地缓存" : "同步失败，请切换线路后重试";
             if (!silent) await ShowErrorAsync(ex.Message);
         }
         finally
@@ -118,7 +119,14 @@ public sealed partial class MainWindow : Window
     private async Task ApplyAsync(bool restart)
     {
         if (_selected is null) return;
-        if (restart && !await ConfirmAsync("应用主题会关闭当前 Codex，然后以主题模式重新打开。")) return;
+        var restartConfirmed = false;
+        if (!restart && !await new CdpThemeInjector().IsReadyAsync())
+        {
+            if (!await ConfirmAsync("当前 Codex 没有启用本机主题端口，需要关闭并重新启动 Codex 后应用主题。是否继续？")) return;
+            restart = true;
+            restartConfirmed = true;
+        }
+        if (restart && !restartConfirmed && !await ConfirmAsync("应用主题会关闭当前 Codex，然后以主题模式重新打开。")) return;
         SetBusy(true, restart ? "正在重启 Codex..." : "正在应用主题...");
         try
         {

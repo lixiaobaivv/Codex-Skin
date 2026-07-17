@@ -36,15 +36,23 @@ jobs:
         run: dotnet build src/CodexThemeStore/CodexThemeStore.csproj --configuration Release
 
       - name: Publish self-contained Windows client
-        run: dotnet publish src/CodexThemeStore/CodexThemeStore.csproj --configuration Release --runtime win-x64 --self-contained true --output artifacts/Codex-Skin-win-x64 -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true -p:IncludeAllContentForSelfExtract=true -p:KeepThemeAssetsExternal=false
+        run: dotnet publish src/CodexThemeStore/CodexThemeStore.csproj --configuration Release --runtime win-x64 --self-contained true --output artifacts/Codex-Skin-win-x64 -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true -p:IncludeAllContentForSelfExtract=true
 
       - name: Validate protocol parser
         shell: pwsh
         run: |
-          $client = "artifacts/Codex-Skin-win-x64/Codex-Skin.exe"
+          $client = (Resolve-Path "artifacts/Codex-Skin-win-x64/Codex-Skin.exe").Path
           & $client protocol self-test
-          $themes = @(& $client list)
-          if ($LASTEXITCODE -ne 0 -or $themes.Count -lt 4) { throw "Standalone client does not contain the built-in themes." }
+          $isolated = Join-Path $env:RUNNER_TEMP 'codex-skin-online-catalog'
+          New-Item -ItemType Directory -Force $isolated | Out-Null
+          Push-Location $isolated
+          try {
+            & $client list 2>$null
+            if ($LASTEXITCODE -eq 0) { throw "Standalone client unexpectedly contains bundled themes." }
+            & $client refresh github
+            $themes = @(& $client list)
+            if ($LASTEXITCODE -ne 0 -or $themes.Count -ne 4) { throw "Standalone client did not load four online themes." }
+          } finally { Pop-Location }
 
       - name: Validate current-user shell registration
         shell: pwsh

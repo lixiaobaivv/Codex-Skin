@@ -42,7 +42,6 @@ jobs:
             -p:PublishSingleFile=true `
             -p:IncludeNativeLibrariesForSelfExtract=true `
             -p:IncludeAllContentForSelfExtract=true `
-            -p:KeepThemeAssetsExternal=false `
             -p:EnableCompressionInSingleFile=true `
             -p:DebugType=None `
             -p:DebugSymbols=false
@@ -56,8 +55,14 @@ jobs:
           Copy-Item -LiteralPath $source -Destination $env:RUNNER_TEMP/codex-skin-standalone/Codex-Skin-win-x64.exe
           $standalone = "$env:RUNNER_TEMP/codex-skin-standalone/Codex-Skin-win-x64.exe"
           & $standalone protocol self-test
-          $themes = @(& $standalone list)
-          if ($LASTEXITCODE -ne 0 -or $themes.Count -lt 4) { throw "Standalone client does not contain the built-in themes." }
+          Push-Location $env:RUNNER_TEMP/codex-skin-standalone
+          try {
+            & $standalone list 2>$null
+            if ($LASTEXITCODE -eq 0) { throw "Standalone client unexpectedly contains bundled themes." }
+            & $standalone refresh github
+            $themes = @(& $standalone list)
+            if ($LASTEXITCODE -ne 0 -or $themes.Count -ne 4) { throw "Standalone client did not load four online themes." }
+          } finally { Pop-Location }
 
       - name: Create archive and checksums
         shell: pwsh

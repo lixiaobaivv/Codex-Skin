@@ -65,7 +65,7 @@ Verified imports remain in the local theme browser after Codex-Skin restarts. Wh
 
 The desktop catalog is fixed to the public [lixiaobaivv/Codex-Skin-Store](https://github.com/lixiaobaivv/Codex-Skin-Store) repository. Users can select direct GitHub, GH Proxy, or GHFast transport, but cannot redirect the client to an unreviewed repository.
 
-Updates are fully validated in a temporary directory before the local cache is replaced. A failed refresh keeps the previous valid cache or bundled themes.
+Installers no longer duplicate the online themes. The first launch requires a catalog sync; later launches retain the last validated cache. Updates are fully validated in a temporary directory before that cache is replaced.
 
 The web signed-package catalog and desktop theme catalog are separate contracts. Both are declarative and reject JavaScript, HTML, CSS, SVG, executable payloads, traversal, and unlisted assets.
 

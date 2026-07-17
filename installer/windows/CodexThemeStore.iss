@@ -24,6 +24,7 @@ OutputBaseFilename=Codex-Skin-Setup-win-x64
 Compression=lzma2/ultra64
 SolidCompression=yes
 WizardStyle=modern
+SetupIconFile=..\..\assets\Codex-Skin.ico
 UninstallDisplayIcon={app}\Codex-Skin.exe
 CloseApplications=yes
 RestartApplications=no

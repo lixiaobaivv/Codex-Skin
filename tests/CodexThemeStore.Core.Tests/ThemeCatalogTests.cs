@@ -74,6 +74,14 @@ public sealed class ThemeCatalogTests : IDisposable
         Assert.Throws<DirectoryNotFoundException>(() => ThemeCatalog.Load([], library, "macos"));
     }
 
+    [Fact]
+    public void AllowsAnEmptyCatalogForOnlineFirstRun()
+    {
+        var themes = ThemeCatalog.Load([], Path.Combine(_root, "missing-library"), "macos", allowEmpty: true);
+
+        Assert.Empty(themes);
+    }
+
     [Theory]
     [InlineData("1.0.0-alpha.2", "1.0.0-alpha.10", -1)]
     [InlineData("1.0.0-rc.1", "1.0.0", -1)]

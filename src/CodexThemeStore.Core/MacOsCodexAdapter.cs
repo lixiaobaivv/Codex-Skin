@@ -66,19 +66,34 @@ public sealed class MacOsCodexAdapter : ICodexPlatformAdapter
         }
     }
 
-    public Task StartAsync(CodexInstallation installation, bool enableCdp, CancellationToken cancellationToken = default)
+    public async Task StartAsync(CodexInstallation installation, bool enableCdp, CancellationToken cancellationToken = default)
     {
         EnsureSupported();
         cancellationToken.ThrowIfCancellationRequested();
         if (!File.Exists(installation.ExecutablePath)) throw new FileNotFoundException("Codex 可执行文件不存在。", installation.ExecutablePath);
+        var startInfo = CreateLaunchStartInfo(installation, enableCdp);
+        using var process = Process.Start(startInfo) ?? throw new InvalidOperationException("无法通过 LaunchServices 启动 Codex。");
+        var standardError = process.StandardError.ReadToEndAsync(cancellationToken);
+        await process.WaitForExitAsync(cancellationToken);
+        if (process.ExitCode != 0)
+        {
+            var detail = (await standardError).Trim();
+            throw new InvalidOperationException(string.IsNullOrWhiteSpace(detail)
+                ? $"LaunchServices 启动 Codex 失败，退出码 {process.ExitCode}。"
+                : $"LaunchServices 启动 Codex 失败：{detail}");
+        }
+    }
+
+    public static ProcessStartInfo CreateLaunchStartInfo(CodexInstallation installation, bool enableCdp)
+    {
         var startInfo = new ProcessStartInfo
         {
             FileName = "/usr/bin/open",
             WorkingDirectory = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile),
             UseShellExecute = false,
+            RedirectStandardError = true,
         };
         startInfo.ArgumentList.Add("-n");
-        startInfo.ArgumentList.Add("-a");
         startInfo.ArgumentList.Add(installation.AppPath);
         if (enableCdp)
         {
@@ -86,8 +101,7 @@ public sealed class MacOsCodexAdapter : ICodexPlatformAdapter
             startInfo.ArgumentList.Add("--remote-debugging-address=127.0.0.1");
             startInfo.ArgumentList.Add($"--remote-debugging-port={CdpThemeInjector.DebugPort}");
         }
-        using var process = Process.Start(startInfo) ?? throw new InvalidOperationException("无法通过 LaunchServices 启动 Codex。");
-        return process.WaitForExitAsync(cancellationToken);
+        return startInfo;
     }
 
     public async Task<bool> InjectAsync(ThemeInjectionPayload payload, TimeSpan timeout, CancellationToken cancellationToken = default) =>

@@ -21,22 +21,14 @@ test("Windows client release uses stable English artifact names", async () => {
   assert.match(release, /Codex-Skin-win-x64-SHA256SUMS\.txt/);
   assert.match(build, /Codex-Skin-Setup-win-x64\.exe/);
   assert.match(build, /Codex-Skin-osx-arm64\.pkg|Codex-Skin-\$\{\{ matrix\.rid \}\}\.pkg/);
-  assert.match(build, /Codex-Skin-theme-catalog-v1\.zip/);
   assert.match(build, /Codex-Skin-installers-SHA256SUMS\.txt/);
   assert.match(release, /PublishSingleFile=true/);
   assert.match(release, /IncludeAllContentForSelfExtract=true/);
-  assert.equal(
-    (project.match(/ExcludeFromSingleFile="\$\(KeepThemeAssetsExternal\)"/g) ?? []).length,
-    6,
-    "all mutable theme resource groups must remain beside the single-file executable",
-  );
-  assert.match(project, /<KeepThemeAssetsExternal Condition=.*>true<\/KeepThemeAssetsExternal>/);
-  assert.match(ci, /KeepThemeAssetsExternal=false/);
-  assert.match(ci, /Standalone client does not contain the built-in themes/);
-  assert.match(release, /KeepThemeAssetsExternal=false/);
-  for (const directory of ["themes", "previews", "backgrounds", "logos", "pets"]) {
-    assert.match(project, new RegExp(`\\\\${directory}\\\\`));
-  }
+  assert.doesNotMatch(project, /KeepThemeAssetsExternal|themes\\\*\.json|previews\\\*\.png/);
+  assert.match(ci, /unexpectedly contains bundled themes/);
+  assert.match(release, /did not load four online themes/);
+  assert.match(project, /<ApplicationIcon>.*Codex-Skin\.ico<\/ApplicationIcon>/);
+  assert.match(installer, /SetupIconFile=.*Codex-Skin\.ico/);
   assert.match(installer, /MessagesFile: "\{#SourcePath\}\\languages\\ChineseSimplified\.isl"/);
   assert.match(installer, /Parameters: "protocol register"/);
   assert.match(installer, /\[UninstallRun\][\s\S]*Parameters: "protocol unregister"/);
@@ -54,8 +46,11 @@ test("macOS package registers Codex-Skin URL and document activation", async () 
   assert.match(project, /<AssemblyName>Codex-Skin<\/AssemblyName>/);
   assert.match(plist, /<key>CFBundleURLSchemes<\/key>[\s\S]*<string>dreamskin<\/string>/);
   assert.match(plist, /<key>CFBundleTypeExtensions<\/key>[\s\S]*<string>dreamskin<\/string>/);
+  assert.match(plist, /<key>CFBundleIconFile<\/key>[\s\S]*<string>Codex-Skin\.icns<\/string>/);
   assert.match(packageScript, /Applications\/Codex-Skin\.app/);
   assert.match(packageScript, /Contents\/MacOS\/Codex-Skin/);
+  assert.match(packageScript, /iconutil -c icns/);
+  assert.match(packageScript, /docs\/images\/icon\.png/);
 });
 
 test("macOS release status documents the unsigned graphical client", async () => {
