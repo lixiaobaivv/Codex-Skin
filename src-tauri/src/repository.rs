@@ -594,6 +594,8 @@ fn validate_theme(path: &Path, expected_id: &str, repository: &Path) -> Result<(
             "semanticColors",
             "surface",
             "backgroundImage",
+            "backgroundFit",
+            "backgroundPosition",
             "logoImage",
             "backgroundImageOpacity",
             "backgroundImageBlur",
@@ -631,6 +633,33 @@ fn validate_theme(path: &Path, expected_id: &str, repository: &Path) -> Result<(
         && !(0.0..=24.0).contains(&value)
     {
         return Err(AppError::Message("背景模糊度越界。".into()));
+    }
+    if let Some(value) = theme.get("backgroundPosition") {
+        let value = value
+            .as_str()
+            .ok_or_else(|| AppError::Message("背景定位值必须是字符串。".into()))?;
+        if ![
+            "center",
+            "center top",
+            "center 20%",
+            "center 30%",
+            "center 40%",
+            "center bottom",
+            "left center",
+            "right center",
+        ]
+        .contains(&value)
+        {
+            return Err(AppError::Message("背景定位值无效。".into()));
+        }
+    }
+    if let Some(value) = theme.get("backgroundFit") {
+        let value = value
+            .as_str()
+            .ok_or_else(|| AppError::Message("背景适配模式必须是字符串。".into()))?;
+        if !["smart", "cover", "contain"].contains(&value) {
+            return Err(AppError::Message("背景适配模式无效。".into()));
+        }
     }
     validate_asset_path(
         repository,

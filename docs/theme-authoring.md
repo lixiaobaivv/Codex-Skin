@@ -46,6 +46,8 @@ pets/
 - `version` 使用语义化版本，例如 `1.2.0`。已公开的 `codeThemeId` 永不转让或复用。
 - `variant` 描述主题本身的明暗模式，不跟随系统自动切换。
 - `accent`、`ink`、`surface` 使用六位十六进制颜色，并保证正文可读。
+- `theme.backgroundFit` 默认为 `smart`：比例接近 Hero 时铺满显示，裁切超过 34% 时自动完整显示并用同图模糊铺底；作者也可固定为 `cover` 或 `contain`。
+- `theme.backgroundPosition` 用于保护人物或主体焦点，只能使用模板列出的安全定位值；人物头部靠近画面上缘时优先使用 `center top`。
 - `home.quickActions` 必须正好四项；点击后只向真实输入框写入 `prompt`。
 - `home.pet` 只能提供图片、替代文本和 48–220 的显示尺寸，不能包含脚本或点击行为。
 - `home.sidebarLabels` 只能修改新建任务、已安排、插件和设置四个固定入口。
