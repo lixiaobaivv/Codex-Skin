@@ -1,6 +1,12 @@
 {
+  "$schema": "../schemas/theme-v1.schema.json",
+  "schemaVersion": 1,
+  "version": "1.0.0",
   "displayName": "Jackson Sage",
   "codeThemeId": "jackson-sage",
+  "category": "人物",
+  "description": "鼠尾草绿与安静留白氛围",
+  "author": "Codex Skin",
   "variant": "light",
   "previewImage": "../previews/jackson-sage.png",
   "theme": {
@@ -36,32 +42,12 @@
       "细节主义",
       "温柔落地"
     ],
-    "sidebarProject": "Jackson 星球",
-    "sidebarItems": [
-      "千玺电影清单",
-      "今日穿搭灵感",
-      "手账与拍立得收藏",
-      "一起练字打卡"
-    ],
     "sidebarLabels": {
       "newTask": "新建手账",
       "scheduled": "已安排",
       "plugins": "插件",
-      "projects": "项目",
-      "tasks": "任务",
       "settings": "设置"
     },
-    "tasks": [
-      "听千玺歌单",
-      "看一部喜欢的电影",
-      "练舞 or 运动打卡",
-      "拍一张氛围感照片",
-      "做今日手账",
-      "学习一点新技能",
-      "晚安留言给千玺"
-    ],
-    "progressLabel": "继续设置 · 0/4",
-    "profileLabel": "千纸鹤",
     "composerHint": "随心输入，让千玺陪你一起写代码吧～",
     "footerNote": "Be Better · Be Jackson Yee",
     "quickActions": [
@@ -93,23 +79,6 @@
   },
   "copy": {
     "title": "Codex 千玺星球",
-    "replaceText": {
-      "Codex": "Codex 千玺",
-      "New Task": "New Note",
-      "New task": "New Note",
-      "Skills": "Studio",
-      "Chat": "Quiet Chat",
-      "新建任务": "新建手账",
-      "已安排": "已安排",
-      "技能": "千玺技能",
-      "站点": "收藏站点",
-      "拉取请求": "练字请求",
-      "聊天": "安静聊天",
-      "项目": "项目",
-      "任务": "任务",
-      "选择项目": "选择项目",
-      "继续设置": "继续设置"
-    },
     "replacePlaceholders": {
       "Ask Codex": "Write calmly...",
       "Ask Codex anything": "随心输入，让千玺陪你一起写代码吧~",

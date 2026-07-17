@@ -1,6 +1,12 @@
 {
+  "$schema": "../schemas/theme-v1.schema.json",
+  "schemaVersion": 1,
+  "version": "1.0.0",
   "displayName": "ENFP Pop",
   "codeThemeId": "enfp-pop",
+  "category": "其他",
+  "description": "高饱和青橙与自由脑暴氛围",
+  "author": "Codex Skin",
   "variant": "light",
   "previewImage": "../previews/enfp-pop.png",
   "theme": {
@@ -36,32 +42,12 @@
       "热情驱动",
       "趣味至上"
     ],
-    "sidebarProject": "ENFP 小宇宙项目",
-    "sidebarItems": [
-      "灵感收集站",
-      "脑暴草稿箱",
-      "创意实验室",
-      "组件游乐场",
-      "最终落地版"
-    ],
     "sidebarLabels": {
       "newTask": "新建点子",
       "scheduled": "灵感排期",
       "plugins": "插件",
-      "projects": "项目",
-      "tasks": "任务",
       "settings": "设置"
     },
-    "tasks": [
-      "做一个会说话的按钮",
-      "把想法倒成小 Demo",
-      "重构一下更丝滑",
-      "加点动效吧",
-      "修复那个烦人的 Bug",
-      "写文档（晚点再说）"
-    ],
-    "progressLabel": "ENFP 能量值 · 100%",
-    "profileLabel": "小宇宙发射中",
     "composerHint": "随便输入一个想法吧～ 我陪你一起把它变成酷炫的作品！",
     "footerNote": "今日心情：创意 +100 · 动力 +100 · 乐趣 +100",
     "quickActions": [
@@ -93,23 +79,6 @@
   },
   "copy": {
     "title": "Codex ENFP 小宇宙",
-    "replaceText": {
-      "Codex": "Codex ENFP",
-      "New Task": "New Spark",
-      "New task": "New Spark",
-      "Skills": "Playground",
-      "Chat": "Idea Chat",
-      "新建任务": "新建点子",
-      "已安排": "灵感排期",
-      "技能": "技能游乐场",
-      "站点": "小宇宙站点",
-      "拉取请求": "边玩边改",
-      "聊天": "灵感聊天",
-      "项目": "项目",
-      "任务": "任务",
-      "选择项目": "选择灵感图",
-      "继续设置": "ENFP 能量值"
-    },
     "replacePlaceholders": {
       "Ask Codex": "Turn the idea into something real...",
       "Ask Codex anything": "随便输入一个想法吧~ 我陪你一起把它变成酷炫的作品！",

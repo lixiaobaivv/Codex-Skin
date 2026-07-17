@@ -1,0 +1,128 @@
+name: Build and package
+
+on:
+  push:
+    branches: [main]
+    tags: ["v*"]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-dotnet@v6
+        with:
+          dotnet-version: 8.0.x
+      - run: dotnet test tests/CodexThemeStore.Core.Tests/CodexThemeStore.Core.Tests.csproj --configuration Release
+      - name: Render macOS theme store UI
+        run: |
+          dotnet run --project tests/CodexThemeStore.Desktop.Headless/CodexThemeStore.Desktop.Headless.csproj --configuration Release -- artifacts/theme-store-ui.png 1120 780
+          dotnet run --project tests/CodexThemeStore.Desktop.Headless/CodexThemeStore.Desktop.Headless.csproj --configuration Release -- artifacts/theme-store-ui-compact.png 820 620
+      - uses: actions/upload-artifact@v7
+        with:
+          name: theme-store-ui-render
+          path: artifacts/theme-store-ui*.png
+          if-no-files-found: error
+      - name: Validate theme schemas
+        run: |
+          npx --yes ajv-cli@5 validate --spec=draft2020 -s schemas/theme-v1.schema.json -d 'themes/*.json'
+          npx --yes ajv-cli@5 validate --spec=draft2020 --strict=false -s schemas/theme-repository-v1.schema.json -d theme-repository.json
+      - name: Validate and package theme catalog
+        run: |
+          dotnet run --project src/CodexThemeStore.Cli/CodexThemeStore.Cli.csproj --configuration Release -- theme-validate .
+          dotnet run --project src/CodexThemeStore.Cli/CodexThemeStore.Cli.csproj --configuration Release -- theme-pack . artifacts/CodexSkin-theme-catalog-v1.zip
+      - uses: actions/upload-artifact@v7
+        with:
+          name: CodexSkin-theme-catalog-v1
+          path: artifacts/CodexSkin-theme-catalog-v1.zip
+          if-no-files-found: error
+
+  windows-installer:
+    needs: test
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-dotnet@v6
+        with:
+          dotnet-version: 8.0.x
+      - name: Set version
+        shell: pwsh
+        run: |
+          $version = "${{ github.ref_name }}" -replace '^v', ''
+          if ($version -notmatch '^\d+\.\d+\.\d+$') { $version = "0.0.${{ github.run_number }}" }
+          "PACKAGE_VERSION=$version" >> $env:GITHUB_ENV
+      - name: Publish Windows app
+        shell: pwsh
+        run: |
+          $publish = Join-Path $PWD 'artifacts\win-x64'
+          dotnet publish src/CodexThemeStore/CodexThemeStore.csproj `
+            -p:PublishProfile=win-x64 `
+            -p:PublishDir="$publish\" `
+            -p:Version=$env:PACKAGE_VERSION
+          @('dilraba-star','enfp-pop','jackson-sage','kun-stage') | ForEach-Object {
+            if (!(Test-Path (Join-Path $publish "previews\$_.png"))) { throw "Missing preview: $_" }
+            if (!(Test-Path (Join-Path $publish "themes\$_.json"))) { throw "Missing theme: $_" }
+          }
+      - name: Build Setup EXE
+        shell: pwsh
+        run: |
+          choco install innosetup --no-progress -y
+          $iscc = Join-Path ${env:ProgramFiles(x86)} 'Inno Setup 6\ISCC.exe'
+          $source = Join-Path $PWD 'artifacts\win-x64'
+          $output = Join-Path $PWD 'artifacts\installer'
+          New-Item -ItemType Directory -Force $output | Out-Null
+          & $iscc "/DMyAppSource=$source" "/DMyOutputDir=$output" "/DMyAppVersion=$env:PACKAGE_VERSION" installer/windows/CodexThemeStore.iss
+      - uses: actions/upload-artifact@v7
+        with:
+          name: CodexThemeStore-windows-x64
+          path: artifacts/installer/CodexThemeStore-Setup-win-x64.exe
+          if-no-files-found: error
+
+  macos-installer:
+    needs: test
+    runs-on: macos-14
+    strategy:
+      matrix:
+        rid: [osx-arm64, osx-x64]
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-dotnet@v6
+        with:
+          dotnet-version: 8.0.x
+      - name: Set version
+        run: |
+          version="${GITHUB_REF_NAME#v}"
+          if [[ ! "$version" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then version="0.0.${GITHUB_RUN_NUMBER}"; fi
+          echo "PACKAGE_VERSION=$version" >> "$GITHUB_ENV"
+      - name: Build macOS PKG
+        run: |
+          chmod +x installer/macos/build-pkg.sh
+          installer/macos/build-pkg.sh "${{ matrix.rid }}" "$PACKAGE_VERSION" "artifacts/CodexThemeStore-${{ matrix.rid }}.pkg"
+      - uses: actions/upload-artifact@v7
+        with:
+          name: CodexThemeStore-${{ matrix.rid }}
+          path: artifacts/CodexThemeStore-${{ matrix.rid }}.pkg
+          if-no-files-found: error
+
+  release:
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: [windows-installer, macos-installer]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v7
+        with:
+          path: release
+          merge-multiple: true
+      - uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            release/*.exe
+            release/*.pkg
+            release/*.zip

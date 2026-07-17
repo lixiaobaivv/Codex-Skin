@@ -1,0 +1,127 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://codex-skin.dev/schemas/theme-v1.schema.json",
+  "title": "Codex Skin theme v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schemaVersion", "version", "displayName", "codeThemeId", "category", "description", "author", "variant", "previewImage", "theme", "home"],
+  "properties": {
+    "$schema": { "type": "string" },
+    "schemaVersion": { "const": 1 },
+    "version": { "type": "string", "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+(?:-[0-9A-Za-z.-]+)?$" },
+    "displayName": { "type": "string", "minLength": 1, "maxLength": 60 },
+    "codeThemeId": { "type": "string", "pattern": "^[a-z0-9][a-z0-9-]{1,63}$" },
+    "category": { "enum": ["人物", "动漫", "游戏", "风景", "极简", "节日", "其他"] },
+    "description": { "type": "string", "maxLength": 120 },
+    "author": { "type": "string", "maxLength": 60 },
+    "variant": { "enum": ["light", "dark"] },
+    "previewImage": { "$ref": "#/$defs/previewPath" },
+    "theme": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["accent", "ink", "surface"],
+      "properties": {
+        "accent": { "$ref": "#/$defs/color" },
+        "ink": { "$ref": "#/$defs/color" },
+        "surface": { "$ref": "#/$defs/color" },
+        "contrast": { "type": "number", "minimum": 0, "maximum": 100 },
+        "opaqueWindows": { "type": "boolean" },
+        "backgroundImage": { "$ref": "#/$defs/backgroundPath" },
+        "logoImage": { "$ref": "#/$defs/logoPath" },
+        "backgroundImageOpacity": { "type": "number", "minimum": 0, "maximum": 1 },
+        "backgroundImageBlur": { "type": "number", "minimum": 0, "maximum": 24 },
+        "fonts": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "code": { "type": "string", "maxLength": 200 },
+            "ui": { "type": "string", "maxLength": 300 },
+            "display": { "type": "string", "maxLength": 300 }
+          }
+        },
+        "semanticColors": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "diffAdded": { "$ref": "#/$defs/color" },
+            "diffRemoved": { "$ref": "#/$defs/color" },
+            "skill": { "$ref": "#/$defs/color" }
+          }
+        }
+      }
+    },
+    "home": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["brand", "title", "quickActions"],
+      "properties": {
+        "brand": { "$ref": "#/$defs/copy" },
+        "eyebrow": { "$ref": "#/$defs/copy" },
+        "badge": { "$ref": "#/$defs/copy" },
+        "title": { "$ref": "#/$defs/copy" },
+        "subtitle": { "$ref": "#/$defs/copy" },
+        "footerNote": { "$ref": "#/$defs/copy" },
+        "composerHint": { "$ref": "#/$defs/copy" },
+        "tags": { "type": "array", "maxItems": 6, "items": { "$ref": "#/$defs/shortCopy" } },
+        "sidebarLabels": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "newTask": { "$ref": "#/$defs/shortCopy" },
+            "scheduled": { "$ref": "#/$defs/shortCopy" },
+            "plugins": { "$ref": "#/$defs/shortCopy" },
+            "settings": { "$ref": "#/$defs/shortCopy" }
+          }
+        },
+        "pet": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["image"],
+          "properties": {
+            "image": { "$ref": "#/$defs/petPath" },
+            "alt": { "$ref": "#/$defs/shortCopy" },
+            "size": { "type": "number", "minimum": 48, "maximum": 220 }
+          }
+        },
+        "quickActions": {
+          "type": "array",
+          "minItems": 4,
+          "maxItems": 4,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["title", "prompt"],
+            "properties": {
+              "icon": { "type": "string", "maxLength": 12 },
+              "title": { "$ref": "#/$defs/copy" },
+              "description": { "$ref": "#/$defs/copy" },
+              "prompt": { "type": "string", "minLength": 1, "maxLength": 1000 }
+            }
+          }
+        }
+      }
+    },
+    "copy": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "title": { "$ref": "#/$defs/copy" },
+        "replacePlaceholders": {
+          "type": "object",
+          "propertyNames": { "maxLength": 100 },
+          "additionalProperties": { "type": "string", "maxLength": 200 },
+          "maxProperties": 20
+        }
+      }
+    }
+  },
+  "$defs": {
+    "previewPath": { "type": "string", "pattern": "^\\.\\./previews/[A-Za-z0-9._-]+\\.(png|jpg|jpeg|webp|avif)$" },
+    "backgroundPath": { "type": "string", "pattern": "^\\.\\./backgrounds/[A-Za-z0-9._-]+\\.(png|jpg|jpeg|webp|avif)$" },
+    "logoPath": { "type": "string", "pattern": "^\\.\\./logos/[A-Za-z0-9._-]+\\.(png|jpg|jpeg|webp|avif)$" },
+    "petPath": { "type": "string", "pattern": "^\\.\\./pets/[A-Za-z0-9._-]+\\.(png|jpg|jpeg|webp|avif)$" },
+    "color": { "type": "string", "pattern": "^#[0-9A-Fa-f]{6}$" },
+    "copy": { "type": "string", "maxLength": 200 },
+    "shortCopy": { "type": "string", "maxLength": 40 }
+  }
+}

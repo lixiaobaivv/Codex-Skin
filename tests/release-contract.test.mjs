@@ -22,9 +22,11 @@ test("Windows client release uses stable English artifact names", async () => {
   assert.doesNotMatch(`${readme}\n${program}\n${ci}\n${release}`, /Codex主题商店\.exe/);
 });
 
-test("macOS release status is explicit and does not claim a nonexistent binary", async () => {
+test("macOS release status documents the unsigned graphical client", async () => {
   const readme = await readFile(new URL("../README.md", import.meta.url), "utf8");
   assert.match(readme, /macOS Apple Silicon/);
-  assert.match(readme, /尚未包含可独立构建的 macOS 客户端源码/);
+  assert.match(readme, /Avalonia 图形客户端、共享 Core 和 PKG 构建链已接入/);
+  assert.match(readme, /尚待真实设备验收/);
+  assert.match(readme, /当前 CI 产物保持未签名/);
   assert.match(readme, /代码签名与公证/);
 });

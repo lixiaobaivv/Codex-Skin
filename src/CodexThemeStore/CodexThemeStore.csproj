@@ -3,6 +3,7 @@
     <OutputType>Exe</OutputType>
     <TargetFramework>net8.0-windows</TargetFramework>
     <UseWindowsForms>true</UseWindowsForms>
+    <EnableWindowsTargeting>true</EnableWindowsTargeting>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
     <AssemblyName>Codex-Skin</AssemblyName>
@@ -12,6 +13,7 @@
 
   <ItemGroup>
     <PackageReference Include="NSec.Cryptography" Version="24.4.0" />
+    <ProjectReference Include="..\CodexThemeStore.Core\CodexThemeStore.Core.csproj" />
   </ItemGroup>
 
   <ItemGroup>
@@ -20,5 +22,6 @@
     <None Include="..\..\backgrounds\*.jpg" Link="backgrounds\%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
     <None Include="..\..\backgrounds\*.png" Link="backgrounds\%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
     <None Include="..\..\logos\*-logo-ui-v1.png" Link="logos\%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
+    <None Include="..\..\pets\*" Link="pets\%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
   </ItemGroup>
 </Project>

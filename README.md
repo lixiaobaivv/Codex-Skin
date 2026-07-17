@@ -1,5 +1,7 @@
 # Codex-Skin
 
+[简体中文](README.md) | [English](README.en.md)
+
 **Codex-Skin** 是 Codex Desktop 的开源主题客户端，同时也是 Codex-Skin-Store 签名主题包的本机导入器。它在用户本机完成主题选择、校验、安装、应用和恢复，不需要应用服务器、数据库或在线账号系统。
 
 - 主题商店：<https://lixiaobaivv.github.io/Codex-Skin-Store/>
@@ -9,6 +11,8 @@
 
 > [!IMPORTANT]
 > Codex-Skin 是社区开源项目，不是 OpenAI 或 Codex 官方产品。程序不会修改 Microsoft Store 中 Codex 的签名安装包，也不会读取 Codex 凭证、API Key、项目内容或聊天数据。
+
+![Codex Theme Store 主题目录](docs/images/theme-store-desktop.png)
 
 ## 下载
 
@@ -29,15 +33,15 @@ Windows EXE 自带 .NET 运行时，不要求用户预先安装 .NET SDK 或 Run
 | 平台 | 状态 | 计划产物 |
 | --- | --- | --- |
 | Windows x64 | 已实现并纳入 CI/Release 自动构建 | `Codex-Skin-win-x64.exe` |
-| macOS Apple Silicon | 导入器兼容代码已准备，但当前仓库尚未包含可独立构建的 macOS 客户端源码，也未完成真实 macOS runner/设备验收 | 计划提供签名、可验证的 `.app` 压缩包或 `.dmg` |
-| macOS Intel | 尚未确定是否支持 | 根据实际用户需求和构建验证决定 |
+| macOS Apple Silicon | Avalonia 图形客户端、共享 Core 和 PKG 构建链已接入；尚待真实设备验收 | CI 生成未签名 `CodexThemeStore-osx-arm64.pkg` |
+| macOS Intel | Avalonia 与 `osx-x64` PKG 构建链已接入；尚待真实设备验收 | CI 生成未签名 `CodexThemeStore-osx-x64.pkg` |
 
 不会用空壳脚本或伪造文件冒充 macOS 可执行程序。macOS 正式发布需要先完成：
 
-1. 将可构建的 macOS 客户端源码纳入受版本控制的仓库；
-2. 在 `macos-latest` runner 上完成 `.dreamskin` 下载、签名验证、安装和 URL handler 测试；
-3. 生成 `.app`，完成代码签名与公证策略；
-4. 为产物生成 SHA-256，并由同一个 `v*` Release 工作流上传。
+1. 在真实 Apple Silicon 与 Intel Mac 上验证 Codex 发现、启动、注入和回滚；
+2. 补齐 macOS `.dreamskin` 图形导入与 URL handler；
+3. 在具备证书时完成代码签名与公证；当前 CI 产物保持未签名；
+4. 为正式产物生成 SHA-256，并由同一个 `v*` Release 工作流上传。
 
 ## Windows 快速开始
 
@@ -74,6 +78,10 @@ Windows EXE 自带 .NET 运行时，不要求用户预先安装 .NET SDK 或 Run
 - **Patched 版**：在用户明确使用可编辑 webview 时写入主题 hook，重启后自动加载。
 
 Store 版不会修改 `WindowsApps` 中的签名安装包。Codex 更新后，客户端可以重新检测新的安装位置。
+
+运行时主题可以修改主背景、原生侧栏视觉、固定导航文案、masthead、Logo、hero、标签、四张快捷卡、可选宠物、消息气泡和输入框。用户项目、任务、进度、对话及账号数据始终保持 Codex 原生内容和行为。
+
+普通 GitHub 主题目录遵循 [`schemas/theme-v1.schema.json`](schemas/theme-v1.schema.json)；签名分发包继续使用封闭的 `.dreamskin` 协议。统一模板、资源目录、验收和发布流程见 [`docs/theme-authoring.md`](docs/theme-authoring.md)。
 
 ## `.dreamskin` 导入
 
@@ -144,6 +152,12 @@ dreamskin://install?url=<https-url>&sha256=<sha256>&size=<bytes>&id=<theme-id>&v
 dotnet build src\CodexThemeStore\CodexThemeStore.csproj --configuration Release
 ```
 
+共享 Core 测试：
+
+```powershell
+dotnet test tests\CodexThemeStore.Core.Tests\CodexThemeStore.Core.Tests.csproj
+```
+
 自包含 Windows 发布：
 
 ```powershell
@@ -158,6 +172,14 @@ dotnet publish src\CodexThemeStore\CodexThemeStore.csproj `
 
 ```powershell
 node --test tests\*.test.mjs
+```
+
+主题目录制作与发布：
+
+```powershell
+dotnet run --project src\CodexThemeStore.Cli -- theme-index . "My Theme Repository"
+dotnet run --project src\CodexThemeStore.Cli -- theme-validate .
+dotnet run --project src\CodexThemeStore.Cli -- theme-pack . artifacts\theme-catalog-v1.zip
 ```
 
 ## 自动发布
@@ -181,6 +203,8 @@ git push origin v0.1.0
 
 `sample-v1` 和 `catalog-v1` 由独立的主题包发布流程维护，客户端版本与主题数据版本不会混用。
 
+工作流 [`.github/workflows/build.yml`](.github/workflows/build.yml) 还会验证普通主题目录，并构建 Windows Setup EXE、macOS arm64/x64 PKG 和标准主题目录 ZIP。macOS PKG 当前未签名、未公证。
+
 ## 项目结构
 
 ```text
@@ -190,6 +214,9 @@ logos/                   内置主题 UI 标志
 previews/                主题预览图
 samples/dreamskin/       确定性的签名互操作夹具
 src/CodexThemeStore/     Windows 客户端与导入器
+src/CodexThemeStore.Core/ 共享主题编译、仓库、CDP 与平台契约
+src/CodexThemeStore.Desktop/ macOS/跨平台 Avalonia 图形客户端
+src/CodexThemeStore.Cli/  跨平台诊断和主题作者工具
 tests/                   签名包结构与密码学验证测试
 themes/                  内置主题配置
 tools/dreamskin/         签名主题包生成器
@@ -212,7 +239,7 @@ qa/                      本地视觉与 CDP 验证工具
 - [x] `.dreamskin` 本地文件导入；
 - [x] `dreamskin://install`、安全下载和文件关联；
 - [x] Windows x64 GitHub Release 自动构建；
-- [ ] 将 macOS 客户端源码正式接入仓库；
+- [x] macOS Avalonia 客户端、共享 Core 和 PKG 构建链接入仓库；
 - [ ] macOS Apple Silicon runner 与设备验收；
 - [ ] macOS 代码签名、公证和 Release 产物；
 - [ ] 生产发布者密钥、轮换和撤回列表；

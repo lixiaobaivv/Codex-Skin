@@ -1,6 +1,12 @@
 {
+  "$schema": "../schemas/theme-v1.schema.json",
+  "schemaVersion": 1,
+  "version": "1.0.0",
   "displayName": "Dilraba Star",
   "codeThemeId": "dilraba-star",
+  "category": "人物",
+  "description": "星光蓝紫与甜酷舞台氛围",
+  "author": "Codex Skin",
   "variant": "light",
   "previewImage": "../previews/dilraba-star.png",
   "theme": {
@@ -36,32 +42,12 @@
       "热巴同频",
       "高光时刻"
     ],
-    "sidebarProject": "热巴星球",
-    "sidebarItems": [
-      "热巴影视清单",
-      "红毯造型收藏",
-      "甜妹穿搭灵感",
-      "一起追剧打卡"
-    ],
     "sidebarLabels": {
       "newTask": "新建灵感",
       "scheduled": "已安排",
       "plugins": "插件",
-      "projects": "项目",
-      "tasks": "任务",
       "settings": "设置"
     },
-    "tasks": [
-      "每一部热巴主演作品",
-      "嗑追剧 BGM 歌单",
-      "收藏一张热巴氛围照",
-      "写一句今日灵感",
-      "学一个拍照姿势",
-      "做今日追星手账",
-      "晚安留言给热巴"
-    ],
-    "progressLabel": "继续设置 · 0/4",
-    "profileLabel": "热巴星球",
     "composerHint": "随心输入，让灵感陪你一起写代码吧～",
     "footerNote": "Be Your Light · Dilraba",
     "quickActions": [
@@ -93,23 +79,6 @@
   },
   "copy": {
     "title": "Codex 热巴星球",
-    "replaceText": {
-      "Codex": "Codex 热巴",
-      "New Task": "Star Task",
-      "New task": "Star Task",
-      "Skills": "Star Skills",
-      "Chat": "Inspiration Chat",
-      "新建任务": "新建灵感",
-      "已安排": "已安排",
-      "技能": "热巴技能",
-      "站点": "星球站点",
-      "拉取请求": "灵感请求",
-      "聊天": "灵感聊天",
-      "项目": "项目",
-      "任务": "任务",
-      "选择项目": "选择星球",
-      "继续设置": "继续追星"
-    },
     "replacePlaceholders": {
       "Ask Codex": "Write with inspiration...",
       "Ask Codex anything": "随心输入，让灵感陪你一起写代码吧~",

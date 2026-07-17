@@ -17,7 +17,7 @@
 | ENFP Pop | `previews/enfp-pop.png` | `qa/captures/enfp-pop-home-final-v3.png` | `qa/comparisons/enfp-pop-comparison-v3.png` | 1586×992，空白主页；源参考为 3840×2160，比较板使用 contain 归一化 |
 | Dilraba Star | `previews/dilraba-star.png` | `qa/captures/dilraba-star-home-final-v5.png` | `qa/comparisons/dilraba-star-comparison-v3.png` | 1586×992，空白主页 |
 
-四主题连续切换诊断均满足：主题主页、侧栏和 live style 存在；`horizontalOverflow=false`；`cardComposerOverlap=false`；`logoLoaded=true`；`consoleErrorCount=0`。
+这些截图记录的是早期自定义侧栏实现。当前安全边界已经调整为保留 Codex 原生侧栏，因此截图仅作为 hero、快捷卡、输入框和气泡的历史视觉证据，不能作为当前侧栏 DOM 的验收结论。
 
 ## 重点区域证据
 
@@ -42,9 +42,9 @@
 
 | 之前的 P2 | 修复方式 | 修复后证据 |
 | --- | --- | --- |
-| 侧栏和正文使用 display/serif 字体，中文辨识度和参考图密度不足 | 将 `fonts.ui` 改为中文无衬线字体栈，仅标题使用独立 `fonts.display`；同步提高字号、行高和辅助文本对比度 | `qa/comparisons/dilraba-sidebar-focus-v3.png` 及上方列出的四张 v3 全屏对比图 |
-| 文本 Logo 无法形成四套独立品牌识别 | 每套主题新增透明 PNG Logo，通过 `theme.logoImage` Base64 data URL 注入真实 `<img>` | 上方列出的四张最终主页截图；自动诊断 `logoLoaded=true` |
-| 窄屏卡片可能被固定输入框遮挡，原生侧栏可能露出 | 按主面板宽度切换 compact/narrow；为输入框动态预留空间；窄屏保留自定义侧栏并让主页自身滚动 | `qa/captures/dilraba-responsive-820x900-final-v3.png`、`qa/captures/dilraba-responsive-1200x800-final-v3.png`；`cardComposerOverlap=false` |
+| 侧栏和正文使用 display/serif 字体，中文辨识度不足 | 将 `fonts.ui` 改为中文无衬线字体栈，仅标题使用独立 `fonts.display`；原生侧栏只接受视觉样式和固定导航白名单文案 | 运行时选择器 `.app-shell-left-panel` 与 v1 Schema |
+| 文本 Logo 无法形成四套独立品牌识别 | 每套主题透明 PNG Logo 通过 `theme.logoImage` Base64 data URL 注入 masthead `<img>` | 共享 `JsBuilder` 的 masthead 生成逻辑 |
+| 窄屏卡片可能被固定输入框遮挡 | 按主面板宽度切换 compact/narrow；为输入框动态预留空间并让主页自身滚动 | `qa/captures/dilraba-responsive-820x900-final-v3.png`、`qa/captures/dilraba-responsive-1200x800-final-v3.png`；`cardComposerOverlap=false` |
 | “更多”文字在窄布局换行，视觉不稳定 | 使用本地 Tabler `dots-vertical.svg` 图片，避开 `file://` CSS mask CORS | 两张响应式 final-v3 截图；控制台错误 0 |
 | 主题切换后可能残留旧 resize 逻辑或叠加注入 | 注入前移除旧 new-document script 和 resize listener，再注册当前主题 | 四主题连续切换均只显示当前主题，控制台错误 0 |
 
@@ -54,7 +54,7 @@
 - 间距：侧栏分组、Hero、四卡、输入框层级明确；桌面和中屏无重叠；820 窄屏双列并通过主页滚动完整访问内容。
 - 颜色：四套调色分别为黑金舞台、鼠尾草奶油、ENFP 高饱和青橙、星光蓝紫；气泡、边框、焦点环和辅助文字对比可读。
 - 图片质量：四张 Hero 使用生成式位图并压缩为高质量 JPG；四套 Logo 为独立透明 PNG，浏览器自然尺寸 720×194，运行时成功解码。
-- 文案：侧栏项目/任务、Hero 标题/副标题/标签、快捷卡标题/描述和输入框占位均按主题独立配置；快捷卡提示词可写入编辑器。
+- 文案：Hero 标题/副标题/标签、固定导航白名单、快捷卡标题/描述和输入框占位可按主题配置；项目、任务和账号文案保持原生；快捷卡提示词可写入编辑器。
 
 ## 最终图像资产
 

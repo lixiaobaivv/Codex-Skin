@@ -1,6 +1,12 @@
 {
+  "$schema": "../schemas/theme-v1.schema.json",
+  "schemaVersion": 1,
+  "version": "1.0.0",
   "displayName": "KUN Stage",
   "codeThemeId": "kun-stage",
+  "category": "人物",
+  "description": "黑金舞台与聚光灯氛围",
+  "author": "Codex Skin",
   "variant": "dark",
   "previewImage": "../previews/kun-stage.png",
   "theme": {
@@ -36,31 +42,12 @@
       "金色灵感",
       "ikun 应援"
     ],
-    "sidebarProject": "KUN 星球",
-    "sidebarItems": [
-      "Deadman 新歌企划",
-      "JASMINE 视觉灵感",
-      "What a Day 舞台",
-      "海外巡演地图",
-      "ikun 应援手账"
-    ],
     "sidebarLabels": {
       "newTask": "新建舞台",
       "scheduled": "已安排",
       "plugins": "插件",
-      "projects": "项目",
-      "tasks": "任务",
       "settings": "设置"
     },
-    "tasks": [
-      "循环播放 Deadman",
-      "收藏 JASMINE MV",
-      "记录 What a Day 舞台",
-      "关注巡演新动态",
-      "学习一点新技能"
-    ],
-    "progressLabel": "继续设置 · 0/4",
-    "profileLabel": "ikun 宝",
     "composerHint": "随心输入，让 KUN 陪你一起写代码吧～",
     "footerNote": "Be Better, Be KUN",
     "quickActions": [
@@ -92,23 +79,6 @@
   },
   "copy": {
     "title": "Codex KUN 舞台",
-    "replaceText": {
-      "Codex": "Codex KUN",
-      "New Task": "New Stage",
-      "New task": "New Stage",
-      "Skills": "Setlist",
-      "Chat": "Stage Chat",
-      "新建任务": "新建舞台",
-      "已安排": "已安排",
-      "技能": "舞台技能",
-      "站点": "KUN 星球",
-      "拉取请求": "应援请求",
-      "聊天": "舞台聊天",
-      "项目": "项目",
-      "任务": "任务",
-      "选择项目": "选择项目",
-      "继续设置": "继续设置"
-    },
     "replacePlaceholders": {
       "Ask Codex": "Light up the code...",
       "Ask Codex anything": "随心输入，让 KUN 陪你一起写代码吧~",
