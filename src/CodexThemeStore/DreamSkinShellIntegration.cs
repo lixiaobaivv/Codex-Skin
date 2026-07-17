@@ -52,7 +52,7 @@ internal static class DreamSkinShellIntegration
             using var icon = fileType.CreateSubKey("DefaultIcon", writable: true);
             icon.SetValue(null, iconValue, RegistryValueKind.String);
             using var command = fileType.CreateSubKey(@"shell\open\command", writable: true);
-            command.SetValue(null, $"\"{executable}\" import \"%1\"", RegistryValueKind.String);
+            command.SetValue(null, $"\"{executable}\" \"%1\"", RegistryValueKind.String);
         }
     }
 

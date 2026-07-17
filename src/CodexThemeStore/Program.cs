@@ -16,14 +16,17 @@ internal static class Program
     [STAThread]
     public static int Main(string[] args)
     {
-        if (args.Length == 0)
+        var externalImport = args.Length == 1 &&
+            (args[0].StartsWith("dreamskin:", StringComparison.OrdinalIgnoreCase) ||
+             args[0].EndsWith(".dreamskin", StringComparison.OrdinalIgnoreCase));
+        if (args.Length == 0 || externalImport)
         {
-            NativeMethods.FreeConsole();
             ApplicationConfiguration.Initialize();
-            Application.Run(new ThemeStoreForm());
+            Application.Run(new ThemeStoreForm(externalImport ? args[0] : null));
             return 0;
         }
 
+        NativeMethods.AttachParentConsole();
         try
         {
             var app = new ThemeStoreApp();
@@ -43,8 +46,18 @@ internal static class Program
 
 internal static class NativeMethods
 {
+    private const uint AttachParentProcess = 0xFFFFFFFF;
+
     [DllImport("kernel32.dll")]
-    internal static extern bool FreeConsole();
+    private static extern bool AttachConsole(uint processId);
+
+    internal static void AttachParentConsole()
+    {
+        if (!AttachConsole(AttachParentProcess)) return;
+        Console.SetOut(new StreamWriter(Console.OpenStandardOutput(), new UTF8Encoding(false)) { AutoFlush = true });
+        Console.SetError(new StreamWriter(Console.OpenStandardError(), new UTF8Encoding(false)) { AutoFlush = true });
+        Console.SetIn(new StreamReader(Console.OpenStandardInput(), Encoding.UTF8));
+    }
 }
 
 internal sealed class ThemeStoreForm : Form
@@ -65,10 +78,12 @@ internal sealed class ThemeStoreForm : Form
     private readonly Button _applyButton;
     private readonly Button _saveButton;
     private readonly Button _rollbackButton;
+    private readonly string? _externalImport;
     private ThemePreviewCard? _selectedCard;
 
-    public ThemeStoreForm()
+    public ThemeStoreForm(string? externalImport = null)
     {
+        _externalImport = externalImport;
         Text = "Codex 主题商店";
         StartPosition = FormStartPosition.CenterScreen;
         MinimumSize = new Size(900, 680);
@@ -210,7 +225,7 @@ internal sealed class ThemeStoreForm : Form
             MarqueeAnimationSpeed = 24,
             Visible = false,
             Location = new Point(18, 86),
-            Size = new Size(250, 3),
+            Size = new Size(320, 8),
             Anchor = AnchorStyles.Left | AnchorStyles.Bottom,
         };
         footer.Controls.Add(_selectionLabel);
@@ -230,7 +245,11 @@ internal sealed class ThemeStoreForm : Form
         LayoutFooterButtons(footer);
 
         ReloadThemeCards();
-        Shown += async (_, _) => await RefreshThemesAsync(true);
+        Shown += async (_, _) =>
+        {
+            if (_externalImport is not null) await HandleExternalImportAsync(_externalImport);
+            else await RefreshThemesAsync(true);
+        };
     }
 
     private static Button CreateButton(string text, int width, bool primary)
@@ -345,6 +364,100 @@ internal sealed class ThemeStoreForm : Form
         }
     }
 
+    private async Task HandleExternalImportAsync(string value)
+    {
+        try
+        {
+            DreamSkinImportResult imported;
+            if (value.StartsWith("dreamskin:", StringComparison.OrdinalIgnoreCase))
+            {
+                var request = DreamSkinProtocol.Parse(value);
+                var confirmation = MessageBox.Show(
+                    this,
+                    $"来源：{request.PackageUri.Host}\n主题：{request.Id ?? "未提供"}\n版本：{request.Version ?? "未提供"}\n大小：{request.Size:N0} 字节\n\n" +
+                    "客户端会自动尝试当前线路和备用镜像，并校验 SHA-256、Ed25519 签名及全部图片。是否继续？",
+                    "导入 Dream Skin 主题",
+                    MessageBoxButtons.YesNo,
+                    MessageBoxIcon.Information,
+                    MessageBoxDefaultButton.Button2);
+                if (confirmation != DialogResult.Yes) return;
+
+                SetBusy(true, "正在准备下载主题...");
+                _progress.Style = ProgressBarStyle.Continuous;
+                _progress.Value = 0;
+                var reporter = new Progress<DreamSkinDownloadProgress>(UpdateDownloadProgress);
+                var preferredSource = (_sourceCombo.SelectedItem as ThemeRepositorySource)?.Id
+                                      ?? ThemeRepositoryClient.LoadSettings().SourceId;
+                imported = await DreamSkinDownloadService.DownloadAndImportAsync(
+                    request,
+                    CancellationToken.None,
+                    preferredSource,
+                    reporter);
+            }
+            else
+            {
+                var path = Uri.TryCreate(value, UriKind.Absolute, out var fileUri) && fileUri.IsFile
+                    ? fileUri.LocalPath
+                    : value;
+                if (!path.EndsWith(".dreamskin", StringComparison.OrdinalIgnoreCase))
+                    throw new InvalidOperationException("只支持打开 .dreamskin 主题包。");
+                var confirmation = MessageBox.Show(
+                    this,
+                    $"验证并安装本地主题包？\n\n{Path.GetFileName(path)}\n\n安装后不会自动应用。",
+                    "导入 Dream Skin 主题",
+                    MessageBoxButtons.YesNo,
+                    MessageBoxIcon.Information,
+                    MessageBoxDefaultButton.Button2);
+                if (confirmation != DialogResult.Yes) return;
+                SetBusy(true, "正在验证主题签名和图片...");
+                imported = await Task.Run(() => DreamSkinPackageInstaller.ImportLocal(path, platform: "windows"));
+            }
+
+            ReloadThemeCards();
+            _statusLabel.Text = $"{imported.DisplayName} 已安全安装";
+            var applyNow = MessageBox.Show(
+                this,
+                $"{imported.DisplayName} 已通过签名验证并安装。\n\n是否立即应用并重启 Codex？",
+                "主题安装完成",
+                MessageBoxButtons.YesNo,
+                MessageBoxIcon.Question,
+                MessageBoxDefaultButton.Button2);
+            if (applyNow != DialogResult.Yes) return;
+
+            SetBusy(true, "正在应用主题并重启 Codex...");
+            await Task.Run(() =>
+            {
+                var app = new ThemeStoreApp();
+                if (app.Run(["apply", ThemeStoreApp.ResolveImportedThemeForApply(imported)]) != 0)
+                    throw new InvalidOperationException("主题应用失败。");
+                if (app.Run(["launch"]) != 0)
+                    throw new InvalidOperationException("Codex 主题启动失败。");
+            });
+            _statusLabel.Text = $"{imported.DisplayName} 已应用";
+        }
+        catch (Exception ex)
+        {
+            _statusLabel.Text = "主题导入失败";
+            MessageBox.Show(this, ex.Message, "Dream Skin 导入失败", MessageBoxButtons.OK, MessageBoxIcon.Error);
+        }
+        finally
+        {
+            SetBusy(false, _statusLabel.Text);
+        }
+    }
+
+    private void UpdateDownloadProgress(DreamSkinDownloadProgress progress)
+    {
+        var percent = progress.TotalBytes <= 0
+            ? 0
+            : (int)Math.Clamp(progress.BytesReceived * 100 / progress.TotalBytes, 0, 100);
+        _progress.Style = ProgressBarStyle.Continuous;
+        _progress.Value = percent;
+        _statusLabel.Text = progress.Stage == "正在下载"
+            ? $"正在通过 {progress.SourceName} 下载主题：{percent}%"
+            : $"{progress.Stage}（{progress.SourceName}）";
+    }
+
     private void SelectCard(ThemePreviewCard card)
     {
         _selectedCard = card;
@@ -431,6 +544,11 @@ internal sealed class ThemeStoreForm : Form
         _sourceCombo.Enabled = !busy;
         _categoryCombo.Enabled = !busy;
         foreach (var card in _cards) card.Enabled = !busy;
+        if (!busy)
+        {
+            _progress.Style = ProgressBarStyle.Marquee;
+            _progress.Value = 0;
+        }
     }
 }
 
@@ -757,7 +875,7 @@ internal sealed class ThemeStoreApp
         return 0;
     }
 
-    private static string ResolveImportedThemeForApply(DreamSkinImportResult imported)
+    internal static string ResolveImportedThemeForApply(DreamSkinImportResult imported)
     {
         var official = LoadThemes().FirstOrDefault(theme =>
             theme.CodeThemeId.Equals(imported.Id, StringComparison.Ordinal) &&

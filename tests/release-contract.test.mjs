@@ -2,39 +2,37 @@ import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import test from "node:test";
 
-test("Windows client release uses stable English artifact names", async () => {
-  const [project, ci, release, build, readme, program, installer, chineseMessages] = await Promise.all([
+test("Windows release publishes only the graphical Setup installer", async () => {
+  const [project, ci, build, readme, program, shellIntegration, installer, chineseMessages] = await Promise.all([
     readFile(new URL("../src/CodexThemeStore/CodexThemeStore.csproj", import.meta.url), "utf8"),
     readFile(new URL("../.github/workflows/ci.yml", import.meta.url), "utf8"),
-    readFile(new URL("../.github/workflows/release-client.yml", import.meta.url), "utf8"),
     readFile(new URL("../.github/workflows/build.yml", import.meta.url), "utf8"),
     readFile(new URL("../README.md", import.meta.url), "utf8"),
     readFile(new URL("../src/CodexThemeStore/Program.cs", import.meta.url), "utf8"),
+    readFile(new URL("../src/CodexThemeStore/DreamSkinShellIntegration.cs", import.meta.url), "utf8"),
     readFile(new URL("../installer/windows/CodexThemeStore.iss", import.meta.url), "utf8"),
     readFile(new URL("../installer/windows/languages/ChineseSimplified.isl", import.meta.url), "utf8"),
   ]);
 
   assert.match(project, /<AssemblyName>Codex-Skin<\/AssemblyName>/);
+  assert.match(project, /<OutputType>WinExe<\/OutputType>/);
   assert.match(ci, /Codex-Skin-win-x64\/Codex-Skin\.exe/);
-  assert.match(release, /Codex-Skin-win-x64\.exe/);
-  assert.match(release, /Codex-Skin-win-x64\.zip/);
-  assert.match(release, /Codex-Skin-win-x64-SHA256SUMS\.txt/);
   assert.match(build, /Codex-Skin-Setup-win-x64\.exe/);
   assert.match(build, /Codex-Skin-osx-arm64\.pkg|Codex-Skin-\$\{\{ matrix\.rid \}\}\.pkg/);
   assert.match(build, /Codex-Skin-installers-SHA256SUMS\.txt/);
-  assert.match(release, /PublishSingleFile=true/);
-  assert.match(release, /IncludeAllContentForSelfExtract=true/);
   assert.doesNotMatch(project, /KeepThemeAssetsExternal|themes\\\*\.json|previews\\\*\.png/);
   assert.match(ci, /unexpectedly contains bundled themes/);
-  assert.match(release, /did not load four online themes/);
+  assert.match(ci, /did not load four online themes/);
   assert.match(project, /<ApplicationIcon>.*Codex-Skin\.ico<\/ApplicationIcon>/);
   assert.match(installer, /SetupIconFile=.*Codex-Skin\.ico/);
   assert.match(installer, /MessagesFile: "\{#SourcePath\}\\languages\\ChineseSimplified\.isl"/);
   assert.match(installer, /Parameters: "protocol register"/);
+  assert.match(program, /Application\.Run\(new ThemeStoreForm\(externalImport \? args\[0\] : null\)\)/);
+  assert.doesNotMatch(shellIntegration, /command\.SetValue\(null, .* import /);
   assert.match(installer, /\[UninstallRun\][\s\S]*Parameters: "protocol unregister"/);
   assert.match(chineseMessages, /Inno Setup version 6\.5\.0\+/);
-  assert.match(readme, /Codex-Skin-win-x64\.exe/);
-  assert.doesNotMatch(`${readme}\n${program}\n${ci}\n${release}\n${build}\n${installer}`, /Codex主题商店\.exe|CodexThemeStore-(?:Setup|osx)|CodexSkin-theme/);
+  assert.doesNotMatch(readme, /Windows (?:x64 )?便携版|Windows portable|Codex-Skin-win-x64\.(?:exe|zip)/);
+  assert.doesNotMatch(`${readme}\n${program}\n${ci}\n${build}\n${installer}`, /Codex主题商店\.exe|CodexThemeStore-(?:Setup|osx)|CodexSkin-theme/);
 });
 
 test("macOS package registers Codex-Skin URL and document activation", async () => {

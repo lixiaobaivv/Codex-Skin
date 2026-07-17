@@ -15,9 +15,10 @@ Open the [latest release](https://github.com/lixiaobaivv/Codex-Skin/releases/lat
 | Platform | Recommended file | Notes |
 | --- | --- | --- |
 | Windows x64 | `Codex-Skin-Setup-win-x64.exe` | Complete installer with web import registration |
-| Windows portable | `Codex-Skin-win-x64.exe` | Single file; protocol registration is manual |
 | macOS Apple Silicon | `Codex-Skin-osx-arm64.pkg` | M-series Macs |
 | macOS Intel | `Codex-Skin-osx-x64.pkg` | Intel Macs |
+
+Windows is distributed only through Setup; portable EXE and ZIP downloads are not published.
 
 The installers include the .NET runtime. No SDK or separate runtime is required. Windows and Apple commercial signing are not currently available, so SmartScreen or Gatekeeper may request explicit approval.
 
@@ -29,11 +30,7 @@ The installers include the .NET runtime. No SDK or separate runtime is required.
 4. Choose **Apply and restart Codex**.
 5. Choose **Restore default** to remove the theme.
 
-Setup registers `dreamskin://` and `.dreamskin` for the current user and removes only its own associations during uninstall. Portable users can register manually:
-
-```powershell
-.\Codex-Skin-win-x64.exe protocol register
-```
+Setup registers `dreamskin://` and `.dreamskin` for the current user and removes only its own associations during uninstall.
 
 ## Use On macOS
 
@@ -52,7 +49,7 @@ The client:
 
 1. shows the source host, theme hint, version, and exact size;
 2. asks before downloading;
-3. restricts HTTPS redirects, network targets, and bytes;
+3. shows download progress and retries the selected GitHub transport and built-in mirrors when needed;
 4. verifies package SHA-256, Ed25519 signature, manifest, and images;
 5. installs atomically;
 6. asks separately before restarting Codex and applying the theme.
@@ -81,7 +78,7 @@ Themes cannot replace project, task, progress, conversation, or account data. Pr
 
 **Catalog refresh failed:** switch between GitHub, GH Proxy, and GHFast. Existing themes remain available.
 
-**One-click import did nothing:** repair the Windows Setup registration, run `protocol register` for the portable EXE, or confirm that macOS uses the PKG with URL handler support and has been opened once.
+**One-click import did nothing:** repair the Windows Setup registration, or confirm that macOS uses the PKG with URL handler support and has been opened once.
 
 **Codex became slow after applying a theme:** restore the default theme and reapply with the latest client. The current runtime ignores streaming-message internals, avoids full-page mutation scans, and removes expensive full-surface blur effects.
 

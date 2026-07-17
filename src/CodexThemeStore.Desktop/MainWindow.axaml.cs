@@ -195,8 +195,17 @@ public sealed partial class MainWindow : Window
                         $"从 {request.PackageUri.Host} 下载主题？\n\n" +
                         $"主题：{request.Id ?? "未提供"}\n版本：{request.Version ?? "未提供"}\n大小：{request.Size:N0} 字节\n\n" +
                         "客户端会校验 SHA-256、Ed25519 签名和全部图片后再安装，不会自动应用。")) return;
-                SetBusy(true, "正在安全下载并验证主题...");
-                imported = await DreamSkinDownloadService.DownloadAndImportAsync(request, CancellationToken.None);
+                SetBusy(true, "正在准备下载主题...");
+                BusyBar.IsIndeterminate = false;
+                BusyBar.Value = 0;
+                var reporter = new Progress<DreamSkinDownloadProgress>(UpdateDownloadProgress);
+                var preferredSource = (SourceCombo.SelectedItem as ThemeRepositorySource)?.Id
+                                      ?? ThemeRepositoryClient.LoadSettings().SourceId;
+                imported = await DreamSkinDownloadService.DownloadAndImportAsync(
+                    request,
+                    CancellationToken.None,
+                    preferredSource,
+                    reporter);
             }
             else
             {
@@ -242,6 +251,23 @@ public sealed partial class MainWindow : Window
         RefreshButton.IsEnabled = !busy;
         ThemeList.IsEnabled = !busy;
         SetCommandAvailability(!busy);
+        if (!busy)
+        {
+            BusyBar.IsIndeterminate = true;
+            BusyBar.Value = 0;
+        }
+    }
+
+    private void UpdateDownloadProgress(DreamSkinDownloadProgress progress)
+    {
+        var percent = progress.TotalBytes <= 0
+            ? 0
+            : (int)Math.Clamp(progress.BytesReceived * 100 / progress.TotalBytes, 0, 100);
+        BusyBar.IsIndeterminate = false;
+        BusyBar.Value = percent;
+        StatusLabel.Text = progress.Stage == "正在下载"
+            ? $"正在通过 {progress.SourceName} 下载主题：{percent}%"
+            : $"{progress.Stage}（{progress.SourceName}）";
     }
 
     private void SetCommandAvailability(bool enabled)
