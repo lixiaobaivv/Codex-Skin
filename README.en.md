@@ -23,6 +23,7 @@ Codex-Skin provides a complete, auditable path from discovery and on-demand down
 - Verify SHA-256, Ed25519/RFC8785 signatures, manifests, ZIP paths, and decoded images.
 - Check for updates through a lightweight incremental index with fallback across GitHub, GH Proxy, and GHFast.
 - Download previews only as they enter the viewport, then fetch and persist complete theme assets only before application.
+- Show online, downloaded, and update-available states, with subscriptions that refresh local theme resources when the catalog is refreshed.
 - Forward web and file activations to one application instance.
 
 ## Download
@@ -114,6 +115,8 @@ The desktop catalog comes from the public [lixiaobaivv/Codex-Skin-Store](https:/
 Synchronization requests only a content-addressed lightweight index and uses HTTP ETags to avoid transferring an unchanged catalog. It tries the selected route first and then the other built-in routes. If every route fails, the last valid catalog remains available.
 
 Previews are downloaded only when their cards enter the viewport. Before applying a theme, the client fetches only missing or changed manifests, backgrounds, logos, and pet images. Every resource is checked against its declared size and SHA-256, decoded when applicable, and written atomically to the persistent cache. A theme removed from the remote catalog is no longer shown as online, while an installed signed version remains available offline.
+
+Theme cards show Online, Downloaded, Subscribed, or Update Available. Download Theme saves resources without applying them. Subscribing downloads the current version when needed and automatically fetches later versions whenever the catalog is refreshed. Unsubscribing does not delete local theme data.
 
 Installers do not bundle online themes, so first use requires a lightweight index synchronization. Third-party mirrors may be unavailable or stale; every downloaded resource is still checked against the size and SHA-256 declared by the index.
 

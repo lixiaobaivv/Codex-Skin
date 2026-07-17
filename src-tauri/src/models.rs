@@ -49,6 +49,10 @@ pub struct ThemeSummary {
     pub description: String,
     pub category: String,
     pub preview_path: String,
+    pub remote_version: Option<String>,
+    pub installed_version: Option<String>,
+    pub subscribed: bool,
+    pub update_available: bool,
     #[serde(skip)]
     pub manifest_path: std::path::PathBuf,
 }

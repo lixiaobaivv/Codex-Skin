@@ -9,7 +9,7 @@ use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use sha2::{Digest, Sha256};
 use std::{
-    collections::HashSet,
+    collections::{BTreeMap, BTreeSet, HashSet},
     fs,
     io::Write,
     path::{Path, PathBuf},
@@ -56,6 +56,13 @@ pub(crate) struct RemoteCatalog {
 struct SyncState {
     source_id: String,
     etag: Option<String>,
+}
+
+#[derive(Clone, Default, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub(crate) struct ThemeLibraryState {
+    pub downloaded_versions: BTreeMap<String, String>,
+    pub subscriptions: BTreeSet<String>,
 }
 
 pub fn load_settings() -> RepositorySettings {
@@ -267,7 +274,66 @@ pub(crate) async fn ensure_theme(theme_id: &str) -> Result<()> {
     for asset in &theme.assets {
         download_resource(asset, &source_id, true).await?;
     }
-    validate_theme(&manifest, &theme.id, &paths::cache_root()?)
+    validate_theme(&manifest, &theme.id, &paths::cache_root()?)?;
+    let mut state = load_theme_library_state();
+    state
+        .downloaded_versions
+        .insert(theme.id.clone(), theme.version.clone());
+    save_theme_library_state(&state)
+}
+
+pub(crate) fn theme_library_state() -> ThemeLibraryState {
+    load_theme_library_state()
+}
+
+pub(crate) fn set_subscription(theme_id: &str, subscribed: bool) -> Result<()> {
+    if !valid_catalog_id(theme_id) {
+        return Err(AppError::Message(format!("主题 ID 无效：{theme_id}")));
+    }
+    let mut state = load_theme_library_state();
+    if subscribed {
+        state.subscriptions.insert(theme_id.into());
+    } else {
+        state.subscriptions.remove(theme_id);
+    }
+    save_theme_library_state(&state)
+}
+
+pub(crate) async fn sync_subscriptions() -> Result<usize> {
+    let subscriptions: Vec<_> = load_theme_library_state()
+        .subscriptions
+        .into_iter()
+        .collect();
+    let mut updated = 0;
+    for theme_id in subscriptions {
+        let before = load_theme_library_state()
+            .downloaded_versions
+            .get(&theme_id)
+            .cloned();
+        ensure_theme(&theme_id).await?;
+        let after = load_theme_library_state()
+            .downloaded_versions
+            .get(&theme_id)
+            .cloned();
+        if after.is_some() && after != before {
+            updated += 1;
+        }
+    }
+    Ok(updated)
+}
+
+fn load_theme_library_state() -> ThemeLibraryState {
+    paths::theme_library_state_path()
+        .ok()
+        .and_then(|path| fs::read(path).ok())
+        .and_then(|bytes| serde_json::from_slice(&bytes).ok())
+        .unwrap_or_default()
+}
+
+fn save_theme_library_state(state: &ThemeLibraryState) -> Result<()> {
+    let path = paths::theme_library_state_path()?;
+    fs::create_dir_all(path.parent().unwrap())?;
+    write_atomic(&path, &serde_json::to_vec_pretty(state)?)
 }
 
 async fn download_resource(
@@ -735,6 +801,26 @@ mod tests {
         assert!(validate_remote_catalog(&duplicate).is_err());
     }
 
+    #[test]
+    fn theme_library_state_is_stable_and_strict() {
+        let mut state = ThemeLibraryState::default();
+        state
+            .downloaded_versions
+            .insert("example-theme".into(), "1.2.0".into());
+        state.subscriptions.insert("example-theme".into());
+        let bytes = serde_json::to_vec(&state).unwrap();
+        let decoded: ThemeLibraryState = serde_json::from_slice(&bytes).unwrap();
+        assert_eq!(
+            decoded
+                .downloaded_versions
+                .get("example-theme")
+                .map(String::as_str),
+            Some("1.2.0")
+        );
+        assert!(decoded.subscriptions.contains("example-theme"));
+        assert!(serde_json::from_str::<ThemeLibraryState>(r#"{"unknown":true}"#).is_err());
+    }
+
     #[tokio::test]
     #[ignore = "requires the public Codex-Skin-Store repository"]
     async fn syncs_and_validates_official_catalog() {
@@ -749,6 +835,11 @@ mod tests {
         let preview = ensure_preview(&first).await.unwrap();
         assert!(preview.is_file());
         ensure_theme(&first).await.unwrap();
+        set_subscription(&first, true).unwrap();
+        assert_eq!(sync_subscriptions().await.unwrap(), 0);
+        let summary = crate::catalog::find(&first).unwrap();
+        assert!(summary.subscribed);
+        assert_eq!(summary.installed_version, summary.remote_version);
         assert_eq!(
             crate::compiler::compile(&first).unwrap().theme_id,
             Some(first)

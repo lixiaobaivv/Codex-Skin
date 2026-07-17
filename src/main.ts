@@ -10,6 +10,10 @@ type Theme = {
   description: string;
   category: string;
   previewPath: string;
+  remoteVersion: string | null;
+  installedVersion: string | null;
+  subscribed: boolean;
+  updateAvailable: boolean;
 };
 type AppState = { themes: Theme[]; sources: Source[]; selectedSourceId: string };
 
@@ -19,7 +23,10 @@ const qaThemes: Theme[] = [
   ["enfp-pop", "ENFP 多巴胺", "明亮活泼的彩色工作空间", "其他", "/qa/captures/enfp-pop-home-final-v3.png"],
   ["jackson-sage", "千玺 · 鼠尾草", "克制自然的鼠尾草绿", "人物", "/qa/captures/jackson-sage-home-final-v3.png"],
   ["kun-stage", "舞台 · 银蓝", "深色舞台与银蓝高光", "人物", "/qa/captures/kun-stage-home-final-v3.png"],
-].map(([id, name, description, category, previewPath]) => ({ id, version: "1.0.0", name, description, category, previewPath }));
+].map(([id, name, description, category, previewPath]) => ({
+  id, version: "1.0.0", name, description, category, previewPath,
+  remoteVersion: "1.0.0", installedVersion: null, subscribed: false, updateAvailable: false,
+}));
 
 async function call<T>(command: string, args?: Record<string, unknown>): Promise<T> {
   if (!qaMode) return invoke<T>(command, args);
@@ -27,6 +34,8 @@ async function call<T>(command: string, args?: Record<string, unknown>): Promise
   if (command === "read_preview") return String(args?.path ?? "") as T;
   if (command === "pending_activations") return [] as T;
   if (command === "sync_catalog") return { themeCount: qaThemes.length, sourceId: "github", sourceName: "GitHub 官方" } as T;
+  if (command === "sync_subscribed_themes") return 0 as T;
+  if (command === "set_theme_subscription") return undefined as T;
   return "QA 操作已完成" as T;
 }
 
@@ -51,6 +60,8 @@ document.querySelector<HTMLDivElement>("#app")!.innerHTML = `
     <footer class="command-bar">
       <section><strong id="selection">请选择主题</strong><span id="status">准备就绪</span></section>
       <button id="rollback" class="button">恢复默认</button>
+      <button id="subscribe" class="button">订阅</button>
+      <button id="download" class="button">下载主题</button>
       <button id="apply" class="button">应用主题</button>
       <button id="restart" class="button primary">应用并重启 Codex</button>
     </footer>
@@ -75,6 +86,18 @@ function setBusy(value: boolean, text?: string): void {
 function updateCommands(): void {
   document.querySelector<HTMLButtonElement>("#apply")!.disabled = busy || !selectedTheme;
   document.querySelector<HTMLButtonElement>("#restart")!.disabled = busy || !selectedTheme;
+  const subscribe = document.querySelector<HTMLButtonElement>("#subscribe")!;
+  const download = document.querySelector<HTMLButtonElement>("#download")!;
+  subscribe.disabled = busy || !selectedTheme?.remoteVersion;
+  subscribe.textContent = selectedTheme?.subscribed ? "取消订阅" : "订阅";
+  download.disabled = busy || !selectedTheme?.remoteVersion || (!!selectedTheme.installedVersion && !selectedTheme.updateAvailable);
+  download.textContent = selectedTheme?.updateAvailable ? "下载更新" : selectedTheme?.installedVersion ? "已下载" : "下载主题";
+}
+
+function themeState(theme: Theme): string {
+  if (theme.updateAvailable) return `有更新 · ${theme.remoteVersion}`;
+  if (theme.installedVersion) return theme.subscribed ? `已订阅 · ${theme.installedVersion}` : `已下载 · ${theme.installedVersion}`;
+  return theme.subscribed ? "已订阅" : "在线";
 }
 
 function renderSources(): void {
@@ -123,10 +146,11 @@ function renderThemes(): void {
     const card = document.createElement("article");
     card.className = `theme-card${selectedTheme?.id === theme.id ? " selected" : ""}`;
     card.tabIndex = 0;
-    card.innerHTML = `<div class="preview"><img alt="" /></div><div class="card-copy"><div><h2></h2><p></p></div><span></span></div>`;
+    card.innerHTML = `<div class="preview"><img alt="" /><i class="theme-state"></i></div><div class="card-copy"><div><h2></h2><p></p></div><span></span></div>`;
     card.querySelector("h2")!.textContent = theme.name;
     card.querySelector("p")!.textContent = theme.description;
     card.querySelector("span")!.textContent = theme.category;
+    card.querySelector<HTMLElement>(".theme-state")!.textContent = themeState(theme);
     const select = () => { selectedTheme = theme; document.querySelector("#selection")!.textContent = `已选择：${theme.name}`; renderThemes(); updateCommands(); };
     card.onclick = select;
     card.onkeydown = event => { if (event.key === "Enter" || event.key === " ") select(); };
@@ -172,9 +196,35 @@ document.querySelector<HTMLButtonElement>("#refresh")!.onclick = async () => {
   setBusy(true, "正在同步主题目录…");
   try {
     const result = await call<{ themeCount: number; sourceId: string; sourceName: string }>("sync_catalog", { sourceId: sourceSelect.value });
+    const updated = await call<number>("sync_subscribed_themes");
     previewCache.clear(); await loadState();
-    message(`已通过 ${result.sourceName} 更新 ${result.themeCount} 个主题`);
+    message(`已通过 ${result.sourceName} 更新 ${result.themeCount} 个主题${updated ? `，${updated} 个订阅已更新` : ""}`);
   } catch (error) { message(`同步失败：${String(error)}`); }
+  finally { setBusy(false); }
+};
+
+document.querySelector<HTMLButtonElement>("#subscribe")!.onclick = async () => {
+  if (!selectedTheme) return;
+  const subscribed = !selectedTheme.subscribed;
+  setBusy(true, subscribed ? "正在订阅主题…" : "正在取消订阅…");
+  try {
+    await call<void>("set_theme_subscription", { themeId: selectedTheme.id, subscribed });
+    if (subscribed && (!selectedTheme.installedVersion || selectedTheme.updateAvailable)) {
+      await call<string>("download_theme", { themeId: selectedTheme.id });
+    }
+    await loadState();
+    message(subscribed ? "主题已订阅，刷新目录时会自动更新" : "已取消订阅，本地主题不会删除");
+  } catch (error) { message(String(error)); }
+  finally { setBusy(false); }
+};
+
+document.querySelector<HTMLButtonElement>("#download")!.onclick = async () => {
+  if (!selectedTheme) return;
+  setBusy(true, selectedTheme.updateAvailable ? "正在下载主题更新…" : "正在下载主题…");
+  try {
+    const result = await call<string>("download_theme", { themeId: selectedTheme.id });
+    await loadState(); message(result);
+  } catch (error) { message(String(error)); }
   finally { setBusy(false); }
 };
 
@@ -185,7 +235,7 @@ for (const [id, command, label] of [
 ] as const) {
   document.querySelector<HTMLButtonElement>(`#${id}`)!.onclick = async () => {
     setBusy(true, label);
-    try { message(await call<string>(command, { themeId: selectedTheme?.id ?? null })); }
+    try { const result = await call<string>(command, { themeId: selectedTheme?.id ?? null }); await loadState(); message(result); }
     catch (error) { message(String(error)); }
     finally { setBusy(false); }
   };

@@ -21,6 +21,9 @@ pub fn remote_catalog_path() -> Result<PathBuf> {
 pub fn catalog_sync_state_path() -> Result<PathBuf> {
     Ok(store_root()?.join("catalog-sync-state.json"))
 }
+pub fn theme_library_state_path() -> Result<PathBuf> {
+    Ok(store_root()?.join("theme-library-state.json"))
+}
 pub fn settings_path() -> Result<PathBuf> {
     Ok(store_root()?.join("repository-settings.json"))
 }

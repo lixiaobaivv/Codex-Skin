@@ -49,6 +49,22 @@ async fn sync_catalog(source_id: String) -> error::Result<SyncResult> {
 }
 
 #[tauri::command]
+async fn download_theme(theme_id: String) -> error::Result<String> {
+    repository::ensure_theme(&theme_id).await?;
+    Ok(format!("{} 已下载", catalog::find(&theme_id)?.name))
+}
+
+#[tauri::command]
+fn set_theme_subscription(theme_id: String, subscribed: bool) -> error::Result<()> {
+    repository::set_subscription(&theme_id, subscribed)
+}
+
+#[tauri::command]
+async fn sync_subscribed_themes() -> error::Result<usize> {
+    repository::sync_subscriptions().await
+}
+
+#[tauri::command]
 async fn import_local(path: String) -> error::Result<dreamskin::ImportResult> {
     tauri::async_runtime::spawn_blocking(move || dreamskin::import_local(&path))
         .await
@@ -181,6 +197,9 @@ pub fn run() {
         .invoke_handler(tauri::generate_handler![
             get_app_state,
             sync_catalog,
+            download_theme,
+            set_theme_subscription,
+            sync_subscribed_themes,
             import_local,
             install_uri,
             pending_activations,

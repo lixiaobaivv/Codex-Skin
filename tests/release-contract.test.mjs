@@ -113,9 +113,15 @@ test("desktop catalog uses conditional sync and on-demand persistent resources",
   assert.match(repository, /IF_NONE_MATCH/);
   assert.match(repository, /ensure_preview/);
   assert.match(repository, /ensure_theme/);
+  assert.match(repository, /sync_subscriptions/);
+  assert.match(repository, /theme-library-state\.json|theme_library_state_path/);
   assert.match(repository, /Sha256::digest/);
   assert.doesNotMatch(repository, /archive\/refs\/heads\/main\.zip/);
   assert.match(frontend, /IntersectionObserver/);
+  assert.match(frontend, /在线/);
+  assert.match(frontend, /已下载/);
+  assert.match(frontend, /有更新/);
+  assert.match(frontend, /set_theme_subscription/);
 });
 
 test("macOS release status documents the unsigned graphical client", async () => {

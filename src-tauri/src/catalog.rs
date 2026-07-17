@@ -15,9 +15,15 @@ const CATEGORIES: [&str; 7] = ["人物", "动漫", "游戏", "风景", "极简",
 pub fn load() -> Result<Vec<ThemeSummary>> {
     let mut newest = HashMap::<String, ThemeSummary>::new();
     let remote = repository::load_remote_catalog()?;
+    let library = repository::theme_library_state();
+    let mut installed_versions = HashMap::<String, String>::new();
     if let Ok(directory) = paths::cache_themes() {
         load_directory(&directory, &mut newest)?;
     }
+    let cached_versions: HashMap<_, _> = newest
+        .iter()
+        .map(|(id, theme)| (id.clone(), theme.version.clone()))
+        .collect();
     if let Some(remote) = remote.as_ref() {
         let published: std::collections::HashSet<_> = remote
             .themes
@@ -36,10 +42,23 @@ pub fn load() -> Result<Vec<ThemeSummary>> {
             .filter_map(|item| item.ok())
         {
             if entry.file_type().is_file() && entry.file_name() == "theme.json" {
+                if let Ok((id, version)) = manifest_identity(entry.path()) {
+                    keep_newer_version(&mut installed_versions, id, version);
+                }
                 let _ = add_manifest(entry.path(), &mut newest);
             }
         }
     }
+    let remote_versions: HashMap<_, _> = remote
+        .as_ref()
+        .map(|catalog| {
+            catalog
+                .themes
+                .iter()
+                .map(|theme| (theme.id.clone(), theme.version.clone()))
+                .collect()
+        })
+        .unwrap_or_default();
     if let Some(remote) = remote {
         for theme in remote.themes {
             let parsed_version = semver::Version::parse(&theme.version)
@@ -62,13 +81,44 @@ pub fn load() -> Result<Vec<ThemeSummary>> {
                         description: theme.description,
                         category: theme.category,
                         preview_path: format!("remote://{}", theme.id),
+                        remote_version: None,
+                        installed_version: None,
+                        subscribed: false,
+                        update_available: false,
                         manifest_path: paths::cache_root()?.join(theme.manifest.path),
                     },
                 );
             }
         }
     }
-    let mut themes: Vec<_> = newest.into_values().collect();
+    let mut themes: Vec<_> = newest
+        .into_values()
+        .map(|mut theme| {
+            let mut local_version = library.downloaded_versions.get(&theme.id).cloned();
+            for candidate in [
+                cached_versions.get(&theme.id),
+                installed_versions.get(&theme.id),
+            ]
+            .into_iter()
+            .flatten()
+            {
+                if local_version
+                    .as_ref()
+                    .is_none_or(|current| version_is_newer(candidate, current))
+                {
+                    local_version = Some(candidate.clone());
+                }
+            }
+            theme.remote_version = remote_versions.get(&theme.id).cloned();
+            theme.installed_version = local_version.clone();
+            theme.subscribed = library.subscriptions.contains(&theme.id);
+            theme.update_available = match (theme.remote_version.as_ref(), local_version.as_ref()) {
+                (Some(remote), Some(local)) => version_is_newer(remote, local),
+                _ => false,
+            };
+            theme
+        })
+        .collect();
     themes.sort_by(|a, b| {
         a.category
             .cmp(&b.category)
@@ -158,6 +208,10 @@ fn add_manifest(path: &Path, themes: &mut HashMap<String, ThemeSummary>) -> Resu
         description: text("description"),
         category,
         preview_path: preview_path.to_string_lossy().into_owned(),
+        remote_version: None,
+        installed_version: None,
+        subscribed: false,
+        update_available: false,
         manifest_path: path.to_owned(),
     };
     let replace = themes
@@ -172,6 +226,36 @@ fn add_manifest(path: &Path, themes: &mut HashMap<String, ThemeSummary>) -> Resu
         themes.insert(id, candidate);
     }
     Ok(())
+}
+
+fn manifest_identity(path: &Path) -> Result<(String, String)> {
+    let root: Value = serde_json::from_slice(&fs::read(path)?)?;
+    let id = root
+        .get("id")
+        .or_else(|| root.get("codeThemeId"))
+        .and_then(Value::as_str)
+        .ok_or_else(|| AppError::Message("主题缺少 ID。".into()))?;
+    let version = root
+        .get("version")
+        .and_then(Value::as_str)
+        .ok_or_else(|| AppError::Message("主题缺少版本。".into()))?;
+    semver::Version::parse(version)
+        .map_err(|_| AppError::Message(format!("主题版本无效：{version}")))?;
+    Ok((id.into(), version.into()))
+}
+
+fn keep_newer_version(versions: &mut HashMap<String, String>, id: String, version: String) {
+    if versions
+        .get(&id)
+        .is_none_or(|current| version_is_newer(&version, current))
+    {
+        versions.insert(id, version);
+    }
+}
+
+fn version_is_newer(candidate: &str, current: &str) -> bool {
+    semver::Version::parse(candidate).expect("validated theme version")
+        > semver::Version::parse(current).expect("validated theme version")
 }
 
 fn canonical_package_asset(manifest: &Path, relative: &str) -> Result<PathBuf> {
