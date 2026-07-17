@@ -1,5 +1,7 @@
 # Build outputs
 **/[Bb]in/
+!src-tauri/src/bin/
+!src-tauri/src/bin/*.rs
 **/[Oo]bj/
 artifacts/
 publish/

@@ -56,10 +56,13 @@ test("Windows release publishes the Tauri graphical Setup installer", async () =
 });
 
 test("official theme publishing reads the Store source of truth", async () => {
-  const [workflow, builder, discovery] = await Promise.all([
+  const [workflow, builder, discovery, cargo, verifier, catalogTool] = await Promise.all([
     readFile(new URL("../.github/workflows/release-official-themes.yml", import.meta.url), "utf8"),
     readFile(new URL("../tools/dreamskin/build-official-themes.mjs", import.meta.url), "utf8"),
     readFile(new URL("../tools/dreamskin/find-pending-official-themes.mjs", import.meta.url), "utf8"),
+    readFile(new URL("../src-tauri/Cargo.toml", import.meta.url), "utf8"),
+    readFile(new URL("../src-tauri/src/bin/dreamskin-verify.rs", import.meta.url), "utf8"),
+    readFile(new URL("../src-tauri/src/bin/catalog-tool.rs", import.meta.url), "utf8"),
   ]);
   assert.match(workflow, /repository: lixiaobaivv\/Codex-Skin-Store/);
   assert.match(workflow, /environment: theme-publishing/);
@@ -69,6 +72,10 @@ test("official theme publishing reads the Store source of truth", async () => {
   assert.match(builder, /theme-repository\.json/);
   assert.doesNotMatch(builder, /const ids = \["dilraba-star"/);
   assert.match(discovery, /catalog\.package === null/);
+  assert.match(cargo, /name = "dreamskin-verify"[\s\S]*path = "src\/bin\/dreamskin-verify\.rs"/);
+  assert.match(cargo, /name = "catalog-tool"[\s\S]*path = "src\/bin\/catalog-tool\.rs"/);
+  assert.match(verifier, /codex_skin_lib::verify_dreamskin/);
+  assert.match(catalogTool, /codex_skin_lib::catalog_validate/);
 });
 
 test("macOS package registers Codex-Skin URL and document activation", async () => {
