@@ -41,41 +41,47 @@ jobs:
       - name: Validate protocol parser
         shell: pwsh
         run: |
+          . ./tools/windows/invoke-client.ps1
           $client = (Resolve-Path "artifacts/Codex-Skin-win-x64/Codex-Skin.exe").Path
-          & $client protocol self-test
+          $protocol = Invoke-CodexSkinClient $client @('protocol', 'self-test')
+          if ($protocol.ExitCode -ne 0) { throw ($protocol.Error -join "`n") }
           $isolated = Join-Path $env:RUNNER_TEMP 'codex-skin-online-catalog'
           New-Item -ItemType Directory -Force $isolated | Out-Null
-          Push-Location $isolated
-          try {
-            & $client list 2>$null
-            if ($LASTEXITCODE -eq 0) { throw "Standalone client unexpectedly contains bundled themes." }
-            & $client refresh github
-            $themes = @(& $client list)
-            if ($LASTEXITCODE -ne 0 -or $themes.Count -ne 4) { throw "Standalone client did not load four online themes." }
-          } finally { Pop-Location }
+          $empty = Invoke-CodexSkinClient $client @('list') $isolated
+          if ($empty.ExitCode -eq 0) { throw "Standalone client unexpectedly contains bundled themes." }
+          $refresh = Invoke-CodexSkinClient $client @('refresh', 'github') $isolated
+          if ($refresh.ExitCode -ne 0) { throw ($refresh.Error -join "`n") }
+          $themes = Invoke-CodexSkinClient $client @('list') $isolated
+          if ($themes.ExitCode -ne 0 -or $themes.Output.Count -ne 4) { throw "Standalone client did not load four online themes." }
 
       - name: Validate current-user shell registration
         shell: pwsh
         run: |
-          $client = "artifacts/Codex-Skin-win-x64/Codex-Skin.exe"
-          & $client protocol register
-          $status = & $client protocol status
-          if ($status -ne "registered") { throw "dreamskin protocol registration failed." }
-          & $client protocol unregister
-          $status = & $client protocol status
-          if ($status -ne "not registered") { throw "dreamskin protocol cleanup failed." }
+          . ./tools/windows/invoke-client.ps1
+          $client = (Resolve-Path "artifacts/Codex-Skin-win-x64/Codex-Skin.exe").Path
+          $register = Invoke-CodexSkinClient $client @('protocol', 'register')
+          if ($register.ExitCode -ne 0) { throw ($register.Error -join "`n") }
+          $status = Invoke-CodexSkinClient $client @('protocol', 'status')
+          if ($status.ExitCode -ne 0 -or $status.Output -ne "registered") { throw "dreamskin protocol registration failed." }
+          $unregister = Invoke-CodexSkinClient $client @('protocol', 'unregister')
+          if ($unregister.ExitCode -ne 0) { throw ($unregister.Error -join "`n") }
+          $status = Invoke-CodexSkinClient $client @('protocol', 'status')
+          if ($status.ExitCode -ne 0 -or $status.Output -ne "not registered") { throw "dreamskin protocol cleanup failed." }
 
       - name: Import signed fixture into isolated library
         shell: pwsh
         run: |
+          . ./tools/windows/invoke-client.ps1
+          $client = (Resolve-Path "artifacts/Codex-Skin-win-x64/Codex-Skin.exe").Path
           $env:CODEX_THEME_LIBRARY_DIR = Join-Path $env:RUNNER_TEMP "dreamskin-library"
-          & "artifacts/Codex-Skin-win-x64/Codex-Skin.exe" import samples/dreamskin/codex-skin-sample-1.0.0.dreamskin
+          $import = Invoke-CodexSkinClient $client @('import', 'samples/dreamskin/codex-skin-sample-1.0.0.dreamskin') $PWD.Path
+          if ($import.ExitCode -ne 0) { throw ($import.Error -join "`n") }
           $manifest = Join-Path $env:CODEX_THEME_LIBRARY_DIR "codex-skin.jackson-sage-sample/1.0.0/theme.json"
           if (-not (Test-Path -LiteralPath $manifest)) { throw "Signed fixture was not installed." }
           $env:CODEX_THEME_CATALOG_DIAGNOSTICS = "1"
-          $themes = @(& "artifacts/Codex-Skin-win-x64/Codex-Skin.exe" list)
-          $themes | Write-Host
-          if (-not ($themes -match "codex-skin.jackson-sage-sample")) { throw "Imported theme did not persist in the theme list." }
+          $themes = Invoke-CodexSkinClient $client @('list') $PWD.Path
+          $themes.Output | Write-Host
+          if ($themes.ExitCode -ne 0 -or -not ($themes.Output -match "codex-skin.jackson-sage-sample")) { throw "Imported theme did not persist in the theme list." }
 
       - uses: actions/upload-artifact@v7
         with:
