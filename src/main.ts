@@ -1,4 +1,5 @@
 import { invoke } from "@tauri-apps/api/core";
+import { listen } from "@tauri-apps/api/event";
 import "./styles.css";
 
 type Source = { id: string; name: string };
@@ -118,6 +119,25 @@ async function loadState(): Promise<void> {
   updateCommands();
 }
 
+async function handleActivation(values: string[]): Promise<void> {
+  for (const value of values) {
+    if (value.startsWith("dreamskin:")) {
+      if (!window.confirm("是否从网页提供的地址下载主题？\n\n客户端将校验大小、SHA-256、Ed25519 签名和全部图片，下载后不会自动应用。")) continue;
+      setBusy(true, "正在下载并验证签名主题…");
+      try { const result = await invoke<{ name:string;version:string }>("install_uri", { uri:value, sourceId:sourceSelect.value }); await loadState(); message(`${result.name} ${result.version} 已安全安装`); }
+      catch(error){message(String(error));} finally{setBusy(false);} continue;
+    }
+    if (!value.toLowerCase().endsWith(".dreamskin")) continue;
+    if (!window.confirm(`是否校验并安装本地主题包？\n\n${value}`)) continue;
+    setBusy(true, "正在校验主题签名和图片…");
+    try {
+      const result = await invoke<{ name: string; version: string; alreadyInstalled: boolean }>("import_local", { path: value });
+      await loadState(); message(`${result.name} ${result.version} ${result.alreadyInstalled ? "已存在" : "已安全安装"}`);
+    } catch (error) { message(String(error)); }
+    finally { setBusy(false); }
+  }
+}
+
 document.querySelector<HTMLButtonElement>("#refresh")!.onclick = async () => {
   setBusy(true, "正在同步主题目录…");
   try {
@@ -141,4 +161,5 @@ for (const [id, command, label] of [
   };
 }
 
-void loadState();
+void listen<string[]>("external-activation", event => void handleActivation(event.payload));
+void loadState().then(async () => handleActivation(await invoke<string[]>("pending_activations")));

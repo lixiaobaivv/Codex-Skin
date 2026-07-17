@@ -21,6 +21,9 @@
     }],
     "security": { "csp": "default-src 'self'; img-src 'self' data:; style-src 'self' 'unsafe-inline'; connect-src ipc: http://ipc.localhost" }
   },
+  "plugins": {
+    "deep-link": { "desktop": { "schemes": ["dreamskin"] } }
+  },
   "bundle": {
     "active": true,
     "targets": "all",
