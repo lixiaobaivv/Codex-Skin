@@ -3,7 +3,7 @@ import { readFile } from "node:fs/promises";
 import test from "node:test";
 
 test("Windows release publishes only the graphical Setup installer", async () => {
-  const [project, ci, build, readme, program, shellIntegration, installer, chineseMessages] = await Promise.all([
+  const [project, ci, build, readme, program, shellIntegration, installer, chineseMessages, icon] = await Promise.all([
     readFile(new URL("../src/CodexThemeStore/CodexThemeStore.csproj", import.meta.url), "utf8"),
     readFile(new URL("../.github/workflows/ci.yml", import.meta.url), "utf8"),
     readFile(new URL("../.github/workflows/build.yml", import.meta.url), "utf8"),
@@ -12,6 +12,7 @@ test("Windows release publishes only the graphical Setup installer", async () =>
     readFile(new URL("../src/CodexThemeStore/DreamSkinShellIntegration.cs", import.meta.url), "utf8"),
     readFile(new URL("../installer/windows/CodexThemeStore.iss", import.meta.url), "utf8"),
     readFile(new URL("../installer/windows/languages/ChineseSimplified.isl", import.meta.url), "utf8"),
+    readFile(new URL("../assets/Codex-Skin.ico", import.meta.url)),
   ]);
 
   assert.match(project, /<AssemblyName>Codex-Skin<\/AssemblyName>/);
@@ -26,6 +27,13 @@ test("Windows release publishes only the graphical Setup installer", async () =>
   assert.match(ci, /dilraba-star.*enfp-pop.*jackson-sage.*kun-stage/);
   assert.match(project, /<ApplicationIcon>.*Codex-Skin\.ico<\/ApplicationIcon>/);
   assert.match(installer, /SetupIconFile=.*Codex-Skin\.ico/);
+  assert.equal(icon.readUInt16LE(0), 0);
+  assert.equal(icon.readUInt16LE(2), 1);
+  const iconSizes = Array.from({ length: icon.readUInt16LE(4) }, (_, index) => {
+    const width = icon[6 + index * 16];
+    return width === 0 ? 256 : width;
+  });
+  assert.deepEqual(iconSizes, [16, 24, 32, 48, 64, 128, 256]);
   assert.match(installer, /MessagesFile: "\{#SourcePath\}\\languages\\ChineseSimplified\.isl"/);
   assert.match(installer, /Parameters: "protocol register"/);
   assert.match(program, /using var instance = WindowsSingleInstance\.Create\(\)/);
