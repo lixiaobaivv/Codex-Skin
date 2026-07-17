@@ -1,24 +1,81 @@
-name: Publish official Codex-Skin themes
+name: Publish reviewed Codex-Skin themes
 
 on:
-  push:
-    tags:
-      - "official-themes-v*"
   workflow_dispatch:
     inputs:
-      release_tag:
-        description: Immutable theme release tag
+      theme_id:
+        description: Optional pending theme ID; blank publishes every pending theme
+        required: false
+        default: ""
+      store_ref:
+        description: Exact Codex-Skin-Store branch, tag, or commit
         required: true
-        default: official-themes-v2
+        default: main
 
 permissions:
   contents: write
 
+concurrency:
+  group: official-theme-publisher
+  cancel-in-progress: false
+
 jobs:
-  publish:
+  discover:
     runs-on: ubuntu-latest
+    outputs:
+      pending: ${{ steps.pending.outputs.themes }}
+      count: ${{ steps.pending.outputs.count }}
+      store_commit: ${{ steps.pending.outputs.store_commit }}
     steps:
       - uses: actions/checkout@v7
+
+      - name: Check out the Store source of truth
+        uses: actions/checkout@v7
+        with:
+          repository: lixiaobaivv/Codex-Skin-Store
+          ref: ${{ inputs.store_ref }}
+          path: store-source
+          persist-credentials: false
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: store-source/package-lock.json
+
+      - run: npm ci
+        working-directory: store-source
+
+      - name: Validate Store catalogs and discover pending themes
+        id: pending
+        env:
+          REQUESTED_THEME: ${{ inputs.theme_id }}
+        run: |
+          npm --prefix store-source run catalog:check
+          themes="$(node tools/dreamskin/find-pending-official-themes.mjs store-source "$REQUESTED_THEME")"
+          echo "themes=$themes" >> "$GITHUB_OUTPUT"
+          echo "count=$(node -e 'console.log(JSON.parse(process.argv[1]).length)' "$themes")" >> "$GITHUB_OUTPUT"
+          echo "store_commit=$(git -C store-source rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+
+  publish:
+    if: needs.discover.outputs.count != '0'
+    needs: discover
+    runs-on: ubuntu-latest
+    environment: theme-publishing
+    strategy:
+      fail-fast: false
+      matrix:
+        theme_id: ${{ fromJSON(needs.discover.outputs.pending) }}
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Check out the reviewed Store commit
+        uses: actions/checkout@v7
+        with:
+          repository: lixiaobaivv/Codex-Skin-Store
+          ref: ${{ needs.discover.outputs.store_commit }}
+          path: store-source
+          persist-credentials: false
 
       - uses: actions/setup-node@v7
         with:
@@ -28,41 +85,51 @@ jobs:
         with:
           dotnet-version: 8.0.x
 
-      - name: Build official signed themes
+      - name: Resolve immutable release metadata
+        id: metadata
+        env:
+          THEME_ID: ${{ matrix.theme_id }}
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          version="$(node -p 'require(`./store-source/catalog/themes/${process.env.THEME_ID}.json`).version')"
+          release_tag="theme-${THEME_ID}-v${version}"
+          if gh release view "$release_tag" >/dev/null 2>&1; then
+            echo "Release $release_tag already exists and is immutable." >&2
+            exit 1
+          fi
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          echo "release_tag=$release_tag" >> "$GITHUB_OUTPUT"
+          echo "package_name=Codex-Skin-theme-${THEME_ID}-${version}.dreamskin" >> "$GITHUB_OUTPUT"
+
+      - name: Build official signed package
         env:
           CODEX_SKIN_THEME_SIGNING_SEED: ${{ secrets.CODEX_SKIN_THEME_SIGNING_SEED }}
-          CODEX_SKIN_THEME_RELEASE_TAG: ${{ github.event_name == 'workflow_dispatch' && inputs.release_tag || github.ref_name }}
-          CODEX_SKIN_THEME_OUTPUT: artifacts/official-themes
+          CODEX_SKIN_THEME_SOURCE: store-source
+          CODEX_SKIN_THEME_IDS: ${{ matrix.theme_id }}
+          CODEX_SKIN_THEME_RELEASE_TAG: ${{ steps.metadata.outputs.release_tag }}
+          CODEX_SKIN_THEME_OUTPUT: artifacts/official-theme
         run: node tools/dreamskin/build-official-themes.mjs
 
-      - name: Verify every package on both platforms
+      - name: Verify package on both platforms
+        env:
+          PACKAGE_NAME: ${{ steps.metadata.outputs.package_name }}
         run: |
-          for package in artifacts/official-themes/*.dreamskin; do
-            name="$(basename "$package" .dreamskin)"
-            dotnet run --project src/CodexThemeStore.Cli --configuration Release -- theme-import "$package" macos "$RUNNER_TEMP/themes-macos-$name"
-            dotnet run --project src/CodexThemeStore.Cli --configuration Release -- theme-import "$package" windows "$RUNNER_TEMP/themes-windows-$name"
-          done
-
-      - name: Generate checksums
-        working-directory: artifacts/official-themes
-        run: sha256sum Codex-Skin-theme-*.dreamskin > Codex-Skin-official-themes-SHA256SUMS.txt
+          package="artifacts/official-theme/$PACKAGE_NAME"
+          dotnet run --project src/CodexThemeStore.Cli --configuration Release -- theme-import "$package" macos "$RUNNER_TEMP/theme-macos"
+          dotnet run --project src/CodexThemeStore.Cli --configuration Release -- theme-import "$package" windows "$RUNNER_TEMP/theme-windows"
 
       - name: Publish immutable release
         env:
           GH_TOKEN: ${{ github.token }}
-          RELEASE_TAG: ${{ github.event_name == 'workflow_dispatch' && inputs.release_tag || github.ref_name }}
+          RELEASE_TAG: ${{ steps.metadata.outputs.release_tag }}
+          PACKAGE_NAME: ${{ steps.metadata.outputs.package_name }}
+          THEME_ID: ${{ matrix.theme_id }}
+          THEME_VERSION: ${{ steps.metadata.outputs.version }}
+          STORE_COMMIT: ${{ needs.discover.outputs.store_commit }}
         run: |
-          if [[ ! "$RELEASE_TAG" =~ ^official-themes-v[0-9]+$ ]]; then
-            echo "Release tag must match official-themes-v<number>." >&2
-            exit 2
-          fi
-          if gh release view "$RELEASE_TAG" >/dev/null 2>&1; then
-            echo "Release $RELEASE_TAG already exists and is immutable." >&2
-            exit 1
-          fi
-          release_version="${RELEASE_TAG#official-themes-}"
-          package_count="$(find artifacts/official-themes -maxdepth 1 -name 'Codex-Skin-theme-*.dreamskin' -type f | wc -l)"
-          gh release create "$RELEASE_TAG" artifacts/official-themes/Codex-Skin-theme-*.dreamskin artifacts/official-themes/Codex-Skin-official-themes-SHA256SUMS.txt \
+          package="artifacts/official-theme/$PACKAGE_NAME"
+          sha256sum "$package" > "artifacts/official-theme/${PACKAGE_NAME}.sha256"
+          gh release create "$RELEASE_TAG" "$package" "artifacts/official-theme/${PACKAGE_NAME}.sha256" \
             --target "$GITHUB_SHA" \
-            --title "Codex-Skin Official Themes $release_version" \
-            --notes "$package_count reviewed Codex-Skin themes for Windows and macOS. Packages are signed with the official Ed25519 publisher key and verified by CI."
+            --title "Codex-Skin Theme: $THEME_ID v$THEME_VERSION" \
+            --notes "Signed from Codex-Skin-Store commit $STORE_COMMIT. Verified on Windows and macOS before publication."

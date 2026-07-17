@@ -24,7 +24,7 @@ test("Windows release publishes only the graphical Setup installer", async () =>
   assert.doesNotMatch(project, /KeepThemeAssetsExternal|themes\\\*\.json|previews\\\*\.png/);
   assert.match(ci, /unexpectedly contains bundled themes/);
   assert.match(ci, /did not load the required official themes/);
-  assert.match(ci, /dilraba-star.*enfp-pop.*jackson-sage.*kun-stage/);
+  assert.match(ci, /Codex-Skin-Store\/main\/theme-repository\.json/);
   assert.match(project, /<ApplicationIcon>.*Codex-Skin\.ico<\/ApplicationIcon>/);
   assert.match(installer, /SetupIconFile=.*Codex-Skin\.ico/);
   assert.equal(icon.readUInt16LE(0), 0);
@@ -43,6 +43,23 @@ test("Windows release publishes only the graphical Setup installer", async () =>
   assert.match(chineseMessages, /Inno Setup version 6\.5\.0\+/);
   assert.doesNotMatch(readme, /Windows (?:x64 )?便携版|Windows portable|Codex-Skin-win-x64\.(?:exe|zip)/);
   assert.doesNotMatch(`${readme}\n${program}\n${ci}\n${build}\n${installer}`, /Codex主题商店\.exe|CodexThemeStore-(?:Setup|osx)|CodexSkin-theme/);
+});
+
+test("official theme publishing reads the Store source of truth", async () => {
+  const [workflow, builder, discovery] = await Promise.all([
+    readFile(new URL("../.github/workflows/release-official-themes.yml", import.meta.url), "utf8"),
+    readFile(new URL("../tools/dreamskin/build-official-themes.mjs", import.meta.url), "utf8"),
+    readFile(new URL("../tools/dreamskin/find-pending-official-themes.mjs", import.meta.url), "utf8"),
+  ]);
+
+  assert.match(workflow, /repository: lixiaobaivv\/Codex-Skin-Store/);
+  assert.match(workflow, /environment: theme-publishing/);
+  assert.match(workflow, /store_commit/);
+  assert.match(workflow, /theme-\$\{THEME_ID\}-v\$\{version\}/);
+  assert.match(builder, /CODEX_SKIN_THEME_SOURCE/);
+  assert.match(builder, /theme-repository\.json/);
+  assert.doesNotMatch(builder, /const ids = \["dilraba-star"/);
+  assert.match(discovery, /catalog\.package === null/);
 });
 
 test("macOS package registers Codex-Skin URL and document activation", async () => {

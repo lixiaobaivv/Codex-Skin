@@ -1,6 +1,6 @@
 # Codex Skin 主题制作与发布规范 v1
 
-本文定义主题从制作、验证、预览、发布到升级的统一流程。关键字“必须”表示发布阻断要求，“建议”表示质量要求。机器可读约束以 `schemas/theme-v1.schema.json` 和 `schemas/theme-repository-v1.schema.json` 为准。
+本文定义主题从制作、验证、预览、发布到升级的统一流程。官方主题源文件只保存在 [Codex-Skin-Store](https://github.com/lixiaobaivv/Codex-Skin-Store)，本客户端仓库只提供校验器、签名器和协议实现，不再复制正式主题资源。关键字“必须”表示发布阻断要求，“建议”表示质量要求。机器可读约束以 `schemas/theme-v1.schema.json` 和 `schemas/theme-repository-v1.schema.json` 为准。
 
 ## 1. 仓库结构
 
@@ -71,7 +71,7 @@ dotnet run --project src/CodexThemeStore.Cli -- theme-validate .
 
 ## 5. 发布流程
 
-发布前执行：
+在 Codex-Skin-Store 工作副本中，发布前执行：
 
 ```bash
 dotnet run --project src/CodexThemeStore.Cli -- theme-index .
@@ -81,12 +81,14 @@ dotnet run --project src/CodexThemeStore.Cli -- theme-pack . artifacts/theme-cat
 
 `theme-index` 会扫描全部主题、校验资源并按 ID 生成索引。`theme-validate` 会拒绝漏索引、重复 ID、错误目录、缺失资源、未知字段和超限文件。`theme-pack` 只打包客户端允许的文件，并输出 SHA-256。
 
-正式主题仓库建议使用：
+正式主题仓库使用：
 
 - `main`：客户端读取的稳定目录；每次提交都必须通过 CI。
 - Pull Request：新主题和更新先在 PR 中审核，不直接写入 `main`。
 - Git tag：仓库快照可使用 `themes-v1-YYYYMMDD`；单主题版本仍以清单 `version` 为准。
 - 回滚：撤销有问题的清单版本或从索引暂时移除；不得让旧 ID 指向另一个主题。
+
+审核合并后不再人工构建或填写包元数据。维护者手动运行 Codex-Skin 的 **Publish reviewed Codex-Skin themes**，这次操作就是发布批准；工作流发现 `package: null` 主题后，按 Store 提交 SHA 签名并进行双平台验签。Store 随后自动下载复验、回填目录和部署网页。仓库管理员还可为 `theme-publishing` Environment 配置 Required reviewers，增加第二层审批。
 
 ## 6. 验收清单
 

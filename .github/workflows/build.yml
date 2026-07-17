@@ -28,14 +28,6 @@ jobs:
           name: theme-store-ui-render
           path: artifacts/theme-store-ui*.png
           if-no-files-found: error
-      - name: Validate theme schemas
-        run: |
-          npx --yes ajv-cli@5 validate --spec=draft2020 -s schemas/theme-v1.schema.json -d 'themes/*.json'
-          npx --yes ajv-cli@5 validate --spec=draft2020 --strict=false -s schemas/theme-repository-v1.schema.json -d theme-repository.json
-      - name: Validate theme catalog
-        run: |
-          dotnet run --project src/CodexThemeStore.Cli/CodexThemeStore.Cli.csproj --configuration Release -- theme-validate .
-
   windows-installer:
     needs: test
     runs-on: windows-latest

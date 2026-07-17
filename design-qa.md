@@ -5,8 +5,8 @@
 - 项目：WinForms / .NET 8 Codex 主题商店，使用本机回环 `127.0.0.1:9229` CDP 动态注入前端。
 - 验收日期：2026-07-16（Asia/Shanghai）。
 - QA 页面：`qa/codex-fixture.html`，独立 Edge headless 配置，不连接或关闭承载任务的真实 Codex。
-- 参考图：`previews/kun-stage.png`、`previews/jackson-sage.png`、`previews/enfp-pop.png`、`previews/dilraba-star.png`。
-- 实现入口：`src/CodexThemeStore/Program.cs`；主题数据：`themes/*.json`。
+- 参考图和主题数据现由 [Codex-Skin-Store](https://github.com/lixiaobaivv/Codex-Skin-Store) 统一维护；本文件中的 `previews/`、`backgrounds/` 和 `logos/` 路径均相对于该仓库。
+- 实现入口：`src/CodexThemeStore/Program.cs`；客户端仓库不再复制正式主题资源。
 
 ## 四主题全屏证据
 

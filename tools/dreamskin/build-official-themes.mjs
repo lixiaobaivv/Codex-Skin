@@ -1,12 +1,19 @@
 import { createHash, createPrivateKey, sign } from "node:crypto";
 import { mkdir, readFile, writeFile } from "node:fs/promises";
-import { dirname, extname, join, resolve } from "node:path";
+import { dirname, extname, join, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "..", "..");
+const sourceDirValue = process.env.CODEX_SKIN_THEME_SOURCE?.trim();
+if (!sourceDirValue) {
+  throw new Error("CODEX_SKIN_THEME_SOURCE must point to an exact Codex-Skin-Store checkout.");
+}
+const sourceDir = resolve(sourceDirValue);
 const outputDir = resolve(process.env.CODEX_SKIN_THEME_OUTPUT ?? join(root, "artifacts", "official-themes"));
-const releaseTag = process.env.CODEX_SKIN_THEME_RELEASE_TAG ?? "official-themes-v2";
-const signedAt = process.env.CODEX_SKIN_THEME_SIGNED_AT ?? "2026-07-17T06:00:00.000Z";
+const releaseTag = process.env.CODEX_SKIN_THEME_RELEASE_TAG?.trim();
+if (!releaseTag || !/^[A-Za-z0-9][A-Za-z0-9._+-]{0,127}$/.test(releaseTag)) {
+  throw new Error("CODEX_SKIN_THEME_RELEASE_TAG must be an immutable GitHub Release tag.");
+}
 const seedHex = process.env.CODEX_SKIN_THEME_SIGNING_SEED?.trim();
 if (!seedHex || !/^[a-f0-9]{64}$/.test(seedHex)) {
   throw new Error("CODEX_SKIN_THEME_SIGNING_SEED must be a 32-byte lowercase hex Ed25519 seed.");
@@ -18,14 +25,31 @@ const privateKey = createPrivateKey({
   type: "pkcs8",
 });
 
-const ids = ["dilraba-star", "enfp-pop", "jackson-sage", "kun-stage", "zhu-xudan-racing"];
+const requestedIds = (process.env.CODEX_SKIN_THEME_IDS ?? "")
+  .split(",")
+  .map(value => value.trim())
+  .filter(Boolean);
+if (requestedIds.length === 0 || requestedIds.some(id => !/^[a-z0-9]+(?:-[a-z0-9]+)+$/.test(id))) {
+  throw new Error("CODEX_SKIN_THEME_IDS must contain one or more comma-separated theme IDs.");
+}
+const repository = JSON.parse(await readFile(join(sourceDir, "theme-repository.json"), "utf8"));
+const indexedIds = new Set(repository.themes?.map(entry => entry.id));
+const ids = [...new Set(requestedIds)];
 const entries = [];
 await mkdir(outputDir, { recursive: true });
 
 for (const id of ids) {
-  const definition = JSON.parse(await readFile(join(root, "themes", `${id}.json`), "utf8"));
-  const backgroundPath = resolve(join(root, "themes", definition.theme.backgroundImage));
-  const previewPath = resolve(join(root, "themes", definition.previewImage));
+  if (!indexedIds.has(id)) throw new Error(`${id} is not listed in the Store theme repository.`);
+  const definition = JSON.parse(await readFile(join(sourceDir, "themes", `${id}.json`), "utf8"));
+  const catalog = JSON.parse(await readFile(join(sourceDir, "catalog", "themes", `${id}.json`), "utf8"));
+  if (definition.codeThemeId !== id || catalog.slug !== id || catalog.version !== definition.version) {
+    throw new Error(`${id} source and storefront metadata do not agree.`);
+  }
+  if (catalog.package !== null) throw new Error(`${id}@${catalog.version} is already published.`);
+  const signedAt = process.env.CODEX_SKIN_THEME_SIGNED_AT?.trim() || catalog.publishedAt;
+  if (!Number.isFinite(Date.parse(signedAt))) throw new Error(`${id} has an invalid signing timestamp.`);
+  const backgroundPath = resolveThemeAsset(definition.theme.backgroundImage, "backgrounds");
+  const previewPath = resolveThemeAsset(definition.previewImage, "previews");
   const background = await readFile(backgroundPath);
   const preview = await readFile(previewPath);
   const backgroundName = `background${extname(backgroundPath).toLowerCase()}`;
@@ -108,6 +132,15 @@ for (const id of ids) {
 
 await writeFile(join(outputDir, "catalog-entries.json"), `${JSON.stringify(entries, null, 2)}\n`);
 console.log(`Built ${entries.length} official theme packages in ${outputDir}.`);
+
+function resolveThemeAsset(relativePath, directory) {
+  const absolute = resolve(join(sourceDir, "themes", relativePath));
+  const allowedRoot = resolve(sourceDir, directory);
+  if (absolute !== allowedRoot && !absolute.startsWith(`${allowedRoot}${sep}`)) {
+    throw new Error(`Theme asset escapes ${directory}: ${relativePath}`);
+  }
+  return absolute;
+}
 
 function asset(path, mediaType, bytes, dimensions) {
   return { path, mediaType, bytes: bytes.length, ...dimensions, sha256: sha256(bytes) };

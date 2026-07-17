@@ -52,8 +52,10 @@ jobs:
           $refresh = Invoke-CodexSkinClient $client @('refresh', 'github') $isolated
           if ($refresh.ExitCode -ne 0) { throw ($refresh.Error -join "`n") }
           $themes = Invoke-CodexSkinClient $client @('list') $isolated
-          if ($themes.ExitCode -ne 0 -or $themes.Output.Count -lt 4) { throw "Standalone client did not load the required official themes." }
-          @('dilraba-star', 'enfp-pop', 'jackson-sage', 'kun-stage') | ForEach-Object {
+          $catalog = Invoke-RestMethod 'https://raw.githubusercontent.com/lixiaobaivv/Codex-Skin-Store/main/theme-repository.json'
+          $requiredThemes = @($catalog.themes.id)
+          if ($themes.ExitCode -ne 0 -or $themes.Output.Count -lt $requiredThemes.Count) { throw "Standalone client did not load the required official themes." }
+          $requiredThemes | ForEach-Object {
             if (-not ($themes.Output -match "^$_`t")) { throw "Standalone client is missing required theme: $_" }
           }
 
