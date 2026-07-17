@@ -1,0 +1,84 @@
+{
+  "$schema": "../schemas/theme-v1.schema.json",
+  "schemaVersion": 1,
+  "version": "1.0.0",
+  "displayName": "Zhu Xudan Racing",
+  "codeThemeId": "zhu-xudan-racing",
+  "category": "人物",
+  "description": "赛车红黑与卡丁车疾速氛围",
+  "author": "Codex Skin",
+  "variant": "dark",
+  "previewImage": "../previews/zhu-xudan-racing.png",
+  "theme": {
+    "accent": "#e53935",
+    "contrast": 72,
+    "fonts": {
+      "code": "JetBrainsMono NFM",
+      "ui": "\"Microsoft YaHei UI\", \"PingFang SC\", \"Noto Sans SC\", \"Segoe UI\", sans-serif",
+      "display": "\"Microsoft YaHei UI\", \"PingFang SC\", \"Noto Sans SC\", \"Segoe UI\", sans-serif"
+    },
+    "ink": "#f7f4ef",
+    "opaqueWindows": false,
+    "semanticColors": {
+      "diffAdded": "#35c98b",
+      "diffRemoved": "#ff5f59",
+      "skill": "#ffb020"
+    },
+    "surface": "#17191e",
+    "backgroundImage": "../backgrounds/zhu-xudan-racing-hero-v1.png",
+    "logoImage": "../logos/zhu-xudan-racing-logo-v1.png",
+    "backgroundImageOpacity": 1,
+    "backgroundImageBlur": 0
+  },
+  "home": {
+    "brand": "Zhu Xudan Racing",
+    "eyebrow": "祝绪丹竞速主题",
+    "badge": "RACING MODE",
+    "title": "今天从哪条赛道出发？",
+    "subtitle": "与祝绪丹一起，把灵感跑成现实",
+    "tags": ["极速灵感", "专注冲刺", "红线时刻", "赛道模式"],
+    "sidebarLabels": {
+      "newTask": "新建赛程",
+      "scheduled": "已安排",
+      "plugins": "插件",
+      "settings": "设置"
+    },
+    "composerHint": "输入目标，点火出发…",
+    "footerNote": "Full Speed · Zhu Xudan",
+    "quickActions": [
+      {
+        "icon": "</>",
+        "title": "探索并理解代码",
+        "description": "快速梳理结构与关键模块",
+        "prompt": "请帮我探索并理解当前代码库，先概览结构、关键模块和主要流程。"
+      },
+      {
+        "icon": "+",
+        "title": "构建新功能",
+        "description": "把灵感加速成可靠实现",
+        "prompt": "请根据当前项目构建一个新功能，先确认需求并给出可运行的实现。"
+      },
+      {
+        "icon": "✓",
+        "title": "审查代码",
+        "description": "定位风险并改善代码质量",
+        "prompt": "请审查当前代码，优先查找缺陷、回归风险和缺失测试，并提出修改建议。"
+      },
+      {
+        "icon": "!",
+        "title": "修复问题",
+        "description": "找到根因并完成修复验证",
+        "prompt": "请诊断当前问题或失败，找到根因、完成修复并验证结果。"
+      }
+    ]
+  },
+  "copy": {
+    "title": "Codex 祝绪丹竞速",
+    "replacePlaceholders": {
+      "Ask Codex": "Start your engine...",
+      "Ask Codex anything": "输入目标，点火出发…",
+      "向 Codex 询问任何问题": "输入目标，点火出发…",
+      "给 Codex 发送消息": "输入目标，点火出发…"
+    }
+  }
+}

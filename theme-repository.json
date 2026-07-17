@@ -2,7 +2,7 @@
   "$schema": "./schemas/theme-repository-v1.schema.json",
   "schemaVersion": 1,
   "name": "Codex Skin Official Themes",
-  "updatedAt": "2026-07-16T19:36:23Z",
+  "updatedAt": "2026-07-17T08:11:01Z",
   "themes": [
     {
       "id": "dilraba-star",
@@ -19,6 +19,10 @@
     {
       "id": "kun-stage",
       "manifest": "themes/kun-stage.json"
+    },
+    {
+      "id": "zhu-xudan-racing",
+      "manifest": "themes/zhu-xudan-racing.json"
     }
   ]
 }

@@ -18,7 +18,7 @@ const privateKey = createPrivateKey({
   type: "pkcs8",
 });
 
-const ids = ["dilraba-star", "enfp-pop", "jackson-sage", "kun-stage"];
+const ids = ["dilraba-star", "enfp-pop", "jackson-sage", "kun-stage", "zhu-xudan-racing"];
 const entries = [];
 await mkdir(outputDir, { recursive: true });
 
