@@ -30,7 +30,7 @@ jobs:
           node tools/dreamskin/build-sample.mjs
           $after = (Get-FileHash samples/dreamskin/codex-skin-sample-1.0.0.dreamskin -Algorithm SHA256).Hash
           if ($before -ne $after) { throw "Signed fixture is not deterministic." }
-      - run: node --test tests
+      - run: node --test tests/dreamskin-catalog-fixtures.test.mjs tests/dreamskin-fixture.test.mjs tests/release-contract.test.mjs
       - run: npm run build
       - run: cargo fmt --manifest-path src-tauri/Cargo.toml -- --check
       - run: cargo clippy --manifest-path src-tauri/Cargo.toml --all-targets --locked -- -D warnings
