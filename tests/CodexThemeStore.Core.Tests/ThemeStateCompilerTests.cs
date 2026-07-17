@@ -66,6 +66,9 @@ public sealed class ThemeStateCompilerTests : IDisposable
         Assert.Contains("aria-label*=\"bottom panel\" i", payload.Css);
         Assert.Contains("display: inline-flex !important", payload.Css);
         Assert.Contains("transform: translateY(-36px)", payload.Css);
+        Assert.Contains("__codexSkinCustomerNumber", payload.JavaScript);
+        Assert.Contains("crypto.getRandomValues", payload.JavaScript);
+        Assert.Contains("NO. ${saved}", payload.JavaScript);
         Assert.DoesNotContain("repeat(auto-fit", payload.Css);
         Assert.Contains("backdrop-filter: none !important", payload.Css);
         Assert.Contains("function mutationNeedsApply", payload.JavaScript);

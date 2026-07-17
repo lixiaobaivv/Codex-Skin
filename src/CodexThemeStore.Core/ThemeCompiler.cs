@@ -1361,6 +1361,20 @@ public static class JsBuilder
   const themeId = config.themeId || "theme";
   const logoUrl = config.logoUrl || "";
   const petUrl = config.petUrl || "";
+  const customerNumber = (() => {
+    const storageKey = "__codexSkinCustomerNumber";
+    try {
+      const saved = localStorage.getItem(storageKey);
+      if (/^[0-9]{8}$/.test(saved || "")) return `NO. ${saved}`;
+      const values = new Uint32Array(1);
+      crypto.getRandomValues(values);
+      const generated = String(values[0] % 100000000).padStart(8, "0");
+      localStorage.setItem(storageKey, generated);
+      return `NO. ${generated}`;
+    } catch {
+      return `NO. ${String(Math.floor(Math.random() * 100000000)).padStart(8, "0")}`;
+    }
+  })();
   const originals = prior?.originals || { text: new WeakMap(), attributes: new WeakMap() };
   const sidebarChanges = [];
   document.documentElement.dataset.codexThemeId = themeId;
@@ -1617,7 +1631,7 @@ public static class JsBuilder
     );
     masthead.append(
       mastheadCopy,
-      element("div", "codex-theme-masthead-badge", homeConfig.badge || homeConfig.brand || themeId)
+      element("div", "codex-theme-masthead-badge", homeConfig.badge ? customerNumber : homeConfig.brand || themeId)
     );
     if (logoUrl) {
       const logo = element("img", "codex-theme-masthead-logo");
