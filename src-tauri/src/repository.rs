@@ -1,22 +1,62 @@
 use crate::{
-    catalog,
     error::{AppError, Result},
     models::{RepositorySettings, SOURCES, SyncResult},
     paths,
 };
+use atomicwrites::{AllowOverwrite, AtomicFile};
 use futures_util::StreamExt;
+use serde::{Deserialize, Serialize};
 use serde_json::Value;
+use sha2::{Digest, Sha256};
 use std::{
     collections::HashSet,
-    fs::{self, File},
+    fs,
     io::Write,
-    path::Path,
+    path::{Path, PathBuf},
 };
-use tempfile::TempDir;
 
-const MAX_ARCHIVE: u64 = 200 * 1024 * 1024;
 const MAX_FILE: u64 = 20 * 1024 * 1024;
-const MAX_FILES: usize = 2000;
+const MAX_FEED: u64 = 5 * 1024 * 1024;
+const UPSTREAM_ROOT: &str = "https://raw.githubusercontent.com/lixiaobaivv/Codex-Skin-Store/main/";
+const FEED_NAME: &str = "desktop-catalog-v2.json";
+
+#[derive(Clone, Debug, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub(crate) struct RemoteResource {
+    pub path: String,
+    pub sha256: String,
+    pub size: u64,
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub(crate) struct RemoteTheme {
+    pub id: String,
+    pub version: String,
+    pub name: String,
+    pub description: String,
+    pub category: String,
+    pub variant: String,
+    pub manifest: RemoteResource,
+    pub preview: RemoteResource,
+    pub assets: Vec<RemoteResource>,
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub(crate) struct RemoteCatalog {
+    pub schema_version: u64,
+    pub name: String,
+    pub revision: String,
+    pub themes: Vec<RemoteTheme>,
+}
+
+#[derive(Default, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+struct SyncState {
+    source_id: String,
+    etag: Option<String>,
+}
 
 pub fn load_settings() -> RepositorySettings {
     paths::settings_path()
@@ -37,17 +77,16 @@ pub async fn sync(preferred: &str) -> Result<SyncResult> {
             candidates.push(source);
         }
     }
-    let upstream = "https://github.com/lixiaobaivv/Codex-Skin-Store/archive/refs/heads/main.zip";
     let mut last_error = None;
     for source in candidates {
-        match sync_from(&format!("{}{upstream}", source.prefix)).await {
-            Ok(count) => {
+        match sync_feed(source.id, source.prefix).await {
+            Ok(catalog) => {
                 let settings = serde_json::json!({"sourceId": source.id});
                 let settings_path = paths::settings_path()?;
                 fs::create_dir_all(settings_path.parent().unwrap())?;
-                fs::write(settings_path, serde_json::to_vec_pretty(&settings)?)?;
+                write_atomic(&settings_path, &serde_json::to_vec_pretty(&settings)?)?;
                 return Ok(SyncResult {
-                    theme_count: count,
+                    theme_count: catalog.themes.len(),
                     source_id: source.id.into(),
                     source_name: source.name.into(),
                 });
@@ -61,45 +100,279 @@ pub async fn sync(preferred: &str) -> Result<SyncResult> {
     )))
 }
 
-async fn sync_from(url: &str) -> Result<usize> {
-    let temporary = TempDir::new()?;
-    let archive_path = temporary.path().join("catalog.zip");
-    let response = reqwest::Client::builder()
+async fn sync_feed(source_id: &str, prefix: &str) -> Result<RemoteCatalog> {
+    let cached = load_remote_catalog()?;
+    let state = load_sync_state();
+    let client = reqwest::Client::builder()
         .timeout(std::time::Duration::from_secs(45))
-        .build()?
-        .get(url)
-        .header("User-Agent", "Codex-Skin/2")
-        .send()
-        .await?
-        .error_for_status()?;
+        .build()?;
+    let mut request = client
+        .get(format!("{prefix}{UPSTREAM_ROOT}{FEED_NAME}"))
+        .header("User-Agent", "Codex-Skin/2");
+    if state.source_id == source_id
+        && let Some(etag) = state.etag.as_deref()
+    {
+        request = request.header(reqwest::header::IF_NONE_MATCH, etag);
+    }
+    let response = request.send().await?;
+    if response.status() == reqwest::StatusCode::NOT_MODIFIED {
+        return cached
+            .ok_or_else(|| AppError::Message("服务器返回未修改，但本地没有目录缓存。".into()));
+    }
+    let response = response.error_for_status()?;
     if response
         .content_length()
-        .is_some_and(|value| value > MAX_ARCHIVE)
+        .is_some_and(|value| value > MAX_FEED)
     {
-        return Err(AppError::Message("主题仓库归档超过 200 MB 限制。".into()));
+        return Err(AppError::Message("远程主题目录超过 5 MB 限制。".into()));
     }
-    let mut file = File::create(&archive_path)?;
-    let mut total = 0u64;
+    let etag = response
+        .headers()
+        .get(reqwest::header::ETAG)
+        .and_then(|value| value.to_str().ok())
+        .map(str::to_owned);
+    let bytes = download_response(response, MAX_FEED).await?;
+    let catalog: RemoteCatalog = serde_json::from_slice(&bytes)?;
+    validate_remote_catalog(&catalog)?;
+    let path = paths::remote_catalog_path()?;
+    fs::create_dir_all(path.parent().unwrap())?;
+    write_atomic(&path, &bytes)?;
+    let state = SyncState {
+        source_id: source_id.into(),
+        etag,
+    };
+    write_atomic(
+        &paths::catalog_sync_state_path()?,
+        &serde_json::to_vec_pretty(&state)?,
+    )?;
+    Ok(catalog)
+}
+
+pub(crate) fn load_remote_catalog() -> Result<Option<RemoteCatalog>> {
+    let path = paths::remote_catalog_path()?;
+    if !path.exists() {
+        return Ok(None);
+    }
+    let catalog: RemoteCatalog = serde_json::from_slice(&fs::read(path)?)?;
+    validate_remote_catalog(&catalog)?;
+    Ok(Some(catalog))
+}
+
+fn load_sync_state() -> SyncState {
+    paths::catalog_sync_state_path()
+        .ok()
+        .and_then(|path| fs::read(path).ok())
+        .and_then(|bytes| serde_json::from_slice(&bytes).ok())
+        .unwrap_or_default()
+}
+
+fn validate_remote_catalog(catalog: &RemoteCatalog) -> Result<()> {
+    if catalog.schema_version != 2
+        || catalog.name.is_empty()
+        || catalog.name.len() > 80
+        || chrono::DateTime::parse_from_rfc3339(&catalog.revision).is_err()
+        || catalog.themes.is_empty()
+        || catalog.themes.len() > 500
+    {
+        return Err(AppError::Message("远程主题目录元数据无效。".into()));
+    }
+    let mut ids = HashSet::new();
+    for theme in &catalog.themes {
+        if !valid_catalog_id(&theme.id)
+            || !ids.insert(theme.id.as_str())
+            || semver::Version::parse(&theme.version).is_err()
+            || theme.name.is_empty()
+            || theme.name.len() > 80
+            || theme.description.len() > 300
+            || !["人物", "动漫", "游戏", "风景", "极简", "节日", "其他"]
+                .contains(&theme.category.as_str())
+            || !["light", "dark"].contains(&theme.variant.as_str())
+        {
+            return Err(AppError::Message(format!("远程主题条目无效：{}", theme.id)));
+        }
+        validate_remote_resource(&theme.manifest)?;
+        validate_remote_resource(&theme.preview)?;
+        if theme.manifest.path != format!("themes/{}.json", theme.id)
+            || !theme.preview.path.starts_with("previews/")
+            || theme.assets.is_empty()
+            || theme.assets.len() > 4
+        {
+            return Err(AppError::Message(format!(
+                "远程主题资源索引无效：{}",
+                theme.id
+            )));
+        }
+        let mut assets = HashSet::new();
+        for asset in &theme.assets {
+            validate_remote_resource(asset)?;
+            if !assets.insert(asset.path.as_str()) || asset.path.starts_with("themes/") {
+                return Err(AppError::Message(format!(
+                    "远程主题包含重复或无效资源：{}",
+                    theme.id
+                )));
+            }
+        }
+        if !theme.assets.iter().any(|asset| {
+            asset.path == theme.preview.path
+                && asset.sha256 == theme.preview.sha256
+                && asset.size == theme.preview.size
+        }) {
+            return Err(AppError::Message(format!(
+                "远程主题缺少匹配的预览资源：{}",
+                theme.id
+            )));
+        }
+    }
+    Ok(())
+}
+
+fn validate_remote_resource(resource: &RemoteResource) -> Result<()> {
+    if !allowed(&resource.path)
+        || resource.size == 0
+        || resource.size > MAX_FILE
+        || resource.sha256.len() != 64
+        || !resource
+            .sha256
+            .chars()
+            .all(|value| value.is_ascii_hexdigit())
+    {
+        return Err(AppError::Message(format!(
+            "远程主题资源描述无效：{}",
+            resource.path
+        )));
+    }
+    Ok(())
+}
+
+pub(crate) async fn ensure_preview(theme_id: &str) -> Result<PathBuf> {
+    let catalog =
+        load_remote_catalog()?.ok_or_else(|| AppError::Message("尚未同步远程主题目录。".into()))?;
+    let theme = catalog
+        .themes
+        .iter()
+        .find(|theme| theme.id == theme_id)
+        .ok_or_else(|| AppError::Message(format!("远程主题不存在：{theme_id}")))?;
+    download_resource(&theme.preview, &load_settings().source_id, true).await
+}
+
+pub(crate) async fn ensure_theme(theme_id: &str) -> Result<()> {
+    let Some(catalog) = load_remote_catalog()? else {
+        return Ok(());
+    };
+    let Some(theme) = catalog.themes.iter().find(|theme| theme.id == theme_id) else {
+        return Ok(());
+    };
+    let source_id = load_settings().source_id;
+    let manifest = download_resource(&theme.manifest, &source_id, false).await?;
+    for asset in &theme.assets {
+        download_resource(asset, &source_id, true).await?;
+    }
+    validate_theme(&manifest, &theme.id, &paths::cache_root()?)
+}
+
+async fn download_resource(
+    resource: &RemoteResource,
+    preferred: &str,
+    image_resource: bool,
+) -> Result<PathBuf> {
+    let destination = paths::cache_root()?.join(&resource.path);
+    if verify_cached(&destination, resource, image_resource)? {
+        return Ok(destination);
+    }
+    let mut candidates: Vec<_> = SOURCES
+        .iter()
+        .filter(|source| source.id == preferred)
+        .collect();
+    for source in &SOURCES {
+        if !candidates.iter().any(|item| item.id == source.id) {
+            candidates.push(source);
+        }
+    }
+    let client = reqwest::Client::builder()
+        .timeout(std::time::Duration::from_secs(45))
+        .build()?;
+    let mut last_error = None;
+    for source in candidates {
+        let result = async {
+            let response = client
+                .get(format!("{}{UPSTREAM_ROOT}{}", source.prefix, resource.path))
+                .header("User-Agent", "Codex-Skin/2")
+                .send()
+                .await?
+                .error_for_status()?;
+            if response
+                .content_length()
+                .is_some_and(|value| value != resource.size)
+            {
+                return Err(AppError::Message(format!(
+                    "主题资源大小不匹配：{}",
+                    resource.path
+                )));
+            }
+            let bytes = download_response(response, resource.size).await?;
+            if bytes.len() as u64 != resource.size
+                || hex::encode(Sha256::digest(&bytes)) != resource.sha256
+            {
+                return Err(AppError::Message(format!(
+                    "主题资源完整性校验失败：{}",
+                    resource.path
+                )));
+            }
+            if image_resource {
+                image::load_from_memory(&bytes).map_err(|error| {
+                    AppError::Message(format!("主题图片无法解码：{}：{error}", resource.path))
+                })?;
+            }
+            fs::create_dir_all(destination.parent().unwrap())?;
+            write_atomic(&destination, &bytes)?;
+            Ok(destination.clone())
+        }
+        .await;
+        match result {
+            Ok(path) => return Ok(path),
+            Err(error) => last_error = Some(error),
+        }
+    }
+    Err(AppError::Message(format!(
+        "所有线路均无法下载主题资源 {}：{}",
+        resource.path,
+        last_error
+            .map(|error| error.to_string())
+            .unwrap_or_default()
+    )))
+}
+
+fn verify_cached(path: &Path, resource: &RemoteResource, image_resource: bool) -> Result<bool> {
+    let Ok(bytes) = fs::read(path) else {
+        return Ok(false);
+    };
+    if bytes.len() as u64 != resource.size || hex::encode(Sha256::digest(&bytes)) != resource.sha256
+    {
+        return Ok(false);
+    }
+    if image_resource && image::load_from_memory(&bytes).is_err() {
+        return Ok(false);
+    }
+    Ok(true)
+}
+
+async fn download_response(response: reqwest::Response, limit: u64) -> Result<Vec<u8>> {
+    let mut bytes = Vec::new();
     let mut stream = response.bytes_stream();
     while let Some(chunk) = stream.next().await {
         let chunk = chunk?;
-        total += chunk.len() as u64;
-        if total > MAX_ARCHIVE {
-            return Err(AppError::Message("主题仓库归档超过 200 MB 限制。".into()));
+        if bytes.len() as u64 + chunk.len() as u64 > limit {
+            return Err(AppError::Message("远程资源超过声明的大小限制。".into()));
         }
-        file.write_all(&chunk)?;
+        bytes.extend_from_slice(&chunk);
     }
-    let extracted = temporary.path().join("extracted");
-    fs::create_dir(&extracted)?;
-    extract(&archive_path, &extracted)?;
-    validate_repository(&extracted)?;
-    let themes_dir = extracted.join("themes");
-    let count = fs::read_dir(&themes_dir)?
-        .filter_map(|item| item.ok())
-        .filter(|item| item.path().extension().is_some_and(|ext| ext == "json"))
-        .count();
-    replace_cache(&extracted)?;
-    Ok(count)
+    Ok(bytes)
+}
+
+fn write_atomic(path: &Path, bytes: &[u8]) -> Result<()> {
+    let file = AtomicFile::new(path, AllowOverwrite);
+    file.write(|handle| handle.write_all(bytes))
+        .map_err(|error| AppError::Message(format!("原子写入失败：{error}")))
 }
 
 pub(crate) fn allowed(relative: &str) -> bool {
@@ -124,56 +397,6 @@ pub(crate) fn allowed(relative: &str) -> bool {
         }
         _ => false,
     }
-}
-
-fn extract(archive_path: &Path, destination: &Path) -> Result<()> {
-    let mut archive = zip::ZipArchive::new(File::open(archive_path)?)?;
-    if archive.len() > MAX_FILES {
-        return Err(AppError::Message("主题仓库文件数超过限制。".into()));
-    }
-    let root_name = (0..archive.len())
-        .find_map(|index| {
-            let name = archive.by_index(index).ok()?.name().replace('\\', "/");
-            name.strip_suffix("theme-repository.json")
-                .map(str::to_owned)
-        })
-        .ok_or_else(|| AppError::Message("归档缺少 theme-repository.json。".into()))?;
-    let mut seen = HashSet::new();
-    let mut extracted_total = 0u64;
-    let mut extracted_count = 0usize;
-    for index in 0..archive.len() {
-        let mut entry = archive.by_index(index)?;
-        let name = entry.name().replace('\\', "/");
-        let Some(relative) = name.strip_prefix(&root_name) else {
-            continue;
-        };
-        if !allowed(relative) {
-            continue;
-        }
-        if entry.is_dir() || entry.size() > MAX_FILE {
-            continue;
-        }
-        extracted_count += 1;
-        extracted_total += entry.size();
-        if extracted_count > MAX_FILES || extracted_total > MAX_ARCHIVE {
-            return Err(AppError::Message("解压后的主题资源超过安全限制。".into()));
-        }
-        let safe = entry
-            .enclosed_name()
-            .ok_or_else(|| AppError::Message(format!("归档包含不安全路径：{relative}")))?;
-        let prefix_path = Path::new(&root_name);
-        let relative_path = safe
-            .strip_prefix(prefix_path)
-            .map_err(|_| AppError::Message("归档根目录无效。".into()))?;
-        let output = destination.join(relative_path);
-        if !seen.insert(output.clone()) {
-            return Err(AppError::Message(format!("归档包含重复路径：{relative}")));
-        }
-        fs::create_dir_all(output.parent().unwrap())?;
-        let mut target = File::create(output)?;
-        std::io::copy(&mut entry, &mut target)?;
-    }
-    Ok(())
 }
 
 pub(crate) fn validate_repository(root: &Path) -> Result<()> {
@@ -468,47 +691,49 @@ fn validate_asset_path(
     Ok(())
 }
 
-fn replace_cache(source: &Path) -> Result<()> {
-    let target = paths::cache_root()?;
-    let backup = target.with_extension("previous");
-    if backup.exists() {
-        fs::remove_dir_all(&backup)?;
-    }
-    if target.exists() {
-        fs::rename(&target, &backup)?;
-    }
-    if let Err(error) = copy_tree(source, &target) {
-        let _ = fs::remove_dir_all(&target);
-        if backup.exists() {
-            let _ = fs::rename(&backup, &target);
-        }
-        return Err(error);
-    }
-    if backup.exists() {
-        fs::remove_dir_all(backup)?;
-    }
-    let _ = catalog::load()?;
-    Ok(())
-}
-
-fn copy_tree(source: &Path, target: &Path) -> Result<()> {
-    fs::create_dir_all(target)?;
-    for entry in walkdir::WalkDir::new(source) {
-        let entry = entry.map_err(|e| AppError::Message(e.to_string()))?;
-        let relative = entry.path().strip_prefix(source).unwrap();
-        let output = target.join(relative);
-        if entry.file_type().is_dir() {
-            fs::create_dir_all(output)?;
-        } else {
-            fs::copy(entry.path(), output)?;
-        }
-    }
-    Ok(())
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    fn remote_catalog_fixture() -> RemoteCatalog {
+        let preview = RemoteResource {
+            path: "previews/example-theme.png".into(),
+            sha256: "a".repeat(64),
+            size: 42,
+        };
+        RemoteCatalog {
+            schema_version: 2,
+            name: "Test Catalog".into(),
+            revision: "2026-07-17T12:00:00Z".into(),
+            themes: vec![RemoteTheme {
+                id: "example-theme".into(),
+                version: "1.0.0".into(),
+                name: "Example".into(),
+                description: "Example theme".into(),
+                category: "极简".into(),
+                variant: "light".into(),
+                manifest: RemoteResource {
+                    path: "themes/example-theme.json".into(),
+                    sha256: "b".repeat(64),
+                    size: 128,
+                },
+                preview: preview.clone(),
+                assets: vec![preview],
+            }],
+        }
+    }
+
+    #[test]
+    fn validates_content_addressed_remote_catalog() {
+        let catalog = remote_catalog_fixture();
+        validate_remote_catalog(&catalog).unwrap();
+        let mut invalid = catalog.clone();
+        invalid.themes[0].preview.sha256 = "c".repeat(64);
+        assert!(validate_remote_catalog(&invalid).is_err());
+        let mut duplicate = catalog;
+        duplicate.themes.push(duplicate.themes[0].clone());
+        assert!(validate_remote_catalog(&duplicate).is_err());
+    }
 
     #[tokio::test]
     #[ignore = "requires the public Codex-Skin-Store repository"]
@@ -519,7 +744,19 @@ mod tests {
         }
         let result = sync("github").await.unwrap();
         assert!(result.theme_count >= 5);
-        assert_eq!(catalog::load().unwrap().len(), result.theme_count);
+        assert_eq!(crate::catalog::load().unwrap().len(), result.theme_count);
+        let first = load_remote_catalog().unwrap().unwrap().themes[0].id.clone();
+        let preview = ensure_preview(&first).await.unwrap();
+        assert!(preview.is_file());
+        ensure_theme(&first).await.unwrap();
+        assert_eq!(
+            crate::compiler::compile(&first).unwrap().theme_id,
+            Some(first)
+        );
+        assert_eq!(
+            sync("github").await.unwrap().theme_count,
+            result.theme_count
+        );
         unsafe {
             std::env::remove_var("CODEX_THEME_STORE_DATA_DIR");
         }

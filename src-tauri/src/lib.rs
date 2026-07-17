@@ -69,8 +69,12 @@ fn pending_activations(queue: tauri::State<'_, ActivationQueue>) -> Vec<String> 
 }
 
 #[tauri::command]
-fn read_preview(path: String) -> error::Result<String> {
-    let requested = std::path::PathBuf::from(&path).canonicalize()?;
+async fn read_preview(path: String) -> error::Result<String> {
+    let requested = if let Some(theme_id) = path.strip_prefix("remote://") {
+        repository::ensure_preview(theme_id).await?.canonicalize()?
+    } else {
+        std::path::PathBuf::from(&path).canonicalize()?
+    };
     let allowed = [paths::cache_root()?, paths::installed_root()?]
         .into_iter()
         .filter_map(|root| root.canonicalize().ok())
@@ -105,6 +109,7 @@ fn read_preview(path: String) -> error::Result<String> {
 
 #[tauri::command]
 async fn apply_theme(theme_id: String) -> error::Result<String> {
+    repository::ensure_theme(&theme_id).await?;
     let payload = compiler::compile(&theme_id)?;
     if cdp::inject(&payload, std::time::Duration::from_secs(15)).await? == 0 {
         return Err(error::AppError::Message(
@@ -115,6 +120,7 @@ async fn apply_theme(theme_id: String) -> error::Result<String> {
 }
 #[tauri::command]
 async fn restart_and_apply(theme_id: String) -> error::Result<String> {
+    repository::ensure_theme(&theme_id).await?;
     let payload = compiler::compile(&theme_id)?;
     platform::restart_and_inject(&payload, std::time::Duration::from_secs(90)).await?;
     Ok(format!("{} 已应用", catalog::find(&theme_id)?.name))

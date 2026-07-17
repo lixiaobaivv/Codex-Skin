@@ -21,7 +21,8 @@ This first public release focuses on a complete, auditable path from browsing an
 - Restore the default Codex appearance.
 - Import through `dreamskin://` links or local `.dreamskin` files.
 - Verify SHA-256, Ed25519/RFC8785 signatures, manifests, ZIP paths, and decoded images.
-- Fall back across GitHub, GH Proxy, and GHFast while preserving the last valid local cache.
+- Check for updates through a lightweight incremental index with fallback across GitHub, GH Proxy, and GHFast.
+- Download previews only as they enter the viewport, then fetch and persist complete theme assets only before application.
 - Forward web and file activations to one application instance.
 
 ## Download
@@ -110,9 +111,11 @@ The desktop catalog comes from the public [lixiaobaivv/Codex-Skin-Store](https:/
 - GH Proxy;
 - GHFast.
 
-Synchronization tries the selected route first and then the other built-in routes. A new catalog is downloaded into a temporary location and replaces the cache only after complete validation. If every route fails, the last valid catalog remains available.
+Synchronization requests only a content-addressed lightweight index and uses HTTP ETags to avoid transferring an unchanged catalog. It tries the selected route first and then the other built-in routes. If every route fails, the last valid catalog remains available.
 
-Installers do not bundle online themes, so first use requires a catalog synchronization. Third-party mirrors may be unavailable or stale; downloaded content still receives the same validation.
+Previews are downloaded only when their cards enter the viewport. Before applying a theme, the client fetches only missing or changed manifests, backgrounds, logos, and pet images. Every resource is checked against its declared size and SHA-256, decoded when applicable, and written atomically to the persistent cache. A theme removed from the remote catalog is no longer shown as online, while an installed signed version remains available offline.
+
+Installers do not bundle online themes, so first use requires a lightweight index synchronization. Third-party mirrors may be unavailable or stale; every downloaded resource is still checked against the size and SHA-256 declared by the index.
 
 ## Theme Scope
 
@@ -174,7 +177,7 @@ Codex-Skin is built with Tauri 2, Rust, and TypeScript/Vite:
 - **Runtime integration** (`cdp.rs` and `platform.rs`) owns Codex discovery and launch, loopback CDP injection, verification, and rollback.
 - **Tooling and release** (`authoring.rs`, `src-tauri/src/bin/`, and `installer/`) owns catalog authoring, package diagnostics, and cross-platform installers.
 
-The catalog flow is: download into a temporary directory → validate the catalog, manifests, and images → atomically replace the cache → compile the declarative theme → apply it through loopback CDP. `.dreamskin` follows a separate signed-import path into an immutable local version library.
+The catalog flow is: conditionally synchronize a lightweight index → incrementally merge catalog state → cache visible previews on demand → download and validate missing or changed resources before application → compile the declarative theme → apply it through loopback CDP. `.dreamskin` follows a separate signed-import path into an immutable local version library.
 
 Windows and macOS share the interface and domain logic. Platform-specific behavior is limited to Codex discovery, process launch, window activation, and installer associations.
 

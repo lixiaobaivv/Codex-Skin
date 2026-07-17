@@ -36,6 +36,7 @@ let state: AppState = { themes: [], sources: [], selectedSourceId: "github" };
 let selectedCategory = "全部";
 let selectedTheme: Theme | undefined;
 let busy = false;
+let previewObserver: IntersectionObserver | undefined;
 
 document.querySelector<HTMLDivElement>("#app")!.innerHTML = `
   <main class="shell">
@@ -105,6 +106,16 @@ async function loadPreview(image: HTMLImageElement, path: string): Promise<void>
 }
 
 function renderThemes(): void {
+  previewObserver?.disconnect();
+  const observer = new IntersectionObserver(entries => {
+    for (const entry of entries) {
+      if (!entry.isIntersecting) continue;
+      const image = entry.target as HTMLImageElement;
+      observer.unobserve(image);
+      void loadPreview(image, image.dataset.previewPath ?? "");
+    }
+  }, { rootMargin: "240px" });
+  previewObserver = observer;
   const visible = state.themes.filter(theme => selectedCategory === "全部" || theme.category === selectedCategory);
   document.querySelector("#catalog-count")!.textContent = selectedCategory === "全部"
     ? `${state.themes.length} 个主题` : `${visible.length} / ${state.themes.length} 个主题`;
@@ -119,7 +130,9 @@ function renderThemes(): void {
     const select = () => { selectedTheme = theme; document.querySelector("#selection")!.textContent = `已选择：${theme.name}`; renderThemes(); updateCommands(); };
     card.onclick = select;
     card.onkeydown = event => { if (event.key === "Enter" || event.key === " ") select(); };
-    void loadPreview(card.querySelector("img")!, theme.previewPath);
+    const image = card.querySelector("img")!;
+    image.dataset.previewPath = theme.previewPath;
+    observer.observe(image);
     return card;
   }));
   if (!visible.length) themeGrid.innerHTML = `<div class="empty">暂无主题，点击“刷新”同步官方主题目录。</div>`;

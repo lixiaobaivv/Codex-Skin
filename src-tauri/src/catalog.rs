@@ -1,7 +1,7 @@
 use crate::{
     error::{AppError, Result},
     models::ThemeSummary,
-    paths,
+    paths, repository,
 };
 use serde_json::Value;
 use std::{
@@ -14,8 +14,17 @@ const CATEGORIES: [&str; 7] = ["人物", "动漫", "游戏", "风景", "极简",
 
 pub fn load() -> Result<Vec<ThemeSummary>> {
     let mut newest = HashMap::<String, ThemeSummary>::new();
+    let remote = repository::load_remote_catalog()?;
     if let Ok(directory) = paths::cache_themes() {
         load_directory(&directory, &mut newest)?;
+    }
+    if let Some(remote) = remote.as_ref() {
+        let published: std::collections::HashSet<_> = remote
+            .themes
+            .iter()
+            .map(|theme| theme.id.as_str())
+            .collect();
+        newest.retain(|id, _| published.contains(id.as_str()));
     }
     if let Ok(root) = paths::installed_root()
         && root.exists()
@@ -28,6 +37,34 @@ pub fn load() -> Result<Vec<ThemeSummary>> {
         {
             if entry.file_type().is_file() && entry.file_name() == "theme.json" {
                 let _ = add_manifest(entry.path(), &mut newest);
+            }
+        }
+    }
+    if let Some(remote) = remote {
+        for theme in remote.themes {
+            let parsed_version = semver::Version::parse(&theme.version)
+                .map_err(|_| AppError::Message(format!("主题版本无效：{}", theme.version)))?;
+            let replace = newest
+                .get(&theme.id)
+                .map(|old| {
+                    parsed_version
+                        > semver::Version::parse(&old.version)
+                            .expect("catalog only stores validated semantic versions")
+                })
+                .unwrap_or(true);
+            if replace {
+                newest.insert(
+                    theme.id.clone(),
+                    ThemeSummary {
+                        id: theme.id.clone(),
+                        version: theme.version,
+                        name: theme.name,
+                        description: theme.description,
+                        category: theme.category,
+                        preview_path: format!("remote://{}", theme.id),
+                        manifest_path: paths::cache_root()?.join(theme.manifest.path),
+                    },
+                );
             }
         }
     }

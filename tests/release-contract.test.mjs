@@ -91,6 +91,20 @@ test("Tauri desktop uses horizontal categories and single-instance activation", 
   assert.match(rustApp, /external-activation/);
 });
 
+test("desktop catalog uses conditional sync and on-demand persistent resources", async () => {
+  const [repository, frontend] = await Promise.all([
+    readFile(new URL("../src-tauri/src/repository.rs", import.meta.url), "utf8"),
+    readFile(new URL("../src/main.ts", import.meta.url), "utf8"),
+  ]);
+  assert.match(repository, /desktop-catalog-v2\.json/);
+  assert.match(repository, /IF_NONE_MATCH/);
+  assert.match(repository, /ensure_preview/);
+  assert.match(repository, /ensure_theme/);
+  assert.match(repository, /Sha256::digest/);
+  assert.doesNotMatch(repository, /archive\/refs\/heads\/main\.zip/);
+  assert.match(frontend, /IntersectionObserver/);
+});
+
 test("macOS release status documents the unsigned graphical client", async () => {
   const readme = await readFile(new URL("../README.md", import.meta.url), "utf8");
   assert.match(readme, /macOS Apple Silicon/);

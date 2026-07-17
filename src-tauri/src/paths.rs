@@ -15,6 +15,12 @@ pub fn cache_root() -> Result<PathBuf> {
 pub fn cache_themes() -> Result<PathBuf> {
     Ok(cache_root()?.join("themes"))
 }
+pub fn remote_catalog_path() -> Result<PathBuf> {
+    Ok(cache_root()?.join("desktop-catalog-v2.json"))
+}
+pub fn catalog_sync_state_path() -> Result<PathBuf> {
+    Ok(store_root()?.join("catalog-sync-state.json"))
+}
 pub fn settings_path() -> Result<PathBuf> {
     Ok(store_root()?.join("repository-settings.json"))
 }
