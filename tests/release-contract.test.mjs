@@ -3,12 +3,14 @@ import { readFile } from "node:fs/promises";
 import test from "node:test";
 
 test("Windows client release uses stable English artifact names", async () => {
-  const [project, ci, release, readme, program] = await Promise.all([
+  const [project, ci, release, readme, program, installer, chineseMessages] = await Promise.all([
     readFile(new URL("../src/CodexThemeStore/CodexThemeStore.csproj", import.meta.url), "utf8"),
     readFile(new URL("../.github/workflows/ci.yml", import.meta.url), "utf8"),
     readFile(new URL("../.github/workflows/release-client.yml", import.meta.url), "utf8"),
     readFile(new URL("../README.md", import.meta.url), "utf8"),
     readFile(new URL("../src/CodexThemeStore/Program.cs", import.meta.url), "utf8"),
+    readFile(new URL("../installer/windows/CodexThemeStore.iss", import.meta.url), "utf8"),
+    readFile(new URL("../installer/windows/languages/ChineseSimplified.isl", import.meta.url), "utf8"),
   ]);
 
   assert.match(project, /<AssemblyName>Codex-Skin<\/AssemblyName>/);
@@ -26,6 +28,8 @@ test("Windows client release uses stable English artifact names", async () => {
   for (const directory of ["themes", "previews", "backgrounds", "logos", "pets"]) {
     assert.match(project, new RegExp(`\\\\${directory}\\\\`));
   }
+  assert.match(installer, /MessagesFile: "\{#SourcePath\}\\languages\\ChineseSimplified\.isl"/);
+  assert.match(chineseMessages, /Inno Setup version 6\.5\.0\+/);
   assert.match(readme, /Codex-Skin-win-x64\.exe/);
   assert.doesNotMatch(`${readme}\n${program}\n${ci}\n${release}`, /Codex主题商店\.exe/);
 });
