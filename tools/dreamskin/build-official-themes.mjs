@@ -5,7 +5,7 @@ import { fileURLToPath } from "node:url";
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "..", "..");
 const outputDir = resolve(process.env.CODEX_SKIN_THEME_OUTPUT ?? join(root, "artifacts", "official-themes"));
-const releaseTag = process.env.CODEX_SKIN_THEME_RELEASE_TAG ?? "official-themes-v1";
+const releaseTag = process.env.CODEX_SKIN_THEME_RELEASE_TAG ?? "official-themes-v2";
 const signedAt = process.env.CODEX_SKIN_THEME_SIGNED_AT ?? "2026-07-17T06:00:00.000Z";
 const seedHex = process.env.CODEX_SKIN_THEME_SIGNING_SEED?.trim();
 if (!seedHex || !/^[a-f0-9]{64}$/.test(seedHex)) {

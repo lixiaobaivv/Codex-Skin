@@ -60,7 +60,9 @@ jobs:
             echo "Release $RELEASE_TAG already exists and is immutable." >&2
             exit 1
           fi
+          release_version="${RELEASE_TAG#official-themes-}"
+          package_count="$(find artifacts/official-themes -maxdepth 1 -name 'Codex-Skin-theme-*.dreamskin' -type f | wc -l)"
           gh release create "$RELEASE_TAG" artifacts/official-themes/Codex-Skin-theme-*.dreamskin artifacts/official-themes/Codex-Skin-official-themes-SHA256SUMS.txt \
             --target "$GITHUB_SHA" \
-            --title "Codex-Skin Official Themes ${RELEASE_TAG#official-themes-}" \
-            --notes "Reviewed Codex-Skin themes for Windows and macOS. Packages are signed with the official Ed25519 publisher key and verified by CI."
+            --title "Codex-Skin Official Themes $release_version" \
+            --notes "$package_count reviewed Codex-Skin themes for Windows and macOS. Packages are signed with the official Ed25519 publisher key and verified by CI."
