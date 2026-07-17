@@ -34,39 +34,53 @@ pub async fn restart_and_inject(payload: &Payload, timeout: Duration) -> Result<
     let installation = discover()?;
     stop(&installation).await?;
     start(&installation, true)?;
+
     let deadline = Instant::now() + timeout;
+    let mut last_injection_error = None;
     while Instant::now() < deadline {
         if cdp::is_ready().await {
             let remaining = deadline
                 .saturating_duration_since(Instant::now())
                 .min(Duration::from_secs(10));
-            if remaining > Duration::ZERO && cdp::inject(payload, remaining).await.unwrap_or(0) > 0
-            {
-                return Ok(());
+            if remaining > Duration::ZERO {
+                match cdp::inject(payload, remaining).await {
+                    Ok(count) if count > 0 => return Ok(()),
+                    Ok(_) => {
+                        last_injection_error = Some("Codex 窗口尚未完成初始化。".to_owned());
+                    }
+                    Err(error) => last_injection_error = Some(error.to_string()),
+                }
             }
         }
         tokio::time::sleep(Duration::from_millis(500)).await;
     }
-    Err(AppError::Message(
-        "Codex 已启动，但主题未能在 90 秒内完成 CDP 注入。".into(),
-    ))
+    let detail = last_injection_error.unwrap_or_else(|| {
+        "未检测到本机 127.0.0.1:9229 调试端口；请确认 Codex 未被安全软件阻止启动。".into()
+    });
+    Err(AppError::Message(format!(
+        "Codex 已启动，但主题未能在 90 秒内完成 CDP 注入：{detail}"
+    )))
 }
 
 async fn stop(installation: &Installation) -> Result<()> {
     let deadline = Instant::now() + Duration::from_secs(15);
+    let force_after = Instant::now() + Duration::from_secs(10);
     while Instant::now() < deadline {
         let mut system = System::new_all();
         system.refresh_processes(ProcessesToUpdate::All, true);
         let mut found = false;
+        let signal = if Instant::now() >= force_after {
+            Signal::Kill
+        } else {
+            Signal::Term
+        };
         for process in system.processes().values() {
             let Some(path) = process.exe() else {
                 continue;
             };
             if belongs_to(path, installation) {
                 found = true;
-                let _ = process
-                    .kill_with(Signal::Kill)
-                    .or_else(|| Some(process.kill()));
+                let _ = process.kill_with(signal).or_else(|| Some(process.kill()));
             }
         }
         if !found {
@@ -225,21 +239,46 @@ mod macos_platform {
             "未找到 macOS Codex 安装，可通过 CODEX_APP_PATH 指定位置。".into(),
         ))
     }
-    pub fn start(installation: &Installation, enable_cdp: bool) -> Result<()> {
-        let mut command = std::process::Command::new("/usr/bin/open");
-        command.arg("-n").arg(&installation.app_path);
+    fn launch_arguments(enable_cdp: bool) -> Vec<&'static str> {
         if enable_cdp {
-            command
-                .arg("--args")
-                .arg("--remote-debugging-address=127.0.0.1")
-                .arg("--remote-debugging-port=9229");
+            vec![
+                "--remote-debugging-address=127.0.0.1",
+                "--remote-debugging-port=9229",
+            ]
+        } else {
+            Vec::new()
         }
-        let status = command.status()?;
-        if !status.success() {
-            return Err(AppError::Message(format!(
-                "LaunchServices 启动 Codex 失败：{status}"
-            )));
+    }
+
+    pub fn start(installation: &Installation, enable_cdp: bool) -> Result<()> {
+        // Starting the bundle through `open -n` can leave Electron's profile lock or
+        // debug arguments behind. Spawn the app executable only after `stop` has
+        // observed the previous process tree exit, so the debugging port is owned by
+        // the new Codex instance.
+        std::process::Command::new(&installation.executable)
+            .args(launch_arguments(enable_cdp))
+            .stdin(std::process::Stdio::null())
+            .stdout(std::process::Stdio::null())
+            .stderr(std::process::Stdio::null())
+            .spawn()
+            .map(|_| ())
+            .map_err(|error| AppError::Message(format!("启动 Codex 失败：{error}")))
+    }
+
+    #[cfg(test)]
+    mod tests {
+        use super::*;
+
+        #[test]
+        fn starts_cdp_on_loopback_only() {
+            assert_eq!(
+                launch_arguments(true),
+                [
+                    "--remote-debugging-address=127.0.0.1",
+                    "--remote-debugging-port=9229"
+                ]
+            );
+            assert!(launch_arguments(false).is_empty());
         }
-        Ok(())
     }
 }

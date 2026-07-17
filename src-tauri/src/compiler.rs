@@ -149,16 +149,16 @@ pub fn compile(theme_id: &str) -> Result<Payload> {
         }
         _ => default_background_position,
     };
-    let curated_cover_theme = matches!(
+    // `backgroundFit` is intentionally not part of the public theme manifest: Codex
+    // rejects unknown fields in `theme.theme`. Curated hero art still uses a safe
+    // compiler-side default, which is emitted only into the injected runtime config.
+    let background_fit = if matches!(
         summary.id.as_str(),
         "dilraba-star" | "enfp-pop" | "jackson-sage" | "kun-stage" | "zhu-xudan-racing"
-    );
-    let background_fit = match theme.get("backgroundFit").and_then(Value::as_str) {
-        Some("cover") => "cover",
-        Some("contain") => "contain",
-        Some("smart") => "smart",
-        _ if curated_cover_theme => "cover",
-        _ => "smart",
+    ) {
+        "cover"
+    } else {
+        "smart"
     };
 
     let mut css = CSS_TEMPLATE.to_owned();
