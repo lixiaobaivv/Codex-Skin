@@ -7,6 +7,10 @@
 
 Codex-Skin is a theme client for Codex Desktop on Windows and macOS. It provides a visual theme catalog, previews, safe application and rollback, plus signed imports from [Codex-Skin-Store](https://lixiaobaivv.github.io/Codex-Skin-Store/).
 
+- Storefront: <https://lixiaobaivv.github.io/Codex-Skin-Store/>
+- No-code Theme Workshop: <https://lixiaobaivv.github.io/Codex-Skin-Store/submit/>
+- Latest client downloads: <https://github.com/lixiaobaivv/Codex-Skin/releases/latest>
+
 Codex-Skin provides a complete, auditable path from discovery and on-demand download through validation, installation, incremental updates, application, and rollback.
 
 > Codex-Skin is a community open-source project, not an OpenAI or official Codex product. It does not modify the signed Codex installation or read API keys, project files, tasks, or conversations.
@@ -226,15 +230,22 @@ npm run tauri -- build --no-bundle
 
 The [Build and package](https://github.com/lixiaobaivv/Codex-Skin/actions/workflows/build.yml) workflow produces the Windows Setup executable and both macOS PKGs.
 
-## Theme Authoring
+## Create And Submit Themes
 
-The desktop catalog and web-distributed `.dreamskin` packages are separate protocols:
+Regular creators can use the [Codex-Skin-Store Theme Workshop](https://lixiaobaivv.github.io/Codex-Skin-Store/submit/) without forking a repository, installing Node.js or Rust, writing JSON, calculating SHA-256, or handling an official signing key.
 
-- Read [theme authoring](docs/theme-authoring.md) to create or maintain a desktop catalog.
-- Read [signed sample publishing](docs/publish-signed-sample.md) for signed fixtures and release packages.
-- Submit public themes through the [Codex-Skin-Store submission guide](https://github.com/lixiaobaivv/Codex-Skin-Store/blob/main/docs/theme-submission.md).
+1. Enter the theme name, stable English ID, author, and asset license details.
+2. Tune the accent, text, surface colors, and home-page copy.
+3. Review the live preview; text fields are saved in the current browser.
+4. Upload a real PNG screenshot from Codex and an optional background.
+5. Generate the standard submission ZIP.
+6. Open the GitHub submission form and attach the ZIP under **Standard submission bundle**.
 
-The Rust `catalog-tool` can create an index, validate a repository, and pack a catalog. `dreamskin-verify` validates signed packages for Windows or macOS.
+The bundle contains the desktop manifest, a `package: null` storefront draft, client and web previews, the optional background, and license notes. Submitting the form does not publish a theme immediately. A maintainer reviews the real result and asset rights, then converts the bundle into a review PR. Once its closed-schema and catalog checks pass, trusted CI builds and signs `.dreamskin` from the exact Store commit, verifies it on Windows and macOS, and updates the content-addressed remote catalog. Clients discover and incrementally download the new theme on a later refresh.
+
+Authors who need a custom logo, pet, four prompt cards, fonts, or complete copy control can use the advanced PR workflow in the [submission guide](https://github.com/lixiaobaivv/Codex-Skin-Store/blob/main/docs/theme-submission.md). Themes remain declarative: submissions cannot carry arbitrary CSS, JavaScript, HTML, SVG, commands, or executables.
+
+This repository's [theme authoring guide](docs/theme-authoring.md) is for catalog maintainers and protocol development. [Signed sample publishing](docs/publish-signed-sample.md) maintains test fixtures and is not the regular creator workflow. The Rust `catalog-tool` creates indexes, validates repositories, and packs catalogs; `dreamskin-verify` validates signed packages for Windows or macOS.
 
 ## Feedback And Contributions
 
