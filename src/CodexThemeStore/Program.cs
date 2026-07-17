@@ -58,7 +58,6 @@ internal sealed class ThemeStoreForm : Form
     private readonly ComboBox _sourceCombo;
     private readonly ComboBox _categoryCombo;
     private readonly Button _refreshButton;
-    private readonly Button _repositoryButton;
     private readonly Label _themeCountLabel;
     private readonly Label _selectionLabel;
     private readonly Label _statusLabel;
@@ -141,16 +140,12 @@ internal sealed class ThemeStoreForm : Form
         _refreshButton = CreateButton("刷新主题", 92, false);
         _refreshButton.Height = 32;
         _refreshButton.Click += async (_, _) => await RefreshThemesAsync(false);
-        _repositoryButton = CreateButton("仓库设置", 88, false);
-        _repositoryButton.Height = 32;
-        _repositoryButton.Click += async (_, _) => await ConfigureRepositoryAsync();
 
         void LayoutHeaderControls()
         {
             var right = header.ClientSize.Width;
             _refreshButton.Location = new Point(Math.Max(0, right - _refreshButton.Width), 7);
-            _repositoryButton.Location = new Point(Math.Max(0, _refreshButton.Left - _repositoryButton.Width - 10), 7);
-            _sourceCombo.Location = new Point(Math.Max(0, _repositoryButton.Left - _sourceCombo.Width - 10), 7);
+            _sourceCombo.Location = new Point(Math.Max(0, _refreshButton.Left - _sourceCombo.Width - 10), 7);
             _categoryCombo.Location = new Point(Math.Max(0, _sourceCombo.Left - _categoryCombo.Width - 10), 7);
             _themeCountLabel.Location = new Point(Math.Max(0, _categoryCombo.Left - _themeCountLabel.Width - 16), 14);
         }
@@ -160,7 +155,6 @@ internal sealed class ThemeStoreForm : Form
         header.Controls.Add(_themeCountLabel);
         header.Controls.Add(_categoryCombo);
         header.Controls.Add(_sourceCombo);
-        header.Controls.Add(_repositoryButton);
         header.Controls.Add(_refreshButton);
         LayoutHeaderControls();
         root.Controls.Add(header, 0, 0);
@@ -276,17 +270,14 @@ internal sealed class ThemeStoreForm : Form
 
     private static List<ThemePreviewModel> LoadPreviewThemes()
     {
-        var themeDir = ThemeStoreApp.FindThemeDir();
-        return Directory.GetFiles(themeDir, "*.json")
-            .Select(ThemeDefinition.Load)
-            .OrderBy(theme => theme.Category, StringComparer.Ordinal)
-            .ThenBy(theme => theme.DisplayName, StringComparer.CurrentCulture)
+        return ThemeStoreApp.LoadThemes()
             .Select(theme => new ThemePreviewModel(
                 theme.CodeThemeId,
                 theme.DisplayName,
                 theme.Description,
                 theme.Category,
-                theme.ResolvePreviewImage()))
+                theme.ResolvePreviewImage(),
+                theme.SourcePath))
             .ToList();
     }
 
@@ -353,15 +344,6 @@ internal sealed class ThemeStoreForm : Form
         }
     }
 
-    private async Task ConfigureRepositoryAsync()
-    {
-        using var dialog = new RepositorySettingsForm(ThemeRepositoryClient.LoadSettings());
-        if (dialog.ShowDialog(this) != DialogResult.OK) return;
-        ThemeRepositoryClient.SaveSettings(dialog.Settings);
-        _statusLabel.Text = $"主题仓库已设为 {dialog.Settings.Repository}";
-        await RefreshThemesAsync(false);
-    }
-
     private void SelectCard(ThemePreviewCard card)
     {
         _selectedCard = card;
@@ -389,7 +371,7 @@ internal sealed class ThemeStoreForm : Form
         var succeeded = await RunBusyAsync(restart ? "正在应用并重新启动 Codex..." : "正在保存主题...", () =>
         {
             var app = new ThemeStoreApp();
-            var result = app.Run(["apply", selected.Id]);
+            var result = app.Run(["apply", selected.SourcePath]);
             if (result != 0) throw new InvalidOperationException("主题保存失败。");
             if (restart)
             {
@@ -445,64 +427,13 @@ internal sealed class ThemeStoreForm : Form
         _saveButton.Enabled = !busy;
         _rollbackButton.Enabled = !busy;
         _refreshButton.Enabled = !busy;
-        _repositoryButton.Enabled = !busy;
         _sourceCombo.Enabled = !busy;
         _categoryCombo.Enabled = !busy;
         foreach (var card in _cards) card.Enabled = !busy;
     }
 }
 
-internal sealed class RepositorySettingsForm : Form
-{
-    private readonly TextBox _repository;
-    private readonly TextBox _branch;
-
-    public RepositorySettingsForm(ThemeRepositorySettings settings)
-    {
-        Text = "主题仓库设置";
-        StartPosition = FormStartPosition.CenterParent;
-        FormBorderStyle = FormBorderStyle.FixedDialog;
-        MaximizeBox = false;
-        MinimizeBox = false;
-        ShowInTaskbar = false;
-        ClientSize = new Size(460, 190);
-        Font = new Font("Microsoft YaHei UI", 9F);
-
-        Controls.Add(new Label { Text = "GitHub 仓库（owner/repository）", AutoSize = true, Location = new Point(24, 20) });
-        _repository = new TextBox { Text = settings.Repository, Location = new Point(24, 46), Width = 410 };
-        Controls.Add(_repository);
-        Controls.Add(new Label { Text = "分支", AutoSize = true, Location = new Point(24, 82) });
-        _branch = new TextBox { Text = settings.Branch, Location = new Point(24, 106), Width = 220 };
-        Controls.Add(_branch);
-
-        var cancel = new Button { Text = "取消", DialogResult = DialogResult.Cancel, Location = new Point(264, 142), Size = new Size(80, 34) };
-        var save = new Button { Text = "保存", Location = new Point(354, 142), Size = new Size(80, 34) };
-        save.Click += (_, _) => Save(settings.SourceId);
-        Controls.Add(cancel);
-        Controls.Add(save);
-        CancelButton = cancel;
-        AcceptButton = save;
-    }
-
-    public ThemeRepositorySettings Settings { get; private set; } = ThemeRepositorySettings.Default;
-
-    private void Save(string sourceId)
-    {
-        var repository = _repository.Text.Trim();
-        var branch = _branch.Text.Trim();
-        if (!Regex.IsMatch(repository, "^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$") ||
-            !Regex.IsMatch(branch, "^[A-Za-z0-9._/-]+$") || branch.Contains("..", StringComparison.Ordinal))
-        {
-            MessageBox.Show(this, "请输入有效的 owner/repository 和分支名称。", "主题仓库设置", MessageBoxButtons.OK, MessageBoxIcon.Warning);
-            return;
-        }
-        Settings = new ThemeRepositorySettings(repository, branch, sourceId);
-        DialogResult = DialogResult.OK;
-        Close();
-    }
-}
-
-internal sealed record ThemePreviewModel(string Id, string Name, string Description, string Category, string PreviewPath);
+internal sealed record ThemePreviewModel(string Id, string Name, string Description, string Category, string PreviewPath, string SourcePath);
 
 internal sealed class ThemePreviewCard : UserControl
 {
@@ -655,13 +586,11 @@ internal static class ThemeHook
 internal sealed class ThemeStoreApp
 {
     private readonly string? _webviewDir;
-    private readonly string _themeDir;
     private readonly string _storeStateDir;
 
     public ThemeStoreApp()
     {
         _webviewDir = FindWebviewDir();
-        _themeDir = FindThemeDir();
         _storeStateDir = Path.Combine(
             Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
             "CodexThemeStore");
@@ -1006,7 +935,6 @@ internal sealed class ThemeStoreApp
 
     private IEnumerable<string> GetThemeFiles()
     {
-        if (!Directory.Exists(_themeDir)) yield break;
         var priority = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase)
         {
             ["dilraba-star.json"] = 0,
@@ -1014,7 +942,7 @@ internal sealed class ThemeStoreApp
             ["kun-stage.json"] = 2,
             ["enfp-pop.json"] = 3,
         };
-        foreach (var file in Directory.GetFiles(_themeDir, "*.json")
+        foreach (var file in LoadThemes().Select(theme => theme.SourcePath)
                      .OrderBy(file => priority.GetValueOrDefault(Path.GetFileName(file), 100))
                      .ThenBy(Path.GetFileName))
         {
@@ -1039,8 +967,9 @@ internal sealed class ThemeStoreApp
             return temp;
         }
 
-        var named = Path.Combine(_themeDir, trimmed.EndsWith(".json", StringComparison.OrdinalIgnoreCase) ? trimmed : $"{trimmed}.json");
-        if (File.Exists(named)) return named;
+        var id = trimmed.EndsWith(".json", StringComparison.OrdinalIgnoreCase) ? Path.GetFileNameWithoutExtension(trimmed) : trimmed;
+        var named = LoadThemes().FirstOrDefault(theme => theme.CodeThemeId.Equals(id, StringComparison.Ordinal))?.SourcePath;
+        if (named is not null) return named;
         throw new FileNotFoundException($"Theme not found: {input}");
     }
 
@@ -1161,37 +1090,16 @@ internal sealed class ThemeStoreApp
         return null;
     }
 
-    internal static string FindThemeDir()
+    internal static IReadOnlyList<ThemeDefinition> LoadThemes()
     {
-        var candidates = new[]
+        return ThemeCatalog.Load(new[]
         {
             ThemeRepositoryClient.CacheThemeDirectory,
             Path.Combine(AppContext.BaseDirectory, "themes"),
             Path.Combine(Directory.GetCurrentDirectory(), "themes"),
             Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "..", "themes")),
             Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "..", "..", "themes")),
-        };
-        foreach (var candidate in candidates)
-        {
-            if (!Directory.Exists(candidate)) continue;
-            var files = Directory.GetFiles(candidate, "*.json");
-            if (files.Length == 0) continue;
-            try
-            {
-                foreach (var file in files)
-                {
-                    var theme = ThemeDefinition.Load(file);
-                    theme.ValidateAssets();
-                }
-                return candidate;
-            }
-            catch when (Path.GetFullPath(candidate).Equals(Path.GetFullPath(ThemeRepositoryClient.CacheThemeDirectory), StringComparison.OrdinalIgnoreCase))
-            {
-                // A partial or manually modified cache must not prevent the
-                // bundled catalog from opening. The next refresh can replace it.
-            }
-        }
-        throw new DirectoryNotFoundException("Cannot find themes directory.");
+        }, platform: "windows");
     }
 }
 

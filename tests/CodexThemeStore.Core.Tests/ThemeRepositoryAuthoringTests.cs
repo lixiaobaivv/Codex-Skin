@@ -57,6 +57,18 @@ public sealed class ThemeRepositoryAuthoringTests : IDisposable
         Assert.Throws<InvalidDataException>(theme.ValidateAssets);
     }
 
+    [Theory]
+    [InlineData("other/catalog", "dev", "ghfast", "ghfast")]
+    [InlineData("lixiaobaivv/Codex-Skin", "main", "unknown", "github")]
+    public void NormalizesSavedSettingsToOfficialStore(string repository, string branch, string sourceId, string expectedSourceId)
+    {
+        var settings = ThemeRepositoryClient.NormalizeSettings(new ThemeRepositorySettings(repository, branch, sourceId));
+
+        Assert.Equal("lixiaobaivv/Codex-Skin-Store", settings.Repository);
+        Assert.Equal("main", settings.Branch);
+        Assert.Equal(expectedSourceId, settings.SourceId);
+    }
+
     private void CreateRepository()
     {
         Directory.CreateDirectory(Path.Combine(_root, "themes"));

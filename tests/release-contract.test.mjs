@@ -3,10 +3,11 @@ import { readFile } from "node:fs/promises";
 import test from "node:test";
 
 test("Windows client release uses stable English artifact names", async () => {
-  const [project, ci, release, readme, program, installer, chineseMessages] = await Promise.all([
+  const [project, ci, release, build, readme, program, installer, chineseMessages] = await Promise.all([
     readFile(new URL("../src/CodexThemeStore/CodexThemeStore.csproj", import.meta.url), "utf8"),
     readFile(new URL("../.github/workflows/ci.yml", import.meta.url), "utf8"),
     readFile(new URL("../.github/workflows/release-client.yml", import.meta.url), "utf8"),
+    readFile(new URL("../.github/workflows/build.yml", import.meta.url), "utf8"),
     readFile(new URL("../README.md", import.meta.url), "utf8"),
     readFile(new URL("../src/CodexThemeStore/Program.cs", import.meta.url), "utf8"),
     readFile(new URL("../installer/windows/CodexThemeStore.iss", import.meta.url), "utf8"),
@@ -17,7 +18,11 @@ test("Windows client release uses stable English artifact names", async () => {
   assert.match(ci, /Codex-Skin-win-x64\/Codex-Skin\.exe/);
   assert.match(release, /Codex-Skin-win-x64\.exe/);
   assert.match(release, /Codex-Skin-win-x64\.zip/);
-  assert.match(release, /SHA256SUMS\.txt/);
+  assert.match(release, /Codex-Skin-win-x64-SHA256SUMS\.txt/);
+  assert.match(build, /Codex-Skin-Setup-win-x64\.exe/);
+  assert.match(build, /Codex-Skin-osx-arm64\.pkg|Codex-Skin-\$\{\{ matrix\.rid \}\}\.pkg/);
+  assert.match(build, /Codex-Skin-theme-catalog-v1\.zip/);
+  assert.match(build, /Codex-Skin-installers-SHA256SUMS\.txt/);
   assert.match(release, /PublishSingleFile=true/);
   assert.match(release, /IncludeAllContentForSelfExtract=true/);
   assert.equal(
@@ -33,16 +38,30 @@ test("Windows client release uses stable English artifact names", async () => {
     assert.match(project, new RegExp(`\\\\${directory}\\\\`));
   }
   assert.match(installer, /MessagesFile: "\{#SourcePath\}\\languages\\ChineseSimplified\.isl"/);
+  assert.match(installer, /Parameters: "protocol register"/);
+  assert.match(installer, /\[UninstallRun\][\s\S]*Parameters: "protocol unregister"/);
   assert.match(chineseMessages, /Inno Setup version 6\.5\.0\+/);
   assert.match(readme, /Codex-Skin-win-x64\.exe/);
-  assert.doesNotMatch(`${readme}\n${program}\n${ci}\n${release}`, /Codex主题商店\.exe/);
+  assert.doesNotMatch(`${readme}\n${program}\n${ci}\n${release}\n${build}\n${installer}`, /Codex主题商店\.exe|CodexThemeStore-(?:Setup|osx)|CodexSkin-theme/);
+});
+
+test("macOS package registers Codex-Skin URL and document activation", async () => {
+  const [plist, project, packageScript] = await Promise.all([
+    readFile(new URL("../installer/macos/Info.plist", import.meta.url), "utf8"),
+    readFile(new URL("../src/CodexThemeStore.Desktop/CodexThemeStore.Desktop.csproj", import.meta.url), "utf8"),
+    readFile(new URL("../installer/macos/build-pkg.sh", import.meta.url), "utf8"),
+  ]);
+  assert.match(project, /<AssemblyName>Codex-Skin<\/AssemblyName>/);
+  assert.match(plist, /<key>CFBundleURLSchemes<\/key>[\s\S]*<string>dreamskin<\/string>/);
+  assert.match(plist, /<key>CFBundleTypeExtensions<\/key>[\s\S]*<string>dreamskin<\/string>/);
+  assert.match(packageScript, /Applications\/Codex-Skin\.app/);
+  assert.match(packageScript, /Contents\/MacOS\/Codex-Skin/);
 });
 
 test("macOS release status documents the unsigned graphical client", async () => {
   const readme = await readFile(new URL("../README.md", import.meta.url), "utf8");
   assert.match(readme, /macOS Apple Silicon/);
-  assert.match(readme, /Avalonia 图形客户端、共享 Core 和 PKG 构建链已接入/);
-  assert.match(readme, /尚待真实设备验收/);
-  assert.match(readme, /当前 CI 产物保持未签名/);
-  assert.match(readme, /代码签名与公证/);
+  assert.match(readme, /PKG 会声明 `dreamskin:\/\/` 和 `\.dreamskin`/);
+  assert.match(readme, /仍需更多真实 Apple Silicon 与 Intel 设备验收/);
+  assert.match(readme, /macOS PKG 当前未签名、未公证/);
 });

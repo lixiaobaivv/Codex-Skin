@@ -2,14 +2,16 @@ using System.Net;
 using System.Text;
 using System.Text.RegularExpressions;
 
-internal sealed record DreamSkinInstallRequest(
+namespace CodexThemeStore.Core;
+
+public sealed record DreamSkinInstallRequest(
     Uri PackageUri,
     string Sha256,
     long Size,
     string? Id,
     string? Version);
 
-internal static class DreamSkinProtocol
+public static class DreamSkinProtocol
 {
     public const int MaxUriBytes = 4096;
     public const long MaxPackageBytes = 20L * 1024 * 1024;

@@ -66,13 +66,8 @@ static async Task<int> RunAsync(string[] args)
             }
             case "list":
             {
-                var directory = Directory.Exists(ThemeRepositoryClient.CacheThemeDirectory)
-                    ? ThemeRepositoryClient.CacheThemeDirectory
-                    : Path.Combine(Directory.GetCurrentDirectory(), "themes");
-                if (!Directory.Exists(directory)) throw new DirectoryNotFoundException("没有本地主题，请先执行 refresh。");
-                foreach (var file in Directory.GetFiles(directory, "*.json").OrderBy(Path.GetFileName, StringComparer.Ordinal))
+                foreach (var theme in LoadThemes())
                 {
-                    var theme = ThemeDefinition.Load(file);
                     Console.WriteLine($"{theme.CodeThemeId}\t{theme.DisplayName}\t{theme.Category}\t{theme.Version}");
                 }
                 return 0;
@@ -170,18 +165,19 @@ static string DefaultStateDirectory() => Path.Combine(
 static string ResolveThemePath(string input)
 {
     if (File.Exists(input)) return Path.GetFullPath(input);
-    foreach (var directory in new[]
-             {
-                 ThemeRepositoryClient.CacheThemeDirectory,
-                 Path.Combine(AppContext.BaseDirectory, "themes"),
-                 Path.Combine(Directory.GetCurrentDirectory(), "themes"),
-             })
-    {
-        var candidate = Path.Combine(directory, $"{input}.json");
-        if (File.Exists(candidate)) return candidate;
-    }
+    var candidate = LoadThemes().FirstOrDefault(theme => theme.CodeThemeId.Equals(input, StringComparison.Ordinal));
+    if (candidate is not null) return candidate.SourcePath;
     throw new FileNotFoundException($"未找到主题: {input}");
 }
+
+static IReadOnlyList<ThemeDefinition> LoadThemes() => ThemeCatalog.Load(
+    new[]
+    {
+        ThemeRepositoryClient.CacheThemeDirectory,
+        Path.Combine(AppContext.BaseDirectory, "themes"),
+        Path.Combine(Directory.GetCurrentDirectory(), "themes"),
+    },
+    platform: OperatingSystem.IsMacOS() ? "macos" : OperatingSystem.IsWindows() ? "windows" : "macos");
 
 static void DeleteSavedTheme(string stateDirectory)
 {
@@ -194,7 +190,7 @@ static void DeleteSavedTheme(string stateDirectory)
 
 static void PrintUsage()
 {
-    Console.WriteLine("Codex Theme Store CLI");
+    Console.WriteLine("Codex-Skin CLI");
     Console.WriteLine("  codex-theme-store theme-validate [repository-directory]");
     Console.WriteLine("  codex-theme-store theme-index [repository-directory] [repository-name]");
     Console.WriteLine("  codex-theme-store theme-pack [repository-directory] [output.zip]");

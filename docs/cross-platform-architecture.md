@@ -29,7 +29,7 @@ Store/Patched/CDP     app bundle discovery/CDP
 3. 使用固定回环 CDP 参数启动、停止和检测 Codex。
 4. 复用 `CdpThemeInjector` 注入主题或删除持久 new-document script 后回滚。
 
-macOS PKG 安装 `/Applications/Codex Theme Store.app`，图形客户端可浏览、筛选、同步、应用和回滚主题。CLI 仍可从 v1 `theme.json` 执行 `apply-theme` 或 `restart-theme`。
+macOS PKG 安装 `/Applications/Codex-Skin.app`，图形客户端可浏览、筛选、同步、应用和回滚主题。PKG 注册 `dreamskin://` 与 `.dreamskin`，Avalonia 激活处理器复用共享 Core 完成下载限制、Ed25519 验签、图片解码、原子安装和二次应用确认。CLI 仍可从 v1 `theme.json` 执行 `apply-theme` 或 `restart-theme`。
 
 macOS 适配器的验收条件：
 

@@ -71,7 +71,7 @@ jobs:
             $hash = (Get-FileHash "artifacts/release/$name" -Algorithm SHA256).Hash.ToLowerInvariant()
             "$hash  $name"
           }
-          Set-Content -LiteralPath artifacts/release/SHA256SUMS.txt -Value $lines -Encoding utf8NoBOM
+          Set-Content -LiteralPath artifacts/release/Codex-Skin-win-x64-SHA256SUMS.txt -Value $lines -Encoding utf8NoBOM
 
       - uses: actions/upload-artifact@v7
         with:
@@ -91,7 +91,7 @@ jobs:
           $assets = @(
             "artifacts/release/Codex-Skin-win-x64.exe",
             "artifacts/release/Codex-Skin-win-x64.zip",
-            "artifacts/release/SHA256SUMS.txt"
+            "artifacts/release/Codex-Skin-win-x64-SHA256SUMS.txt"
           )
           gh release view $env:RELEASE_TAG *> $null
           if ($LASTEXITCODE -ne 0) {

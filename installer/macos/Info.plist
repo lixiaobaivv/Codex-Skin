@@ -5,15 +5,15 @@
   <key>CFBundleDevelopmentRegion</key>
   <string>zh_CN</string>
   <key>CFBundleDisplayName</key>
-  <string>Codex Theme Store</string>
+  <string>Codex-Skin</string>
   <key>CFBundleExecutable</key>
-  <string>CodexThemeStore.Desktop</string>
+  <string>Codex-Skin</string>
   <key>CFBundleIdentifier</key>
   <string>com.codexskin.themestore</string>
   <key>CFBundleInfoDictionaryVersion</key>
   <string>6.0</string>
   <key>CFBundleName</key>
-  <string>Codex Theme Store</string>
+  <string>Codex-Skin</string>
   <key>CFBundlePackageType</key>
   <string>APPL</string>
   <key>CFBundleShortVersionString</key>
@@ -24,5 +24,31 @@
   <string>12.0</string>
   <key>NSHighResolutionCapable</key>
   <true/>
+  <key>CFBundleURLTypes</key>
+  <array>
+    <dict>
+      <key>CFBundleURLName</key>
+      <string>com.codexskin.themestore.dreamskin</string>
+      <key>CFBundleURLSchemes</key>
+      <array>
+        <string>dreamskin</string>
+      </array>
+    </dict>
+  </array>
+  <key>CFBundleDocumentTypes</key>
+  <array>
+    <dict>
+      <key>CFBundleTypeName</key>
+      <string>Codex Dream Skin Theme Package</string>
+      <key>CFBundleTypeExtensions</key>
+      <array>
+        <string>dreamskin</string>
+      </array>
+      <key>CFBundleTypeRole</key>
+      <string>Viewer</string>
+      <key>LSHandlerRank</key>
+      <string>Owner</string>
+    </dict>
+  </array>
 </dict>
 </plist>

@@ -13,7 +13,6 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <PackageReference Include="NSec.Cryptography" Version="24.4.0" />
     <ProjectReference Include="..\CodexThemeStore.Core\CodexThemeStore.Core.csproj" />
   </ItemGroup>
 

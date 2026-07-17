@@ -358,6 +358,9 @@ public static class CssBuilder
         var backgroundCss = "";
         if (!string.IsNullOrWhiteSpace(backgroundUrl))
         {
+            var backgroundFilter = theme.BackgroundImageBlur > 0
+                ? $"blur({CssNumber(theme.BackgroundImageBlur)}px) saturate(1.05)"
+                : "none";
             backgroundCss = $@"
 :root {{
   --codex-theme-background-image: url(""{CssEscape(backgroundUrl)}"");
@@ -384,7 +387,7 @@ html[data-codex-window-type=""electron""] .browser-main-surface::before {{
   mask-image: linear-gradient(to bottom, #000 0%, #000 50%, rgba(0, 0, 0, 0.82) 64%, rgba(0, 0, 0, 0.34) 82%, transparent 100%);
   -webkit-mask-size: 100% 100%;
   mask-size: 100% 100%;
-  filter: blur({CssNumber(theme.BackgroundImageBlur)}px) saturate(1.08) contrast(1.02);
+  filter: {backgroundFilter};
   transform: {(theme.BackgroundImageBlur > 0 ? "scale(1.03)" : "none")};
   transition: opacity 180ms ease;
 }}
@@ -537,14 +540,12 @@ html[data-codex-window-type=""electron""] .browser-main-surface,
 .main-surface,
 .browser-main-surface {{
   background-color: {ColorUtil.Alpha(theme.Surface, dark ? 0.66 : 0.58)} !important;
-  backdrop-filter: blur({(dark ? 8 : 5)}px) saturate(1.04) !important;
   box-shadow: 0 0 0 1px {ColorUtil.Alpha(theme.Accent, dark ? 0.32 : 0.24)}, 0 18px 48px {ColorUtil.Alpha(theme.Ink, dark ? 0.24 : 0.12)} !important;
 }}
 
 html[data-codex-window-type=""electron""] .app-shell-left-panel,
 .app-shell-left-panel {{
   background: {ColorUtil.Alpha(ColorUtil.Mix(under, theme.Surface, dark ? 0.20 : 0.28), dark ? 0.88 : 0.84)} !important;
-  backdrop-filter: blur(18px) saturate(1.08) !important;
   border-right: 1px solid {ColorUtil.Alpha(theme.Accent, dark ? 0.28 : 0.18)} !important;
 }}
 
@@ -643,7 +644,7 @@ html[data-codex-window-type=""electron""] .codex-theme-home-subtitle {{
 
 html[data-codex-window-type=""electron""] .codex-theme-home-actions {{
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(min(280px, 100%), 1fr));
+  grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 14px;
   margin-top: 18px;
 }}
@@ -718,14 +719,14 @@ html[data-codex-window-type=""electron""] .composer-surface-chrome {{
   background: {ColorUtil.Alpha(elevated2, dark ? 0.90 : 0.88)} !important;
   border: 1px solid {ColorUtil.Alpha(theme.Accent, dark ? 0.68 : 0.52)} !important;
   border-radius: 20px !important;
-  backdrop-filter: blur(22px) saturate(1.16) !important;
+  backdrop-filter: blur(8px) saturate(1.06) !important;
   box-shadow: 0 0 0 1px {ColorUtil.Alpha(theme.Accent, dark ? 0.16 : 0.10)}, 0 12px 34px {ColorUtil.Alpha(theme.Ink, dark ? 0.32 : 0.16)} !important;
 }}
 
 html[data-codex-window-type=""electron""] .app-header-tint {{
   background: {ColorUtil.Alpha(under, dark ? 0.94 : 0.92)} !important;
   border-bottom: 1px solid {ColorUtil.Alpha(theme.Accent, dark ? 0.30 : 0.18)} !important;
-  backdrop-filter: blur(20px) saturate(1.08) !important;
+  backdrop-filter: blur(8px) saturate(1.04) !important;
   box-shadow: 0 4px 18px {ColorUtil.Alpha(theme.Ink, dark ? 0.20 : 0.08)} !important;
 }}
 
@@ -736,7 +737,7 @@ html[data-codex-window-type=""electron""] [data-message-author-role=""assistant"
   background: {ColorUtil.Alpha(theme.Surface, dark ? 0.76 : 0.72)} !important;
   border: 1px solid {ColorUtil.Alpha(theme.Accent, dark ? 0.30 : 0.18)} !important;
   border-radius: 16px !important;
-  backdrop-filter: blur(16px) saturate(1.08) !important;
+  backdrop-filter: none !important;
   box-shadow: 0 10px 28px {ColorUtil.Alpha(theme.Ink, dark ? 0.24 : 0.11)} !important;
 }}
 
@@ -744,13 +745,13 @@ html[data-codex-window-type=""electron""] [data-user-message-bubble=""true""] {{
   background: {ColorUtil.Alpha(softAccent, dark ? 0.88 : 0.84)} !important;
   border: 1px solid {ColorUtil.Alpha(theme.Accent, dark ? 0.42 : 0.30)} !important;
   box-shadow: 0 8px 24px {ColorUtil.Alpha(theme.Ink, dark ? 0.20 : 0.10)} !important;
-  backdrop-filter: blur(14px) saturate(1.10) !important;
+  backdrop-filter: none !important;
 }}
 
 html[data-codex-window-type=""electron""] .app-shell-left-panel .absolute.bottom-0.z-20[class*=""inset-x-0""] {{
   background: linear-gradient(to bottom, {ColorUtil.Alpha(under, 0.18)}, {ColorUtil.Alpha(under, dark ? 0.96 : 0.92)} 38%) !important;
   border-top: 1px solid {ColorUtil.Alpha(theme.Accent, dark ? 0.28 : 0.18)} !important;
-  backdrop-filter: blur(18px) saturate(1.08) !important;
+  backdrop-filter: none !important;
 }}
 
 html[data-codex-window-type=""electron""] [aria-label=""打开设置""] {{
@@ -995,6 +996,7 @@ html[data-codex-window-type="electron"] .codex-theme-home-tag {
 }
 
 html[data-codex-window-type="electron"] .codex-theme-home-actions {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
   position: relative;
   z-index: 3;
   gap: 14px;
@@ -1002,20 +1004,20 @@ html[data-codex-window-type="electron"] .codex-theme-home-actions {
 }
 
 html[data-codex-window-type="electron"] .codex-theme-home-action {
-  min-height: 184px;
+  min-height: 148px;
   display: grid;
   grid-template-columns: 1fr;
-  grid-template-rows: 54px auto 1fr;
+  grid-template-rows: 42px auto 1fr;
   justify-items: center;
   gap: 8px;
-  padding: 18px 16px 15px;
+  padding: 12px 11px 11px;
   text-align: center;
   color: {{theme.Ink}};
   background: {{cardSurface}};
   border: 1px solid {{ColorUtil.Alpha(theme.Accent, dark ? 0.54 : 0.34)}};
   border-radius: var(--codex-theme-card-radius);
   box-shadow: 0 16px 38px {{ColorUtil.Alpha(theme.Ink, dark ? 0.28 : 0.14)}};
-  backdrop-filter: blur(22px) saturate(1.12);
+  backdrop-filter: none;
 }
 
 html[data-codex-window-type="electron"] .codex-theme-home-action:nth-child(1) { background: {{actionOne}}; }
@@ -1036,8 +1038,8 @@ html[data-codex-window-type="electron"] .codex-theme-home-action:focus-visible {
 
 html[data-codex-window-type="electron"] .codex-theme-home-action-icon {
   grid-row: auto;
-  width: 52px;
-  height: 52px;
+  width: 40px;
+  height: 40px;
   color: {{theme.Accent}};
   background: {{ColorUtil.Alpha(theme.Surface, dark ? 0.66 : 0.82)}};
   border: 1px solid {{ColorUtil.Alpha(theme.Accent, 0.44)}};
@@ -1047,8 +1049,8 @@ html[data-codex-window-type="electron"] .codex-theme-home-action-icon {
 
 html[data-codex-window-type="electron"] .codex-theme-home-action-icon svg,
 html[data-codex-window-type="electron"] .codex-theme-home-action-icon img {
-  width: 25px;
-  height: 25px;
+  width: 20px;
+  height: 20px;
 }
 
 html[data-codex-theme-id="kun-stage"] .codex-theme-home-action-icon img {
@@ -1069,15 +1071,15 @@ html[data-codex-theme-id="dilraba-star"] .codex-theme-home-action-icon img {
 
 html[data-codex-window-type="electron"] .codex-theme-home-action-title {
   align-self: auto;
-  font-size: 17px;
-  line-height: 1.45;
+  font-size: 15px;
+  line-height: 1.35;
   font-weight: 850;
 }
 
 html[data-codex-window-type="electron"] .codex-theme-home-action-description {
   color: {{secondaryText}};
-  font-size: 13px;
-  line-height: 1.55;
+  font-size: 12px;
+  line-height: 1.4;
 }
 
 html[data-codex-window-type="electron"] .composer-surface-chrome {
@@ -1108,7 +1110,7 @@ html[data-codex-window-type="electron"] [data-radix-popper-content-wrapper] > * 
   border-color: {{ColorUtil.Alpha(theme.Accent, dark ? 0.50 : 0.34)}} !important;
   border-radius: 18px !important;
   box-shadow: 0 24px 68px {{ColorUtil.Alpha(theme.Ink, dark ? 0.42 : 0.23)}} !important;
-  backdrop-filter: blur(26px) saturate(1.12) !important;
+  backdrop-filter: blur(10px) saturate(1.06) !important;
 }
 
 html[data-codex-window-type="electron"] [data-content-search-unit-key$=":assistant"],
@@ -1130,7 +1132,7 @@ html[data-codex-theme-id="enfp-pop"] .codex-theme-home-actions {
 }
 
 html[data-codex-theme-id="enfp-pop"] .codex-theme-home-action {
-  min-height: 180px;
+  min-height: 148px;
   border-radius: 26px;
 }
 
@@ -1156,8 +1158,8 @@ html[data-codex-window-type="electron"] #codex-theme-home.codex-theme-home-compa
 }
 
 html[data-codex-window-type="electron"] #codex-theme-home.codex-theme-home-compact .codex-theme-home-action {
-  min-height: 174px;
-  padding-inline: 14px;
+  min-height: 142px;
+  padding-inline: 10px;
 }
 
 html[data-codex-window-type="electron"] #codex-theme-home.codex-theme-home-compact .codex-theme-home-hero {
@@ -1181,8 +1183,8 @@ html[data-codex-window-type="electron"] #codex-theme-home.codex-theme-home-narro
   }
 
   html[data-codex-window-type="electron"] .codex-theme-home-action {
-    min-height: 174px;
-    padding-inline: 14px;
+    min-height: 142px;
+    padding-inline: 10px;
   }
 }
 
@@ -1202,11 +1204,6 @@ html[data-codex-window-type="electron"] #codex-theme-home.codex-theme-home-narro
 }
 
 @media (max-width: 900px) {
-  html[data-codex-window-type="electron"] .codex-theme-home-actions {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-    margin-top: 14px;
-  }
-
   html[data-codex-window-type="electron"] .codex-theme-home-copy {
     width: 60%;
   }
@@ -1252,7 +1249,7 @@ html[data-codex-window-type="electron"] #codex-theme-home.codex-theme-home-narro
 }
 
 html[data-codex-window-type="electron"] #codex-theme-home.codex-theme-home-narrow .codex-theme-home-action {
-  min-height: 168px;
+  min-height: 132px;
 }
 
 html[data-codex-window-type="electron"] #codex-theme-home.codex-theme-home-narrow .codex-theme-home-hero {
@@ -1303,6 +1300,7 @@ public static class JsBuilder
   else {
     prior?.observer?.disconnect();
     if (prior?.resizeHandler) window.removeEventListener("resize", prior.resizeHandler);
+    if (prior?.resizeTimer) clearTimeout(prior.resizeTimer);
     prior?.main?.classList.remove("codex-theme-home-active");
     document.getElementById("codex-theme-home")?.remove();
   }
@@ -1548,29 +1546,10 @@ public static class JsBuilder
     document.documentElement.dataset.codexThemeId = themeId;
     if (copyConfig.title) document.title = copyConfig.title;
 
-    // Project, task, conversation and account text belongs to Codex. Themes do
-    // not get a general-purpose page text replacement surface.
-    const textMap = {};
     const placeholderMap = copyConfig.replacePlaceholders || {};
-    const skip = new Set(["SCRIPT", "STYLE", "TEXTAREA", "INPUT", "CODE", "PRE"]);
-    const walker = document.createTreeWalker(document.body || document.documentElement, NodeFilter.SHOW_TEXT);
-    const nodes = [];
-    while (walker.nextNode()) nodes.push(walker.currentNode);
-
-    for (const node of nodes) {
-      const parent = node.parentElement;
-      if (!parent || skip.has(parent.tagName) || isThemeNode(parent)) continue;
-      applyTextReplacement(node, textMap);
-    }
-
-    for (const input of document.querySelectorAll("input[placeholder], textarea[placeholder]")) {
-      applyAttributeReplacement(input, "placeholder", placeholderMap);
-    }
-
-    for (const node of document.querySelectorAll("[aria-label], [title]")) {
-      if (isThemeNode(node)) continue;
-      for (const attribute of ["aria-label", "title"]) {
-        applyAttributeReplacement(node, attribute, textMap);
+    if (Object.keys(placeholderMap).length) {
+      for (const input of document.querySelectorAll("input[placeholder], textarea[placeholder]")) {
+        applyAttributeReplacement(input, "placeholder", placeholderMap);
       }
     }
 
@@ -1686,6 +1665,38 @@ public static class JsBuilder
   let disposed = false;
   let observer = null;
   let resizeHandler = null;
+  let resizeTimer = 0;
+  let applyCount = 0;
+  const messageSelector = '[data-content-search-unit-key$=":user"], [data-content-search-unit-key$=":assistant"], [data-message-author-role]';
+  const structureSelector = [
+    ".main-surface",
+    ".browser-main-surface",
+    ".composer-surface-chrome",
+    ".ProseMirror",
+    ".app-shell-left-panel",
+    "aside.app-shell-left-panel",
+    "nav[aria-label]",
+    "input[placeholder]",
+    "textarea[placeholder]",
+    messageSelector,
+  ].join(",");
+
+  function nodeContainsStructure(node) {
+    if (node?.nodeType !== Node.ELEMENT_NODE || isThemeNode(node)) return false;
+    return node.matches(structureSelector) || !!node.querySelector(structureSelector);
+  }
+
+  function mutationNeedsApply(mutation) {
+    const target = mutation.target?.nodeType === Node.ELEMENT_NODE
+      ? mutation.target
+      : mutation.target?.parentElement;
+    if (!target || isThemeNode(target)) return false;
+    if (mutation.type === "attributes") return target.matches(structureSelector);
+    if (target.closest(messageSelector) || target.closest(".ProseMirror")) return false;
+    if (target.closest(".app-shell-left-panel, aside.app-shell-left-panel")) return true;
+    return [...mutation.addedNodes, ...mutation.removedNodes].some(nodeContainsStructure);
+  }
+
   function queueApply() {
     if (queued || disposed) return;
     queued = true;
@@ -1693,6 +1704,7 @@ public static class JsBuilder
       frameId = 0;
       queued = false;
       if (disposed || globalThis.__codexThemeStore?.themeId !== themeId) return;
+      applyCount += 1;
       applyThemeCopy();
       applyNativeSidebarLabels();
       applyThemeHome();
@@ -1705,6 +1717,7 @@ public static class JsBuilder
     disposed = true;
     observer?.disconnect();
     if (frameId) cancelAnimationFrame(frameId);
+    if (resizeTimer) clearTimeout(resizeTimer);
     if (resizeHandler) window.removeEventListener("resize", resizeHandler);
     globalThis.__codexThemeStore?.main?.classList.remove("codex-theme-home-active");
     document.getElementById("codex-theme-home")?.remove();
@@ -1730,6 +1743,8 @@ public static class JsBuilder
     dispose,
     main: null,
     resizeHandler: null,
+    resizeTimer: 0,
+    getApplyCount: () => applyCount,
   };
 
   applyThemeCopy();
@@ -1737,16 +1752,25 @@ public static class JsBuilder
   applyThemeHome();
   hydrateThemeIcons();
 
-  observer = new MutationObserver(queueApply);
+  observer = new MutationObserver(mutations => {
+    if (mutations.some(mutationNeedsApply)) queueApply();
+  });
   observer.observe(document.documentElement, {
     subtree: true,
     childList: true,
-    characterData: true,
     attributes: true,
-    attributeFilter: ["placeholder", "aria-label", "title", "class"],
+    attributeFilter: ["placeholder", "data-content-search-unit-key", "data-message-author-role"],
   });
   globalThis.__codexThemeStore.observer = observer;
-  resizeHandler = () => queueApply();
+  resizeHandler = () => {
+    if (resizeTimer) clearTimeout(resizeTimer);
+    resizeTimer = setTimeout(() => {
+      resizeTimer = 0;
+      if (!disposed && globalThis.__codexThemeStore?.themeId === themeId) applyThemeHome();
+      if (globalThis.__codexThemeStore) globalThis.__codexThemeStore.resizeTimer = 0;
+    }, 120);
+    globalThis.__codexThemeStore.resizeTimer = resizeTimer;
+  };
   window.addEventListener("resize", resizeHandler, { passive: true });
   globalThis.__codexThemeStore.resizeHandler = resizeHandler;
 })();

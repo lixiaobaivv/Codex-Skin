@@ -17,4 +17,7 @@
   <ItemGroup>
     <ProjectReference Include="..\..\src\CodexThemeStore.Core\CodexThemeStore.Core.csproj" />
   </ItemGroup>
+  <ItemGroup>
+    <None Include="..\..\samples\dreamskin\codex-skin-sample-1.0.0.dreamskin" Link="fixtures\codex-skin-sample-1.0.0.dreamskin" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
 </Project>

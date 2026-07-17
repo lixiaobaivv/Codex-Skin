@@ -64,6 +64,8 @@ jobs:
           & "artifacts/Codex-Skin-win-x64/Codex-Skin.exe" import samples/dreamskin/codex-skin-sample-1.0.0.dreamskin
           $manifest = Join-Path $env:CODEX_THEME_LIBRARY_DIR "codex-skin.jackson-sage-sample/1.0.0/theme.json"
           if (-not (Test-Path -LiteralPath $manifest)) { throw "Signed fixture was not installed." }
+          $themes = @(& "artifacts/Codex-Skin-win-x64/Codex-Skin.exe" list)
+          if (-not ($themes -match "codex-skin.jackson-sage-sample")) { throw "Imported theme did not persist in the theme list." }
 
       - uses: actions/upload-artifact@v7
         with:

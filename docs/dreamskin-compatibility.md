@@ -1,6 +1,6 @@
 # Codex-Skin-Store import compatibility
 
-This repository implements the Windows side of the Codex-Skin-Store MVP v1
+This repository implements the shared Windows and macOS side of the Codex-Skin-Store MVP v1
 contract. The canonical protocol and JSON Schema remain owned by the store
 repository:
 
@@ -16,7 +16,7 @@ registration:
 2. Calculate and display the package SHA-256.
 3. Require exactly `theme.json`, one background image and one preview image.
 4. Reject traversal, nested paths, links, duplicate names and size overruns.
-5. Enforce the closed MVP v1 manifest shape and Windows compatibility range.
+5. Enforce the closed MVP v1 manifest shape and current-platform compatibility range.
 6. Remove `signature.value`, canonicalize the remaining JSON and verify its
    Ed25519 signature against the application keyring.
 7. Verify asset sizes, hashes, media signatures, decoded dimensions and pixel
@@ -24,16 +24,16 @@ registration:
 8. Commit the validated payload to an immutable `<id>/<version>` directory.
 9. Keep installation and application as separate user choices.
 
-The same fixture and validation order are intended for the future macOS
-importer. Platform code should differ only around URL/file association,
-filesystem locations and the final theme activation bridge.
+The same fixture and validation order are used by Windows and macOS. Platform
+code differs only around URL/file activation, confirmation UI and the final
+theme activation bridge.
 
 ## Runtime mapping
 
 Imported store manifests use a smaller cross-platform color model than the
-built-in Windows themes. The Windows renderer maps it as follows:
+built-in themes. The shared renderer maps it as follows:
 
-| Store v1 | Windows runtime |
+| Store v1 | Shared runtime |
 | --- | --- |
 | `id` | `codeThemeId` |
 | `name` | `displayName` |
@@ -59,17 +59,16 @@ key as production authority.
 
 ## Deep-link slice
 
-The Windows implementation now also includes:
+The shared implementation now also includes:
 
 1. strict `dreamskin://install` parsing with duplicate and unknown field rejection;
 2. a 4096-byte URI limit and exactly-once UTF-8 percent decoding;
 3. bounded HTTPS download with public-address DNS enforcement;
 4. manual redirect handling with a maximum of three HTTPS redirects;
 5. package size and SHA-256 checks before package parsing and installation;
-6. current-user Windows URL scheme and `.dreamskin` association commands;
+6. current-user Windows association commands and macOS Avalonia activation handling;
 7. separate confirmation prompts for download/install and immediate application.
 
-The remaining publication steps are to compile and exercise the Windows path,
-publish the sample as an immutable GitHub Release asset, then enable the store
-button for that real catalog entry. The website must continue offering a manual
-`.dreamskin` download fallback.
+Windows Setup registers the protocol during installation. macOS PKG declares
+the URL scheme and document type; real-device LaunchServices validation remains
+required. The website continues to offer a manual `.dreamskin` fallback.

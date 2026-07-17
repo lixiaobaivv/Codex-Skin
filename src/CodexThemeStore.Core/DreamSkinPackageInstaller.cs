@@ -5,21 +5,24 @@ using System.Text.Encodings.Web;
 using System.Text.Json;
 using System.Text.RegularExpressions;
 using NSec.Cryptography;
+using SixLabors.ImageSharp;
 
-internal sealed record DreamSkinImportResult(
+namespace CodexThemeStore.Core;
+
+public sealed record DreamSkinImportResult(
     string Id,
     string Version,
     string DisplayName,
     string ManifestPath,
     string PackageSha256);
 
-internal sealed record DreamSkinExpectedPackage(
+public sealed record DreamSkinExpectedPackage(
     string Sha256,
     long Size,
     string? Id,
     string? Version);
 
-internal static class DreamSkinPackageInstaller
+public static class DreamSkinPackageInstaller
 {
     private const long MaxPackageBytes = 20L * 1024 * 1024;
     private const long MaxManifestBytes = 64L * 1024;
@@ -72,7 +75,17 @@ internal static class DreamSkinPackageInstaller
         "secondary", "highlight", "text", "muted", "line",
     };
 
-    public static DreamSkinImportResult ImportLocal(string packagePath, DreamSkinExpectedPackage? expected = null)
+    public static string DefaultLibraryRoot { get; } = Path.Combine(
+        Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+        "CodexThemeStore",
+        "themes",
+        "packages");
+
+    public static DreamSkinImportResult ImportLocal(
+        string packagePath,
+        DreamSkinExpectedPackage? expected = null,
+        string? platform = null,
+        string? libraryRoot = null)
     {
         var fullPackagePath = Path.GetFullPath(packagePath.Trim().Trim('"'));
         if (!File.Exists(fullPackagePath))
@@ -124,7 +137,7 @@ internal static class DreamSkinPackageInstaller
         }
 
         using var document = ParseManifest(manifestText);
-        var manifest = ValidateManifest(document.RootElement);
+        var manifest = ValidateManifest(document.RootElement, ResolvePlatform(platform));
         if (expected?.Id is not null && !manifest.Id.Equals(expected.Id, StringComparison.Ordinal))
         {
             throw Error("DSI_MANIFEST_INVALID", "下载包主题 ID 与深链接提示不一致。");
@@ -144,7 +157,7 @@ internal static class DreamSkinPackageInstaller
             throw Error("DSI_PACKAGE_INVALID", "ZIP 文件名与清单资源声明不一致。");
         }
 
-        var libraryRoot = GetLibraryRoot();
+        libraryRoot = GetLibraryRoot(libraryRoot);
         Directory.CreateDirectory(libraryRoot);
         var stagingRoot = Path.Combine(libraryRoot, $".staging-{Guid.NewGuid():N}");
         Directory.CreateDirectory(stagingRoot);
@@ -203,6 +216,45 @@ internal static class DreamSkinPackageInstaller
         }
     }
 
+    public static ThemeDefinition LoadInstalledTheme(string manifestPath, string? platform = null)
+    {
+        manifestPath = Path.GetFullPath(manifestPath);
+        var info = new FileInfo(manifestPath);
+        if (!info.Exists || info.Length is < 1 or > MaxManifestBytes)
+            throw Error("DSI_MANIFEST_INVALID", "已安装主题缺少有效的 theme.json。");
+
+        var manifestBytes = File.ReadAllBytes(manifestPath);
+        if (manifestBytes.AsSpan().StartsWith(new byte[] { 0xEF, 0xBB, 0xBF }))
+            throw Error("DSI_MANIFEST_INVALID", "theme.json 必须是无 BOM 的 UTF-8。");
+
+        string manifestText;
+        try
+        {
+            manifestText = new UTF8Encoding(false, true).GetString(manifestBytes);
+        }
+        catch (DecoderFallbackException)
+        {
+            throw Error("DSI_MANIFEST_INVALID", "theme.json 不是严格 UTF-8。");
+        }
+
+        using var document = ParseManifest(manifestText);
+        var manifest = ValidateManifest(document.RootElement, ResolvePlatform(platform));
+        VerifySignature(document.RootElement, manifest.Signature);
+        var directory = Path.GetDirectoryName(manifestPath)!;
+        var idDirectory = Path.GetDirectoryName(directory);
+        if (!Path.GetFileName(directory).Equals(manifest.Version, StringComparison.Ordinal) ||
+            idDirectory is null || !Path.GetFileName(idDirectory).Equals(manifest.Id, StringComparison.Ordinal))
+        {
+            throw Error("DSI_PACKAGE_INVALID", "已安装主题目录与签名清单的 ID 或版本不一致。");
+        }
+        if (!InstalledPackageMatches(directory, manifest, manifestBytes))
+            throw Error("DSI_PACKAGE_INVALID", "已安装主题资源缺失或哈希不匹配。");
+
+        var theme = ThemeDefinition.Load(manifestPath);
+        theme.ValidateAssets();
+        return theme;
+    }
+
     private static JsonDocument ParseManifest(string manifestText)
     {
         try
@@ -222,7 +274,7 @@ internal static class DreamSkinPackageInstaller
         }
     }
 
-    private static DreamSkinManifest ValidateManifest(JsonElement root)
+    private static DreamSkinManifest ValidateManifest(JsonElement root, string platform)
     {
         RequireObject(root, "theme.json");
         RequireClosedObject(root, RootProperties, RootRequired, "theme.json");
@@ -278,9 +330,9 @@ internal static class DreamSkinPackageInstaller
         {
             throw Error("DSI_MANIFEST_INVALID", "platforms 包含重复或未知平台。");
         }
-        if (!platformNames.Contains("windows", StringComparer.Ordinal))
+        if (!platformNames.Contains(platform, StringComparer.Ordinal))
         {
-            throw Error("DSI_UNSUPPORTED_PLATFORM", "该主题未声明支持 Windows。");
+            throw Error("DSI_UNSUPPORTED_PLATFORM", $"该主题未声明支持 {platform}。");
         }
 
         foreach (var optionalText in new[] { "brandSubtitle", "projectPrefix", "projectLabel", "statusText", "quote" })
@@ -535,24 +587,23 @@ internal static class DreamSkinPackageInstaller
             throw Error("DSI_ASSET_INVALID", $"图片 {asset.Path} 的文件魔数与声明类型不符。");
         }
 
-        if (webp)
-        {
-            throw Error("DSI_ASSET_INVALID", "Windows MVP 导入器暂未启用 WebP 完整解码；请使用 PNG 或 JPEG。");
-        }
-
         ValidateStaticImageContainer(path, asset, png, jpeg);
 
         try
         {
-            using var image = System.Drawing.Image.FromStream(input, useEmbeddedColorManagement: false, validateImageData: true);
+            using var image = Image.Load(path);
             var width = image.Width;
             var height = image.Height;
-            if (width != asset.Width || height != asset.Height || (long)width * height > maxPixels)
+            if (image.Frames.Count != 1 || width != asset.Width || height != asset.Height || (long)width * height > maxPixels)
             {
-                throw Error("DSI_ASSET_INVALID", $"图片 {asset.Path} 的像素尺寸与清单不一致或超过限制。");
+                throw Error("DSI_ASSET_INVALID", $"图片 {asset.Path} 必须是静态图片，且像素尺寸需与清单一致并处于限制内。");
             }
         }
-        catch (ArgumentException)
+        catch (UnknownImageFormatException)
+        {
+            throw Error("DSI_ASSET_INVALID", $"图片 {asset.Path} 格式无法识别。");
+        }
+        catch (InvalidImageContentException)
         {
             throw Error("DSI_ASSET_INVALID", $"图片 {asset.Path} 无法完整解码。");
         }
@@ -654,15 +705,19 @@ internal static class DreamSkinPackageInstaller
             && HashFile(previewPath).Equals(manifest.Preview.Sha256, StringComparison.Ordinal);
     }
 
-    private static string GetLibraryRoot()
+    private static string GetLibraryRoot(string? configuredRoot)
     {
-        var configured = Environment.GetEnvironmentVariable("CODEX_THEME_LIBRARY_DIR");
+        var configured = configuredRoot ?? Environment.GetEnvironmentVariable("CODEX_THEME_LIBRARY_DIR");
         if (!string.IsNullOrWhiteSpace(configured)) return Path.GetFullPath(configured);
-        return Path.Combine(
-            Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
-            "CodexThemeStore",
-            "themes",
-            "packages");
+        return DefaultLibraryRoot;
+    }
+
+    private static string ResolvePlatform(string? platform)
+    {
+        platform ??= OperatingSystem.IsWindows() ? "windows" : OperatingSystem.IsMacOS() ? "macos" : null;
+        if (platform is not ("windows" or "macos"))
+            throw Error("DSI_UNSUPPORTED_PLATFORM", "只支持 Windows 或 macOS 主题导入。");
+        return platform;
     }
 
     private static string GetInstallPath(string root, string id, string version)

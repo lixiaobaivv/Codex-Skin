@@ -35,11 +35,11 @@ jobs:
       - name: Validate and package theme catalog
         run: |
           dotnet run --project src/CodexThemeStore.Cli/CodexThemeStore.Cli.csproj --configuration Release -- theme-validate .
-          dotnet run --project src/CodexThemeStore.Cli/CodexThemeStore.Cli.csproj --configuration Release -- theme-pack . artifacts/CodexSkin-theme-catalog-v1.zip
+          dotnet run --project src/CodexThemeStore.Cli/CodexThemeStore.Cli.csproj --configuration Release -- theme-pack . artifacts/Codex-Skin-theme-catalog-v1.zip
       - uses: actions/upload-artifact@v7
         with:
-          name: CodexSkin-theme-catalog-v1
-          path: artifacts/CodexSkin-theme-catalog-v1.zip
+          name: Codex-Skin-theme-catalog-v1
+          path: artifacts/Codex-Skin-theme-catalog-v1.zip
           if-no-files-found: error
 
   windows-installer:
@@ -88,8 +88,8 @@ jobs:
           & $iscc "/DMyAppSource=$source" "/DMyOutputDir=$output" "/DMyAppVersion=$env:PACKAGE_VERSION" installer/windows/CodexThemeStore.iss
       - uses: actions/upload-artifact@v7
         with:
-          name: CodexThemeStore-windows-x64
-          path: artifacts/installer/CodexThemeStore-Setup-win-x64.exe
+          name: Codex-Skin-windows-x64
+          path: artifacts/installer/Codex-Skin-Setup-win-x64.exe
           if-no-files-found: error
 
   macos-installer:
@@ -111,11 +111,11 @@ jobs:
       - name: Build macOS PKG
         run: |
           chmod +x installer/macos/build-pkg.sh
-          installer/macos/build-pkg.sh "${{ matrix.rid }}" "$PACKAGE_VERSION" "artifacts/CodexThemeStore-${{ matrix.rid }}.pkg"
+          installer/macos/build-pkg.sh "${{ matrix.rid }}" "$PACKAGE_VERSION" "artifacts/Codex-Skin-${{ matrix.rid }}.pkg"
       - uses: actions/upload-artifact@v7
         with:
-          name: CodexThemeStore-${{ matrix.rid }}
-          path: artifacts/CodexThemeStore-${{ matrix.rid }}.pkg
+          name: Codex-Skin-${{ matrix.rid }}
+          path: artifacts/Codex-Skin-${{ matrix.rid }}.pkg
           if-no-files-found: error
 
   release:
@@ -129,9 +129,14 @@ jobs:
         with:
           path: release
           merge-multiple: true
+      - name: Generate installer checksums
+        run: |
+          cd release
+          sha256sum Codex-Skin-Setup-win-x64.exe Codex-Skin-osx-arm64.pkg Codex-Skin-osx-x64.pkg Codex-Skin-theme-catalog-v1.zip > Codex-Skin-installers-SHA256SUMS.txt
       - uses: softprops/action-gh-release@v2
         with:
           files: |
             release/*.exe
             release/*.pkg
             release/*.zip
+            release/*.txt

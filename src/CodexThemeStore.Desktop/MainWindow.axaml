@@ -1,7 +1,7 @@
 <Window xmlns="https://github.com/avaloniaui"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         x:Class="CodexThemeStore.Desktop.MainWindow"
-        Title="Codex Theme Store"
+        Title="Codex-Skin"
         Width="1120" Height="780"
         MinWidth="820" MinHeight="620"
         FontFamily="Inter, PingFang SC, Microsoft YaHei, Noto Sans CJK SC, sans-serif"
@@ -28,15 +28,14 @@
 
   <Grid RowDefinitions="82,*,96">
     <Border Grid.Row="0" Background="#FAFBF8" BorderBrush="#DADDD6" BorderThickness="0,0,0,1" Padding="24,16">
-      <Grid ColumnDefinitions="*,Auto,Auto,Auto,Auto" ColumnSpacing="10">
+      <Grid ColumnDefinitions="*,Auto,Auto,Auto" ColumnSpacing="10">
         <StackPanel VerticalAlignment="Center" Spacing="2">
-          <TextBlock Text="Codex Theme Store" FontSize="23" FontWeight="SemiBold" Foreground="#20231F" />
+          <TextBlock Text="Codex-Skin" FontSize="23" FontWeight="SemiBold" Foreground="#20231F" />
           <TextBlock x:Name="CatalogLabel" Text="主题目录" FontSize="12" Foreground="#6D736A" />
         </StackPanel>
         <ComboBox x:Name="CategoryCombo" Grid.Column="1" Width="116" VerticalAlignment="Center" />
         <ComboBox x:Name="SourceCombo" Grid.Column="2" Width="142" VerticalAlignment="Center" />
-        <Button x:Name="RepositoryButton" Grid.Column="3" Classes="command" Content="仓库设置" VerticalAlignment="Center" />
-        <Button x:Name="RefreshButton" Grid.Column="4" Classes="command" Content="刷新" VerticalAlignment="Center" />
+        <Button x:Name="RefreshButton" Grid.Column="3" Classes="command" Content="刷新" VerticalAlignment="Center" />
       </Grid>
     </Border>
 

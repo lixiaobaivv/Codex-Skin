@@ -14,7 +14,10 @@ public sealed partial class MainWindow : Window
     private readonly ObservableCollection<ThemeCardModel> _visibleThemes = [];
     private readonly List<ThemeCardModel> _allThemes = [];
     private readonly ICodexPlatformAdapter _adapter = new MacOsCodexAdapter();
+    private readonly SemaphoreSlim _importGate = new(1, 1);
     private ThemeCardModel? _selected;
+    private string? _lastImportValue;
+    private DateTimeOffset _lastImportAt;
 
     public MainWindow()
     {
@@ -29,7 +32,6 @@ public sealed partial class MainWindow : Window
         CategoryCombo.SelectionChanged += (_, _) => ApplyFilter();
         ThemeList.SelectionChanged += (_, _) => SelectTheme(ThemeList.SelectedItem as ThemeCardModel);
         RefreshButton.Click += async (_, _) => await RefreshAsync(false);
-        RepositoryButton.Click += async (_, _) => await ConfigureRepositoryAsync();
         ApplyButton.Click += async (_, _) => await ApplyAsync(false);
         RestartButton.Click += async (_, _) => await ApplyAsync(true);
         RollbackButton.Click += async (_, _) => await RollbackAsync();
@@ -47,11 +49,8 @@ public sealed partial class MainWindow : Window
         var selectedId = _selected?.Id;
         DisposeThemes();
         _allThemes.Clear();
-        var directory = FindThemeDirectory();
-        foreach (var file in Directory.GetFiles(directory, "*.json").OrderBy(Path.GetFileName, StringComparer.Ordinal))
+        foreach (var theme in ThemeCatalog.Load(ThemeDirectories(), platform: "macos"))
         {
-            var theme = ThemeDefinition.Load(file);
-            theme.ValidateAssets();
             _allThemes.Add(new ThemeCardModel(
                 theme.CodeThemeId,
                 theme.DisplayName,
@@ -65,28 +64,11 @@ public sealed partial class MainWindow : Window
         SelectTheme(_allThemes.FirstOrDefault(theme => theme.Id == selectedId) ?? _visibleThemes.FirstOrDefault());
     }
 
-    private static string FindThemeDirectory()
+    private static IEnumerable<string> ThemeDirectories()
     {
-        foreach (var directory in new[]
-                 {
-                     ThemeRepositoryClient.CacheThemeDirectory,
-                     Path.Combine(AppContext.BaseDirectory, "themes"),
-                     Path.Combine(Directory.GetCurrentDirectory(), "themes"),
-                 })
-        {
-            if (!Directory.Exists(directory)) continue;
-            var files = Directory.GetFiles(directory, "*.json");
-            if (files.Length == 0) continue;
-            try
-            {
-                foreach (var file in files) ThemeDefinition.Load(file).ValidateAssets();
-                return directory;
-            }
-            catch when (Path.GetFullPath(directory).Equals(Path.GetFullPath(ThemeRepositoryClient.CacheThemeDirectory), StringComparison.Ordinal))
-            {
-            }
-        }
-        throw new DirectoryNotFoundException("找不到可用主题目录。");
+        yield return ThemeRepositoryClient.CacheThemeDirectory;
+        yield return Path.Combine(AppContext.BaseDirectory, "themes");
+        yield return Path.Combine(Directory.GetCurrentDirectory(), "themes");
     }
 
     private void ApplyFilter()
@@ -131,16 +113,6 @@ public sealed partial class MainWindow : Window
         {
             SetBusy(false, StatusLabel.Text ?? "准备就绪");
         }
-    }
-
-    private async Task ConfigureRepositoryAsync()
-    {
-        var dialog = new RepositorySettingsWindow(ThemeRepositoryClient.LoadSettings());
-        var settings = await dialog.ShowDialog<ThemeRepositorySettings?>(this);
-        if (settings is null) return;
-        ThemeRepositoryClient.SaveSettings(settings);
-        StatusLabel.Text = $"主题仓库已设为 {settings.Repository}";
-        await RefreshAsync(false);
     }
 
     private async Task ApplyAsync(bool restart)
@@ -193,13 +165,69 @@ public sealed partial class MainWindow : Window
         }
     }
 
+    public async Task HandleExternalImportAsync(string value)
+    {
+        await _importGate.WaitAsync();
+        try
+        {
+            var now = DateTimeOffset.UtcNow;
+            if (value.Equals(_lastImportValue, StringComparison.Ordinal) && now - _lastImportAt < TimeSpan.FromSeconds(3))
+                return;
+            _lastImportValue = value;
+            _lastImportAt = now;
+
+            if (!IsVisible) Show();
+            Activate();
+
+            DreamSkinImportResult imported;
+            if (value.StartsWith("dreamskin:", StringComparison.OrdinalIgnoreCase))
+            {
+                var request = DreamSkinProtocol.Parse(value);
+                if (!await ConfirmAsync(
+                        $"从 {request.PackageUri.Host} 下载主题？\n\n" +
+                        $"主题：{request.Id ?? "未提供"}\n版本：{request.Version ?? "未提供"}\n大小：{request.Size:N0} 字节\n\n" +
+                        "客户端会校验 SHA-256、Ed25519 签名和全部图片后再安装，不会自动应用。")) return;
+                SetBusy(true, "正在安全下载并验证主题...");
+                imported = await DreamSkinDownloadService.DownloadAndImportAsync(request, CancellationToken.None);
+            }
+            else
+            {
+                var path = Uri.TryCreate(value, UriKind.Absolute, out var fileUri) && fileUri.IsFile
+                    ? fileUri.LocalPath
+                    : value;
+                if (!path.EndsWith(".dreamskin", StringComparison.OrdinalIgnoreCase))
+                    throw new InvalidOperationException("只支持打开 .dreamskin 主题包。");
+                if (!await ConfirmAsync($"验证并安装本地主题包？\n\n{Path.GetFileName(path)}\n\n安装后不会自动应用。")) return;
+                SetBusy(true, "正在验证主题签名...");
+                imported = await Task.Run(() => DreamSkinPackageInstaller.ImportLocal(path, platform: "macos"));
+            }
+
+            StatusLabel.Text = $"{imported.DisplayName} 已安全安装";
+            LoadLocalThemes();
+            if (!await ConfirmAsync($"{imported.DisplayName} 已通过签名验证并安装。\n\n立即重启 Codex 并应用该主题？")) return;
+            SetBusy(true, "正在重启 Codex 并应用主题...");
+            var payload = new ThemeStateCompiler().Compile(imported.ManifestPath, StateDirectory());
+            await new CodexThemeRuntime().RestartAndInjectAsync(_adapter, payload, TimeSpan.FromSeconds(90));
+            StatusLabel.Text = $"{imported.DisplayName} 已应用";
+        }
+        catch (Exception ex)
+        {
+            StatusLabel.Text = "主题导入失败";
+            await ShowErrorAsync(ex.Message);
+        }
+        finally
+        {
+            SetBusy(false, StatusLabel.Text ?? "准备就绪");
+            _importGate.Release();
+        }
+    }
+
     private void SetBusy(bool busy, string status)
     {
         BusyBar.IsVisible = busy;
         StatusLabel.Text = status;
         CategoryCombo.IsEnabled = !busy;
         SourceCombo.IsEnabled = !busy;
-        RepositoryButton.IsEnabled = !busy;
         RefreshButton.IsEnabled = !busy;
         ThemeList.IsEnabled = !busy;
         SetCommandAvailability(!busy);
@@ -217,7 +245,7 @@ public sealed partial class MainWindow : Window
         var close = new Button { Content = "关闭", HorizontalAlignment = Avalonia.Layout.HorizontalAlignment.Right, MinWidth = 80 };
         var dialog = new Window
         {
-            Title = "Codex Theme Store",
+            Title = "Codex-Skin",
             Width = 440,
             SizeToContent = SizeToContent.Height,
             CanResize = false,
@@ -244,7 +272,7 @@ public sealed partial class MainWindow : Window
         var confirm = new Button { Content = "继续", MinWidth = 80, Background = new SolidColorBrush(Color.Parse("#D96F4D")), Foreground = Brushes.White };
         var dialog = new Window
         {
-            Title = "Codex Theme Store",
+            Title = "Codex-Skin",
             Width = 440,
             SizeToContent = SizeToContent.Height,
             CanResize = false,

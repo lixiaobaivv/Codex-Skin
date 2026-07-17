@@ -3,7 +3,9 @@ using System.Net.Http.Headers;
 using System.Net.Sockets;
 using System.Security.Cryptography;
 
-internal static class DreamSkinDownloadService
+namespace CodexThemeStore.Core;
+
+public static class DreamSkinDownloadService
 {
     private const int MaxRedirects = 3;
 
@@ -12,7 +14,7 @@ internal static class DreamSkinDownloadService
         return DownloadAndImportAsync(request, CancellationToken.None).GetAwaiter().GetResult();
     }
 
-    private static async Task<DreamSkinImportResult> DownloadAndImportAsync(
+    public static async Task<DreamSkinImportResult> DownloadAndImportAsync(
         DreamSkinInstallRequest request,
         CancellationToken cancellationToken)
     {

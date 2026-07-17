@@ -15,7 +15,7 @@ ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
 BUILD_ROOT="${RUNNER_TEMP:-/tmp}/codex-theme-store-${RID}"
 PUBLISH_DIR="$BUILD_ROOT/publish"
 PAYLOAD_DIR="$BUILD_ROOT/payload"
-APP_DIR="$PAYLOAD_DIR/Applications/Codex Theme Store.app"
+APP_DIR="$PAYLOAD_DIR/Applications/Codex-Skin.app"
 
 case "$RID" in
   osx-arm64|osx-x64) ;;
@@ -44,7 +44,10 @@ done
 
 cp -R "$PUBLISH_DIR/." "$APP_DIR/Contents/MacOS/"
 sed "s/__VERSION__/$VERSION/g" "$ROOT/installer/macos/Info.plist" > "$APP_DIR/Contents/Info.plist"
-chmod 0755 "$APP_DIR/Contents/MacOS/CodexThemeStore.Desktop"
+chmod 0755 "$APP_DIR/Contents/MacOS/Codex-Skin"
+plutil -lint "$APP_DIR/Contents/Info.plist"
+test "$(/usr/libexec/PlistBuddy -c 'Print :CFBundleURLTypes:0:CFBundleURLSchemes:0' "$APP_DIR/Contents/Info.plist")" = "dreamskin"
+test "$(/usr/libexec/PlistBuddy -c 'Print :CFBundleDocumentTypes:0:CFBundleTypeExtensions:0' "$APP_DIR/Contents/Info.plist")" = "dreamskin"
 find "$PAYLOAD_DIR" -name '*.pdb' -delete
 
 pkgbuild \

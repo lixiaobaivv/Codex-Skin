@@ -1,106 +1,99 @@
-# Codex Theme Store
+# Codex-Skin
 
 [简体中文](README.md) | [English](README.en.md)
 
-A desktop theme browser and switcher for Codex on Windows and macOS. It syncs a declarative theme catalog from GitHub, supports categories and download mirrors, and applies the selected appearance through a loopback-only Chrome DevTools Protocol connection.
+Codex-Skin is a desktop theme client for Codex on Windows and macOS. It provides a visual theme browser, safe switching and rollback, and signed one-click imports from [Codex-Skin-Store](https://lixiaobaivv.github.io/Codex-Skin-Store/).
 
-The tool does not modify the signed Codex package. User projects, tasks, conversations, and account data remain owned by Codex and cannot be replaced by a theme.
+> Codex-Skin is a community project, not an OpenAI or official Codex product. It does not modify the signed Codex installation or read API keys, projects, tasks, or conversations.
 
-## Preview
+![Codex-Skin theme catalog](docs/images/theme-store-desktop.png)
 
-![Codex Theme Store catalog](docs/images/theme-store-desktop.png)
+## Download
 
-## Quick Start
+Open the [latest release](https://github.com/lixiaobaivv/Codex-Skin/releases/latest) and choose:
 
-1. Download the Setup EXE or PKG for your platform from GitHub Releases.
-2. Open Codex Theme Store, browse a category, and select a theme card.
-3. Choose **Apply and restart Codex**. Use **Restore default** to remove the theme.
+| Platform | Recommended file | Notes |
+| --- | --- | --- |
+| Windows x64 | `Codex-Skin-Setup-win-x64.exe` | Complete installer with web import registration |
+| Windows portable | `Codex-Skin-win-x64.exe` | Single file; protocol registration is manual |
+| macOS Apple Silicon | `Codex-Skin-osx-arm64.pkg` | M-series Macs |
+| macOS Intel | `Codex-Skin-osx-x64.pkg` | Intel Macs |
 
-The catalog refreshes automatically at startup. When the network is unavailable, bundled themes remain usable. The toolbar also provides manual refresh, GitHub mirror selection, and repository settings.
+The installers include the .NET runtime. No SDK or separate runtime is required. Windows and Apple commercial signing are not currently available, so SmartScreen or Gatekeeper may request explicit approval.
 
-## Platforms
+## Use On Windows
 
-- **Windows:** WinForms store with Store/Patched Codex support.
-- **macOS:** Avalonia graphical store with app discovery, theme compilation, CDP injection, restart, and rollback.
-- **Diagnostic CLI:** available in `src/CodexThemeStore.Cli` for status, refresh, apply, restart, and rollback operations.
+1. Install `Codex-Skin-Setup-win-x64.exe`.
+2. Open Codex-Skin and wait for the catalog refresh.
+3. Select a category and theme.
+4. Choose **Apply and restart Codex**.
+5. Choose **Restore default** to remove the theme.
 
-macOS discovery checks `/Applications/Codex.app`, `~/Applications/Codex.app`, and compatible `ChatGPT.app` locations. Set `CODEX_APP_PATH` for a custom location.
-
-## Built-in Styles
-
-<table>
-  <tr>
-    <td width="50%"><img src="previews/dilraba-star.png" alt="Dilraba Star"><br><b>Dilraba Star</b> · violet starlight</td>
-    <td width="50%"><img src="previews/jackson-sage.png" alt="Jackson Sage"><br><b>Jackson Sage</b> · sage and paper</td>
-  </tr>
-  <tr>
-    <td width="50%"><img src="previews/kun-stage.png" alt="KUN Stage"><br><b>KUN Stage</b> · black and gold stage</td>
-    <td width="50%"><img src="previews/enfp-pop.png" alt="ENFP Pop"><br><b>ENFP Pop</b> · colorful creative pop</td>
-  </tr>
-</table>
-
-Each style can change backgrounds, surfaces, message bubbles, fixed navigation appearance, composer hints, empty-home quick actions, and an optional hero pet image. Themes cannot define project/task data or ship executable JavaScript.
-
-## Theme Repository
-
-The default repository is currently `lixiaobaivv/Codex-Skin` on `main` and can be changed in the store UI. A production public theme repository will be configured before release.
-
-A repository must contain `theme-repository.json`; individual manifests must validate against `schemas/theme-v1.schema.json`. See [Theme repository standard v1](docs/theme-repository-v1.md) for protocol boundaries and [the authoring guide](docs/theme-authoring.md) for the creation, validation, packaging, and publication workflow.
-
-Synchronization downloads to a temporary directory, validates every manifest and asset path, then atomically replaces the cache. Failed updates keep the last valid catalog or bundled themes.
-
-## Runtime Safety
-
-Codex is launched with:
-
-```text
---remote-debugging-address=127.0.0.1
---remote-debugging-port=9229
-```
-
-The injector rejects non-loopback hosts, other ports, `wss`, credentials in WebSocket URLs, and non-Codex page targets. Reapplying a theme removes the previous new-document script before registering the next one.
-
-## Packages and CI
-
-GitHub Actions builds native installer formats rather than ZIP releases:
-
-- `CodexThemeStore-Setup-win-x64.exe`
-- `CodexThemeStore-osx-arm64.pkg`
-- `CodexThemeStore-osx-x64.pkg`
-
-Pushes and pull requests run tests, schema validation, UI rendering, and installer builds. Tags matching `v*` create a GitHub Release. See [build.yml](.github/workflows/build.yml).
-
-The project owner cannot currently provide commercial Windows signing or Apple notarization. Windows SmartScreen or macOS Gatekeeper may therefore require explicit user confirmation. Artifacts remain reproducible from the public CI workflow and source commit.
-
-## Package Size and .NET
-
-Running on Linux works because the development environment already has the .NET SDK/runtime installed. Cross-platform source does not remove the runtime requirement.
-
-| Mode                     |        Windows |     macOS arm64 | Requirement                                                |
-| ------------------------ | -------------: | --------------: | ---------------------------------------------------------- |
-| Framework-dependent      | about 4.91 MiB | about 32.78 MiB | .NET 8 Desktop Runtime / Runtime must already be installed |
-| Self-contained (default) | about 72.8 MiB |  about 59.4 MiB | no separate .NET installation                              |
-
-Framework-dependent packages are smaller because they move the runtime into a prerequisite. The total download does not disappear. Trimming currently produces reflection warnings in JSON/CDP paths and is not enabled for production. NativeAOT requires separate validation on native Windows and macOS runners.
-
-## Development
-
-Run tests:
-
-```bash
-dotnet test tests/CodexThemeStore.Core.Tests/CodexThemeStore.Core.Tests.csproj
-```
-
-Render the desktop UI in headless CI:
-
-```bash
-dotnet run --project tests/CodexThemeStore.Desktop.Headless -- artifacts/theme-store-ui.png 1120 780
-```
-
-Windows local publish:
+Setup registers `dreamskin://` and `.dreamskin` for the current user and removes only its own associations during uninstall. Portable users can register manually:
 
 ```powershell
-dotnet publish .\src\CodexThemeStore\CodexThemeStore.csproj -p:PublishProfile=win-x64
+.\Codex-Skin-win-x64.exe protocol register
 ```
 
-The full architecture and current platform validation status are documented in [cross-platform architecture](docs/cross-platform-architecture.md) and [design compliance](docs/design-compliance.md).
+## Use On macOS
+
+1. Install the PKG matching your Mac processor.
+2. Open `Codex-Skin.app` from Applications.
+3. If Gatekeeper blocks the unsigned package, verify its SHA-256 first, then use **System Settings → Privacy & Security → Open Anyway**.
+4. Select a theme and choose **Apply and restart Codex**.
+
+The PKG declares the `dreamskin://` URL scheme and `.dreamskin` document type. Open Codex-Skin once after installation so LaunchServices can complete registration. macOS packages are currently unsigned and not notarized.
+
+## One-Click Web Import
+
+Open [Codex-Skin-Store](https://lixiaobaivv.github.io/Codex-Skin-Store/), select a published theme, and choose one-click import.
+
+The client:
+
+1. shows the source host, theme hint, version, and exact size;
+2. asks before downloading;
+3. restricts HTTPS redirects, network targets, and bytes;
+4. verifies package SHA-256, Ed25519 signature, manifest, and images;
+5. installs atomically;
+6. asks separately before restarting Codex and applying the theme.
+
+A web click never silently installs or applies a theme. Local `.dreamskin` files can also be opened with the installed app.
+
+Verified imports remain in the local theme browser after Codex-Skin restarts. When several versions of the same theme are installed, the newest semantic version is selected.
+
+## Catalog And Mirrors
+
+The desktop catalog is fixed to the public [lixiaobaivv/Codex-Skin-Store](https://github.com/lixiaobaivv/Codex-Skin-Store) repository. Users can select direct GitHub, GH Proxy, or GHFast transport, but cannot redirect the client to an unreviewed repository.
+
+Updates are fully validated in a temporary directory before the local cache is replaced. A failed refresh keeps the previous valid cache or bundled themes.
+
+The web signed-package catalog and desktop theme catalog are separate contracts. Both are declarative and reject JavaScript, HTML, CSS, SVG, executable payloads, traversal, and unlisted assets.
+
+## Theme Scope
+
+Themes may change backgrounds, fixed sidebar appearance, masthead, logo, hero copy, four prompt cards, message bubbles, composer appearance, and an optional pet image.
+
+Themes cannot replace project, task, progress, conversation, or account data. Prompt cards only insert their configured prompt into the real Codex composer.
+
+## Troubleshooting
+
+**The theme did not appear:** use **Apply and restart Codex**. Codex-Skin only connects to the loopback CDP endpoint at `127.0.0.1:9229`.
+
+**Catalog refresh failed:** switch between GitHub, GH Proxy, and GHFast. Existing themes remain available.
+
+**One-click import did nothing:** repair the Windows Setup registration, run `protocol register` for the portable EXE, or confirm that macOS uses the PKG with URL handler support and has been opened once.
+
+**Codex became slow after applying a theme:** restore the default theme and reapply with the latest client. The current runtime ignores streaming-message internals, avoids full-page mutation scans, and removes expensive full-surface blur effects.
+
+## Security
+
+- The signed Codex application is not modified.
+- CDP is loopback-only.
+- Catalog files and images are treated as untrusted input.
+- DreamSkin packages have strict size, path, file count, media, and pixel limits.
+- SHA-256 protects transfer integrity; Ed25519 verifies publisher trust.
+- Installation and application always require separate confirmation.
+
+See [cross-platform architecture](docs/cross-platform-architecture.md), [desktop catalog v1](docs/theme-repository-v1.md), and [DreamSkin compatibility](docs/dreamskin-compatibility.md) for technical boundaries.
+
+Theme submissions belong in the [Codex-Skin-Store submission guide](https://github.com/lixiaobaivv/Codex-Skin-Store/blob/main/docs/theme-submission.md). Client issues belong in [Codex-Skin Issues](https://github.com/lixiaobaivv/Codex-Skin/issues).

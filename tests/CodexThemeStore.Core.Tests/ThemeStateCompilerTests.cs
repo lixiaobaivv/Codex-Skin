@@ -61,6 +61,16 @@ public sealed class ThemeStateCompilerTests : IDisposable
         Assert.Contains("codex-theme-pet", payload.JavaScript);
         Assert.Contains("cancelAnimationFrame(frameId)", payload.JavaScript);
         Assert.Contains("function dispose()", payload.JavaScript);
+        Assert.Contains("grid-template-columns: repeat(4, minmax(0, 1fr))", payload.Css);
+        Assert.DoesNotContain("repeat(auto-fit", payload.Css);
+        Assert.Contains("backdrop-filter: none !important", payload.Css);
+        Assert.Contains("function mutationNeedsApply", payload.JavaScript);
+        Assert.Contains("mutations.some(mutationNeedsApply)", payload.JavaScript);
+        Assert.Contains("getApplyCount", payload.JavaScript);
+        Assert.Contains("}, 120);", payload.JavaScript);
+        Assert.DoesNotContain("createTreeWalker", payload.JavaScript);
+        Assert.DoesNotContain("characterData: true", payload.JavaScript);
+        Assert.DoesNotContain("\"class\"", payload.JavaScript);
         Assert.Contains("test-theme", payload.JavaScript);
         Assert.DoesNotContain("createThemeSidebar", payload.JavaScript);
         Assert.DoesNotContain("#codex-theme-sidebar", payload.Css);

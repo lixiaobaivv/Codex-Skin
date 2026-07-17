@@ -1,5 +1,7 @@
 # Codex Skin 主题仓库标准 v1
 
+官方桌面目录固定发布在 `lixiaobaivv/Codex-Skin-Store/main`。客户端只允许切换下载加速源，不接受运行时自定义仓库地址。第三方作者仍可使用本标准在本地制作和校验主题，再通过 Codex-Skin-Store 的投稿流程进入受审核目录。
+
 主题仓库必须在根目录提供 `theme-repository.json` 和 `schemas/` 下的两个 v1 Schema。每个主题清单放在 `themes/<id>.json`，图片只能放在 `backgrounds/`、`logos/`、`pets/` 或 `previews/`。完整字段约束以 `schemas/theme-repository-v1.schema.json` 和 `schemas/theme-v1.schema.json` 为准，制作与发布流程见 [`theme-authoring.md`](theme-authoring.md)。
 
 ## 可修改区域

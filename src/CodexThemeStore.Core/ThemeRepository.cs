@@ -13,9 +13,12 @@ public sealed record ThemeRepositorySource(string Id, string Name, string Prefix
 
 public sealed record ThemeRepositorySettings(string Repository, string Branch, string SourceId)
 {
+    public const string OfficialRepository = "lixiaobaivv/Codex-Skin-Store";
+    public const string OfficialBranch = "main";
+
     public static ThemeRepositorySettings Default { get; } = new(
-        Environment.GetEnvironmentVariable("CODEX_THEME_REPOSITORY") ?? "lixiaobaivv/Codex-Skin",
-        Environment.GetEnvironmentVariable("CODEX_THEME_BRANCH") ?? "main",
+        OfficialRepository,
+        OfficialBranch,
         "github");
 }
 
@@ -46,8 +49,8 @@ public sealed class ThemeRepositoryClient
         try
         {
             if (!File.Exists(SettingsPath)) return ThemeRepositorySettings.Default;
-            return JsonSerializer.Deserialize<ThemeRepositorySettings>(File.ReadAllText(SettingsPath, Encoding.UTF8))
-                   ?? ThemeRepositorySettings.Default;
+            var settings = JsonSerializer.Deserialize<ThemeRepositorySettings>(File.ReadAllText(SettingsPath, Encoding.UTF8));
+            return NormalizeSettings(settings);
         }
         catch
         {
@@ -58,15 +61,18 @@ public sealed class ThemeRepositoryClient
     public static void SaveSettings(ThemeRepositorySettings settings)
     {
         Directory.CreateDirectory(StoreDirectory);
-        File.WriteAllText(SettingsPath, JsonSerializer.Serialize(settings, new JsonSerializerOptions { WriteIndented = true }), Encoding.UTF8);
+        File.WriteAllText(SettingsPath, JsonSerializer.Serialize(NormalizeSettings(settings), new JsonSerializerOptions { WriteIndented = true }), Encoding.UTF8);
+    }
+
+    public static ThemeRepositorySettings NormalizeSettings(ThemeRepositorySettings? settings)
+    {
+        var sourceId = Sources.Any(source => source.Id == settings?.SourceId) ? settings!.SourceId : Sources[0].Id;
+        return new ThemeRepositorySettings(ThemeRepositorySettings.OfficialRepository, ThemeRepositorySettings.OfficialBranch, sourceId);
     }
 
     public async Task<ThemeSyncResult> SyncAsync(ThemeRepositorySettings settings, CancellationToken cancellationToken = default)
     {
-        if (!Regex.IsMatch(settings.Repository, "^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$"))
-            throw new InvalidOperationException("主题仓库必须使用 owner/repository 格式。");
-        if (!Regex.IsMatch(settings.Branch, "^[A-Za-z0-9._/-]+$") || settings.Branch.Contains("..", StringComparison.Ordinal))
-            throw new InvalidOperationException("主题仓库分支名称无效。");
+        settings = NormalizeSettings(settings);
 
         var source = Sources.FirstOrDefault(item => item.Id == settings.SourceId) ?? Sources[0];
         var upstream = $"https://github.com/{settings.Repository}/archive/refs/heads/{settings.Branch}.zip";
