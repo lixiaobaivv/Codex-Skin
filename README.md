@@ -5,173 +5,195 @@
 [![CI](https://github.com/lixiaobaivv/Codex-Skin/actions/workflows/ci.yml/badge.svg)](https://github.com/lixiaobaivv/Codex-Skin/actions/workflows/ci.yml)
 [![Build and package](https://github.com/lixiaobaivv/Codex-Skin/actions/workflows/build.yml/badge.svg)](https://github.com/lixiaobaivv/Codex-Skin/actions/workflows/build.yml)
 
-Codex-Skin 是适用于 Windows 和 macOS 的 Codex Desktop 主题客户端。它可以浏览主题、预览效果、切换主题并恢复默认外观，也支持从 [Codex-Skin-Store](https://lixiaobaivv.github.io/Codex-Skin-Store/) 一键导入经过签名验证的主题。
+Codex-Skin 是适用于 Windows 和 macOS 的 Codex Desktop 主题客户端。它提供可视化主题目录、实时预览、安全应用与回滚，并支持从 [Codex-Skin-Store](https://lixiaobaivv.github.io/Codex-Skin-Store/) 导入经过签名验证的主题。
 
-> Codex-Skin 是社区开源项目，不是 OpenAI 或 Codex 官方产品。程序不会修改 Codex 的签名安装包，也不会读取 API Key、项目文件、任务内容或聊天数据。
+这是 Codex-Skin 的首个公开版本，重点是让主题的浏览、下载、验证、安装和应用形成一条完整且可审计的流程。
+
+> Codex-Skin 是社区开源项目，不是 OpenAI 或 Codex 官方产品。它不会修改 Codex 的签名安装包，也不会读取 API Key、项目文件、任务内容或聊天数据。
 
 ![Codex-Skin 主题目录](docs/images/theme-store-desktop.png)
 
+## 核心功能
+
+- 从官方主题目录同步主题，并按人物、动漫、游戏、风景、极简、节日和其他分类筛选；
+- 在应用前查看主题预览、名称、说明和分类；
+- 将主题应用到已启动的 Codex，或由 Codex-Skin 重启 Codex 后自动应用；
+- 一键恢复 Codex 默认外观；
+- 支持 `dreamskin://` 网页导入和本地 `.dreamskin` 文件导入；
+- 验证 SHA-256、Ed25519/RFC8785 签名、主题清单、ZIP 路径和图片内容；
+- 在 GitHub、GH Proxy 和 GHFast 之间自动回退，并保留上一次验证成功的本地缓存；
+- 使用单实例窗口接收网页链接和文件激活，避免重复启动客户端。
+
 ## 下载
 
-从 [最新 Release](https://github.com/lixiaobaivv/Codex-Skin/releases/latest) 选择适合系统的文件：
+从 [最新 Release](https://github.com/lixiaobaivv/Codex-Skin/releases/latest) 下载对应平台的安装包：
 
-| 系统 | 推荐文件 | 说明 |
+| 平台 | 文件 | 说明 |
 | --- | --- | --- |
-| Windows x64 | `Codex-Skin-Setup-win-x64.exe` | 完整安装并自动注册网页导入协议 |
-| macOS Apple Silicon | `Codex-Skin-osx-arm64.pkg` | 适用于 M1/M2/M3/M4 等 Apple 芯片 |
+| Windows x64 | `Codex-Skin-Setup-win-x64.exe` | 图形安装器，注册网页协议和主题文件关联 |
+| macOS Apple Silicon | `Codex-Skin-osx-arm64.pkg` | 适用于 Apple 芯片 Mac |
 | macOS Intel | `Codex-Skin-osx-x64.pkg` | 适用于 Intel Mac |
 
-Windows 只发布 Setup 安装器，不再提供 ZIP 或直接运行的便携包。
+Windows 仅提供 Setup 安装器。Windows 使用系统 WebView2，macOS 使用系统 WKWebView，不需要额外安装应用运行时。
 
-Windows 和 macOS 客户端使用 Tauri 2 + Rust 构建；Windows 使用系统 WebView2，macOS 使用系统 WKWebView，无需安装额外运行时。当前发布方无法提供商业 Windows 签名或 Apple 签名与公证，因此系统可能要求手动确认。
+当前发布包没有商业代码签名：Windows SmartScreen 或 macOS Gatekeeper 可能要求手动确认。运行前请从同一 Release 下载 `Codex-Skin-installers-SHA256SUMS.txt` 并核对文件哈希。
 
-## GitHub 镜像加速下载
-
-如果 GitHub Release 下载较慢，可以把原始下载地址放到镜像前缀后面。
-
-原始地址示例：
-
-```text
-https://github.com/lixiaobaivv/Codex-Skin/releases/latest/download/Codex-Skin-Setup-win-x64.exe
-```
-
-GHFast：
-
-```text
-https://ghfast.top/https://github.com/lixiaobaivv/Codex-Skin/releases/latest/download/Codex-Skin-Setup-win-x64.exe
-```
-
-GH Proxy：
-
-```text
-https://gh-proxy.com/https://github.com/lixiaobaivv/Codex-Skin/releases/latest/download/Codex-Skin-Setup-win-x64.exe
-```
-
-把文件名替换为 Release 页面显示的实际值。镜像属于第三方服务，可能失效或缓存旧文件；下载后请使用同一 Release 中的 `Codex-Skin-installers-SHA256SUMS.txt` 校验文件。校验不一致时不要运行。
-
-Windows PowerShell 校验：
+Windows PowerShell：
 
 ```powershell
 Get-FileHash .\Codex-Skin-Setup-win-x64.exe -Algorithm SHA256
 ```
 
-macOS 校验：
+macOS：
 
 ```bash
 shasum -a 256 Codex-Skin-osx-arm64.pkg
 ```
 
-## Windows 使用方法
+## 快速开始
 
-1. 运行 `Codex-Skin-Setup-win-x64.exe` 完成安装。
-2. 打开 Codex-Skin，等待主题目录同步完成。
-3. 在左上方横向分类栏选择“全部”、人物、动漫、游戏等分类和主题预览。
-4. 点击“应用并重启 Codex”。
+### Windows
+
+1. 安装 `Codex-Skin-Setup-win-x64.exe`。
+2. 从开始菜单打开 Codex-Skin。
+3. 首次使用时点击“刷新”，等待官方主题目录同步完成。
+4. 选择分类和主题卡片，然后点击“应用并重启 Codex”。
 5. 需要取消主题时点击“恢复默认”。
 
-Setup 会为当前用户注册 `dreamskin://` 和 `.dreamskin` 文件关联，卸载时只清理由本程序拥有的关联。
+Setup 会为当前用户注册 `dreamskin://` 和 `.dreamskin`。卸载时只清理由 Codex-Skin 创建的协议与文件关联。
 
-## macOS 使用方法
+### macOS
 
-1. Apple Silicon 下载 `Codex-Skin-osx-arm64.pkg`，Intel Mac 下载 `Codex-Skin-osx-x64.pkg`。
-2. 安装后从“应用程序”打开 `Codex-Skin.app`。
-3. 如果 Gatekeeper 阻止打开，请先确认文件 SHA-256，再到“系统设置 → 隐私与安全性”选择仍要打开。
-4. 选择主题后点击“应用并重启 Codex”。
+1. 根据处理器安装 `Codex-Skin-osx-arm64.pkg` 或 `Codex-Skin-osx-x64.pkg`。
+2. 从“应用程序”打开 `Codex-Skin.app`。
+3. 如果 Gatekeeper 阻止打开，请先核对 SHA-256，再前往“系统设置 → 隐私与安全性”选择仍要打开。
+4. 同步主题目录，选择主题并点击“应用并重启 Codex”。
 
-PKG 会声明 `dreamskin://` 和 `.dreamskin` 文件类型。首次安装后建议先打开一次 Codex-Skin，让 macOS LaunchServices 完成关联。
+PKG 会声明 `dreamskin://` 和 `.dreamskin` 文件类型。安装后请至少启动一次 Codex-Skin，让 LaunchServices 完成系统关联。
 
-macOS PKG 当前未签名、未公证。CI 已在 Apple Silicon 与 Intel 目标上完成 PKG 构建验证；主题浏览、同步、Codex 发现、CDP 注入和回滚已实现，发布前仍建议在对应真实设备上验收系统关联与启动行为。
+macOS PKG 当前未签名、未公证。CI 已在 Apple Silicon 与 Intel 目标上完成 PKG 构建验证；发布前仍建议在对应真实设备上验收系统关联与启动行为。
 
-## 从网页一键导入主题
+## 应用和恢复主题
 
-打开 [Codex-Skin-Store](https://lixiaobaivv.github.io/Codex-Skin-Store/)，选择主题并点击“一键导入”。
+窗口底部提供三个操作：
 
-客户端会依次执行：
+- **应用主题**：向当前以主题模式运行的 Codex 应用所选主题，不重启 Codex；
+- **应用并重启 Codex**：关闭正在运行的 Codex，以仅绑定本机回环的 CDP 参数重新启动，并在连接成功后应用主题；这是推荐操作；
+- **恢复默认**：移除当前主题注入和持久的新页面脚本，恢复 Codex 默认外观。
 
-1. 显示下载域名、主题 ID、版本和文件大小；
-2. 请求用户确认下载；
-3. 在窗口中显示下载进度；GitHub 不稳定时按当前选择、官方直连和内置镜像线路自动重试；
-4. 校验整包 SHA-256、Ed25519 签名、主题清单和图片；
-5. 原子安装主题；
-6. 再次询问是否重启 Codex 并应用。
+Codex-Skin 只连接 `127.0.0.1:9229` 或等价的本机回环目标，不会把调试端口开放到局域网。主题应用失败时，客户端会显示明确错误，不会修改 Codex 安装目录。
 
-网页点击不会静默安装或切换主题。Windows Setup 和 macOS PKG 会自动注册协议。
+## 导入主题
 
-如果 Codex-Skin 已经打开，网页链接会交给现有窗口并将它置前，不会重复打开客户端；只有尚未运行时才创建新窗口。
+### 从网页一键导入
 
-验证完成的主题会保留在本机主题列表中，重新打开 Codex-Skin 后仍可选择；同一主题存在多个版本时自动使用最高版本。
+1. 打开 [Codex-Skin-Store](https://lixiaobaivv.github.io/Codex-Skin-Store/) 并选择主题。
+2. 点击“一键导入”，浏览器会打开 `dreamskin://` 链接。
+3. Codex-Skin 显示来源和主题提示，并在下载前请求确认。
+4. 客户端下载主题包，验证大小、SHA-256、签名、清单和图片。
+5. 验证成功后主题被原子安装到本地主题库，但不会自动应用。
+6. 在主题列表中选择它，再决定立即应用或重启 Codex 后应用。
 
-也可以双击本地 `.dreamskin` 文件并在客户端窗口中确认安装。
+网页不能静默安装或切换主题。如果客户端已经运行，链接会交给现有窗口并将其置前。
 
-## 主题目录与加速源
+### 导入本地文件
 
-桌面主题目录固定来自公开仓库 [lixiaobaivv/Codex-Skin-Store](https://github.com/lixiaobaivv/Codex-Skin-Store)。客户端只允许选择：
+双击已下载的 `.dreamskin` 文件，或用 Codex-Skin 打开它。客户端会显示本地路径并请求确认，然后执行与网页导入相同的签名和资源校验。
+
+同一主题可安装多个版本，列表会自动选择最高 SemVer 版本。同一 ID 和版本如果内容不同会被拒绝，避免不可变版本被覆盖。
+
+## 主题目录与下载线路
+
+桌面主题目录固定来自公开仓库 [lixiaobaivv/Codex-Skin-Store](https://github.com/lixiaobaivv/Codex-Skin-Store)。可选线路包括：
 
 - GitHub 官方直连；
 - GH Proxy；
 - GHFast。
 
-客户端安装包不再携带重复的内置主题。首次启动需要联网同步，之后会使用已验证的本地缓存；同步会以上次成功线路优先，在 GitHub、GH Proxy 和 GHFast 间自动回退，并保存本次实际成功的线路。更新会先下载到临时目录，全部校验通过后才替换缓存。
+同步会优先使用当前选择的线路，再自动尝试其他内置线路。新目录先下载到临时位置，只有全部文件通过校验后才原子替换缓存；所有线路失败时，上一次有效目录仍可继续使用。
 
-网页商店的签名包目录与桌面主题目录是两套独立协议。网页签名包用于安全分发，桌面目录用于客户端浏览和快速切换，两者都不能携带 JavaScript、HTML、CSS、SVG 或可执行文件。
+安装包不内置在线主题，因此首次使用需要联网同步。第三方镜像可能失效或缓存旧内容，客户端仍会对下载结果执行相同的完整性校验。
 
-## 主题可以修改什么
+## 主题能修改什么
 
-主题可以调整：
+主题是声明式数据，可以设置：
 
-- 主背景、固定侧栏视觉和顶部区域；
+- 背景、表面、文字、边框和强调色；
+- 原生侧栏和顶部区域的视觉样式；
 - 用户与助手消息气泡；
-- 首页 hero、Logo、标签和四张快捷操作卡；
-- 输入框颜色和占位提示；
-- 可选宠物图片。
+- 首页 Hero、Logo、标签、说明和快捷操作卡；
+- 输入框外观和占位文案；
+- 可选背景、Logo 和宠物图片。
 
-主题不能替换用户项目、任务、进度、对话内容或账号区域的数据。四张快捷卡只会把对应提示词写入真实输入框。
+主题不能携带任意 CSS、JavaScript、HTML、SVG 或可执行文件，也不能替换项目、任务、对话、进度和账号数据。快捷操作卡只能把预设提示词写入真实输入框。
+
+## 安全设计
+
+- 不修改 Microsoft Store 或 macOS 中 Codex 的签名应用；
+- CDP 连接仅接受固定端口上的本机回环目标；
+- 主题目录、清单和图片始终按不可信输入处理；
+- `.dreamskin` 限制 URI、下载、重定向、文件数量、解压大小、路径、格式、尺寸和像素总量；
+- 深链接拒绝未知字段、重复字段、私网地址和不安全重定向；
+- SHA-256 保护传输完整性，Ed25519/RFC8785 验证发布者签名；
+- 下载安装和主题应用是两个独立的用户确认步骤；
+- 缓存和安装目录使用临时位置与原子替换，失败不会破坏上一次有效状态。
+
+详细协议见 [跨平台架构](docs/cross-platform-architecture.md)、[主题目录标准](docs/theme-repository-v1.md) 和 [DreamSkin 兼容说明](docs/dreamskin-compatibility.md)。
 
 ## 常见问题
 
-### 应用主题后 Codex 没有变化
+### 首次打开没有主题
 
-使用“应用并重启 Codex”，确保 Codex 由 Codex-Skin 以本机 CDP 模式启动。程序只连接 `127.0.0.1:9229`，不会开放远程调试端口到局域网。
+安装包不携带主题资源。保持联网，选择下载线路并点击“刷新”。同步成功后主题卡片会自动出现。
 
-### 主题同步失败
+### 点击“应用主题”提示 Codex 未以主题模式启动
 
-点击“刷新”后客户端会自动尝试 GitHub、GH Proxy 和 GHFast。全部线路失败也不会删除上一次有效缓存。
+第一次应用请使用“应用并重启 Codex”。此操作会用本机回环 CDP 参数启动 Codex，之后可使用不重启的“应用主题”切换主题。
 
 ### 网页点击“一键导入”没有反应
 
-- Windows：重新运行 Setup 安装器修复协议关联。
-- macOS：确认使用包含 URL handler 的新版 PKG，并至少启动过一次 Codex-Skin。
+- Windows：重新运行 Setup 修复当前用户的协议关联；
+- macOS：确认已安装包含 URL handler 的 PKG，并至少启动过一次 Codex-Skin；
+- 仍无法唤起时，从网页下载 `.dreamskin` 文件并手动打开。
 
-### Codex 使用主题后变慢
+### 同步失败
 
-新版运行时只观察主区域、输入框、侧栏和消息容器的结构变化，不再对流式回复执行全页扫描；同时关闭主区域和消息气泡的大面积实时模糊。遇到旧主题状态时先“恢复默认”，再重新应用新版主题。
+切换 GitHub、GH Proxy 或 GHFast 后重试。全部线路失败不会删除已有缓存，可以稍后再次刷新。
 
-## 安全与隐私
+### 系统提示应用来自未知发布者
 
-- 不修改 Microsoft Store 或 macOS 中 Codex 的签名应用包；
-- CDP 仅绑定本机回环地址；
-- 主题目录和图片按不可信输入校验；
-- `.dreamskin` 限制大小、文件数量、路径、媒体格式和像素尺寸；
-- SHA-256 校验传输完整性，Ed25519 验证主题来源；
-- 安装和应用始终是两次独立确认。
-
-更详细的边界说明见 [跨平台架构](docs/cross-platform-architecture.md)、[主题目录标准](docs/theme-repository-v1.md) 和 [签名导入兼容说明](docs/dreamskin-compatibility.md)。
+当前安装包未进行商业签名或 Apple 公证。只从本仓库 Release 下载，并先核对 SHA-256；无法确认来源时不要运行。
 
 ## 技术架构
 
-Codex-Skin 使用 Tauri 2、Rust 和 TypeScript/Vite 构建，按界面、应用桥接、领域核心、运行时集成和发布工具分层：
+Codex-Skin 使用 Tauri 2、Rust 和 TypeScript/Vite 构建：
 
-- **界面层**（`src/`）：在系统 WebView 中提供主题浏览、分类筛选、预览、下载确认和应用状态反馈；
-- **应用桥接层**（`src-tauri/src/lib.rs`）：通过 Tauri Command/Event 连接界面与 Rust 核心，并处理单实例、深链接和本地文件激活；
-- **领域核心层**（`repository.rs`、`catalog.rs`、`compiler.rs`、`dreamskin.rs`、`protocol.rs`）：负责主题目录同步、Schema 与资源校验、SemVer 选择、CSS/JS 编译、签名包验签和安全下载；
-- **运行时集成层**（`cdp.rs`、`platform.rs`）：发现并启动 Codex，只连接本机回环 CDP，完成持久注入、结果验证和回滚；
-- **状态与发布工具**（`paths.rs`、`authoring.rs`、`src-tauri/src/bin/`、`installer/`）：负责原子状态持久化、目录制作、签名包诊断以及 Windows/macOS 安装包生成。
+- **界面层**（`src/`）：主题浏览、分类、预览、确认流程和状态反馈；
+- **应用桥接层**（`src-tauri/src/lib.rs`）：Tauri Command/Event、单实例、深链接和文件激活；
+- **领域核心层**（`repository.rs`、`catalog.rs`、`compiler.rs`、`dreamskin.rs`、`protocol.rs`）：同步、校验、版本选择、主题编译、验签和安全下载；
+- **运行时集成层**（`cdp.rs`、`platform.rs`）：Codex 发现与启动、回环 CDP 注入、验证和回滚；
+- **工具与发布层**（`authoring.rs`、`src-tauri/src/bin/`、`installer/`）：目录制作、签名包诊断和跨平台安装包。
 
-桌面主题的主数据流为：从固定官方源下载到临时目录 → 校验目录、清单和图片 → 原子替换本地缓存 → 编译声明式主题 → 通过回环 CDP 应用到 Codex。网页或本地 `.dreamskin` 导入走独立链路，在安装前验证大小、SHA-256、Ed25519/RFC8785 签名、ZIP 路径和图片内容。
+主题目录的数据流为：下载到临时目录 → 校验目录、清单和图片 → 原子替换缓存 → 编译声明式主题 → 通过回环 CDP 应用到 Codex。`.dreamskin` 使用独立的签名导入链路，验证成功后进入本地不可变版本库。
 
-Windows 与 macOS 共用界面和领域逻辑。平台差异集中在 Codex 发现、进程启动、窗口激活及安装器关联，避免平台代码进入主题规则和安全校验核心。
+Windows 与 macOS 共用界面和领域逻辑，平台差异集中在 Codex 发现、进程启动、窗口激活和安装器关联。
 
-## 本地开发与验证
+## 项目结构
+
+```text
+src/                    TypeScript/Vite 界面
+src-tauri/src/          Rust 应用核心与平台适配
+src-tauri/src/bin/      catalog-tool、dreamskin-verify
+installer/windows/      Windows Inno Setup
+installer/macos/        macOS App/PKG 打包
+tools/dreamskin/        主题签名包制作工具
+schemas/                桌面主题目录 Schema
+samples/dreamskin/      可复现的签名测试样例
+tests/                  合同与发布配置测试
+docs/                   架构、协议和主题制作文档
+```
+
+## 本地开发
 
 需要 Node.js 22、稳定版 Rust 和对应平台的 Tauri 系统依赖。Windows 需要 MSVC Build Tools 与 WebView2；macOS 需要 Xcode Command Line Tools。
 
@@ -180,7 +202,7 @@ npm ci
 npm run tauri -- dev
 ```
 
-提交前运行与 CI 一致的检查：
+提交前运行完整检查：
 
 ```bash
 npm run build
@@ -196,10 +218,18 @@ cargo test --manifest-path src-tauri/Cargo.toml --locked
 npm run tauri -- build --no-bundle
 ```
 
-Windows Setup 和 macOS 双架构 PKG 由 [Build and package](https://github.com/lixiaobaivv/Codex-Skin/actions/workflows/build.yml) 工作流生成。主题目录制作和签名包发布命令见 [主题制作指南](docs/theme-authoring.md) 与 [签名样例发布说明](docs/publish-signed-sample.md)。
+Windows Setup 和两个 macOS PKG 由 [Build and package](https://github.com/lixiaobaivv/Codex-Skin/actions/workflows/build.yml) 工作流生成。
 
-## 参与项目
+## 制作主题
 
-主题投稿请前往 [Codex-Skin-Store 投稿指南](https://github.com/lixiaobaivv/Codex-Skin-Store/blob/main/docs/theme-submission.md)。客户端问题请在 [Codex-Skin Issues](https://github.com/lixiaobaivv/Codex-Skin/issues) 提交，并附上系统版本、Codex 版本和复现步骤。
+桌面主题目录与网页分发的 `.dreamskin` 签名包是两套独立协议：
 
-普通用户不需要克隆源码或安装开发工具。提交代码前请确保上述本地检查通过；主题投稿请遵循独立商店仓库的规范和审核流程。
+- 制作或维护桌面主题目录：阅读 [主题制作指南](docs/theme-authoring.md)；
+- 构建签名样例和发布包：阅读 [签名样例发布说明](docs/publish-signed-sample.md)；
+- 投稿公开主题：前往 [Codex-Skin-Store 投稿指南](https://github.com/lixiaobaivv/Codex-Skin-Store/blob/main/docs/theme-submission.md)。
+
+Rust 工具 `catalog-tool` 可生成索引、验证目录和打包；`dreamskin-verify` 可针对 Windows 或 macOS 验证签名主题包。
+
+## 反馈与贡献
+
+客户端问题请提交到 [Codex-Skin Issues](https://github.com/lixiaobaivv/Codex-Skin/issues)，并附上操作系统、Codex 版本、Codex-Skin 版本、复现步骤和错误信息。代码贡献应先通过上述全部本地检查。
