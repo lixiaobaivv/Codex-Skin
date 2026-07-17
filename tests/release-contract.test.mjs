@@ -95,6 +95,7 @@ test("macOS release status documents the unsigned graphical client", async () =>
   const readme = await readFile(new URL("../README.md", import.meta.url), "utf8");
   assert.match(readme, /macOS Apple Silicon/);
   assert.match(readme, /PKG 会声明 `dreamskin:\/\/` 和 `\.dreamskin`/);
-  assert.match(readme, /仍需更多真实 Apple Silicon 与 Intel 设备验收/);
+  assert.match(readme, /CI 已在 Apple Silicon 与 Intel 目标上完成 PKG 构建验证/);
+  assert.match(readme, /仍建议在对应真实设备上验收系统关联与启动行为/);
   assert.match(readme, /macOS PKG 当前未签名、未公证/);
 });

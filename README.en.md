@@ -2,6 +2,9 @@
 
 [简体中文](README.md) | [English](README.en.md)
 
+[![CI](https://github.com/lixiaobaivv/Codex-Skin/actions/workflows/ci.yml/badge.svg)](https://github.com/lixiaobaivv/Codex-Skin/actions/workflows/ci.yml)
+[![Build and package](https://github.com/lixiaobaivv/Codex-Skin/actions/workflows/build.yml/badge.svg)](https://github.com/lixiaobaivv/Codex-Skin/actions/workflows/build.yml)
+
 Codex-Skin is a desktop theme client for Codex on Windows and macOS. It provides a visual theme browser, safe switching and rollback, and signed one-click imports from [Codex-Skin-Store](https://lixiaobaivv.github.io/Codex-Skin-Store/).
 
 > Codex-Skin is a community project, not an OpenAI or official Codex product. It does not modify the signed Codex installation or read API keys, projects, tasks, or conversations.
@@ -39,7 +42,7 @@ Setup registers `dreamskin://` and `.dreamskin` for the current user and removes
 3. If Gatekeeper blocks the unsigned package, verify its SHA-256 first, then use **System Settings → Privacy & Security → Open Anyway**.
 4. Select a theme and choose **Apply and restart Codex**.
 
-The PKG declares the `dreamskin://` URL scheme and `.dreamskin` document type. Open Codex-Skin once after installation so LaunchServices can complete registration. macOS packages are currently unsigned and not notarized.
+The PKG declares the `dreamskin://` URL scheme and `.dreamskin` document type. Open Codex-Skin once after installation so LaunchServices can complete registration. macOS packages are currently unsigned and not notarized. CI builds both Apple Silicon and Intel PKGs; final releases should still be smoke-tested on matching physical hardware for system activation and launch behavior.
 
 ## One-Click Web Import
 
@@ -95,4 +98,48 @@ Themes cannot replace project, task, progress, conversation, or account data. Pr
 
 See [cross-platform architecture](docs/cross-platform-architecture.md), [desktop catalog v1](docs/theme-repository-v1.md), and [DreamSkin compatibility](docs/dreamskin-compatibility.md) for technical boundaries.
 
+## Architecture
+
+The project has been fully migrated to Tauri 2 and Rust. The former .NET, WinForms, and Avalonia clients are no longer part of `main`:
+
+- `src/` contains the shared TypeScript/Vite interface for browsing, filtering, previewing, and confirmation flows.
+- `src-tauri/src/` contains catalog synchronization, strict validation, theme compilation, CDP injection, signed imports, state persistence, and platform adapters.
+- `installer/windows/` contains the Inno Setup package and registrations for `dreamskin://` and `.dreamskin`.
+- `installer/macos/` builds the macOS app and PKG with URL and document activation declarations.
+- `tools/` and `src-tauri/src/bin/` provide signed-theme and catalog authoring diagnostics.
+- `tests/` verifies DreamSkin contracts, release configuration, and cross-platform packaging invariants.
+
+Windows and macOS share the same WebView interface and Rust business logic. Only Codex discovery, process launch, and OS activation are platform-specific. The former implementation remains temporarily available on `backup/main-dotnet-20260717` until the new release has demonstrated long-term stability.
+
+## Development And Verification
+
+Development requires Node.js 22, stable Rust, and the platform prerequisites for Tauri. Windows requires MSVC Build Tools and WebView2; macOS requires Xcode Command Line Tools.
+
+```bash
+npm ci
+npm run tauri -- dev
+```
+
+Run the same checks enforced by CI before submitting changes:
+
+```bash
+npm run build
+node --test tests/dreamskin-catalog-fixtures.test.mjs tests/dreamskin-fixture.test.mjs tests/release-contract.test.mjs
+cargo fmt --manifest-path src-tauri/Cargo.toml -- --check
+cargo clippy --manifest-path src-tauri/Cargo.toml --all-targets --locked -- -D warnings
+cargo test --manifest-path src-tauri/Cargo.toml --locked
+```
+
+Build an optimized application for the current platform with:
+
+```bash
+npm run tauri -- build --no-bundle
+```
+
+The [Build and package](https://github.com/lixiaobaivv/Codex-Skin/actions/workflows/build.yml) workflow produces the Windows Setup executable and both macOS PKGs. See [theme authoring](docs/theme-authoring.md) and [signed sample publishing](docs/publish-signed-sample.md) for catalog and package tooling.
+
+## Contributing
+
 Theme submissions belong in the [Codex-Skin-Store submission guide](https://github.com/lixiaobaivv/Codex-Skin-Store/blob/main/docs/theme-submission.md). Client issues belong in [Codex-Skin Issues](https://github.com/lixiaobaivv/Codex-Skin/issues).
+
+End users do not need the development toolchain. Code contributions should pass every command above before submission; theme contributions follow the separate Store repository's schema and review process.
