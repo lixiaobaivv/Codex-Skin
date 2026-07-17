@@ -61,7 +61,6 @@ jobs:
           @('themes','previews','backgrounds','logos','pets') | ForEach-Object {
             if (Test-Path (Join-Path $publish $_)) { throw "Online theme assets must not be bundled: $_" }
           }
-          if (!(Test-Path (Join-Path $publish 'Codex-Skin.ico'))) { throw 'Missing application icon.' }
       - name: Build Setup EXE
         shell: pwsh
         run: |

@@ -16,8 +16,4 @@
     <ProjectReference Include="..\CodexThemeStore.Core\CodexThemeStore.Core.csproj" />
   </ItemGroup>
 
-  <ItemGroup>
-    <Content Include="..\..\assets\Codex-Skin.ico" Link="Codex-Skin.ico" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
-  </ItemGroup>
-
 </Project>
