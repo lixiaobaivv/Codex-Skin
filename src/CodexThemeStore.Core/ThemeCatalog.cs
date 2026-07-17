@@ -32,7 +32,7 @@ public static class ThemeCatalog
             }
         }
 
-        var packageRoot = Path.GetFullPath(installedPackageDirectory ?? DreamSkinPackageInstaller.DefaultLibraryRoot);
+        var packageRoot = DreamSkinPackageInstaller.ResolveLibraryRoot(installedPackageDirectory);
         if (Directory.Exists(packageRoot))
         {
             foreach (var manifestPath in EnumerateInstalledManifests(packageRoot))

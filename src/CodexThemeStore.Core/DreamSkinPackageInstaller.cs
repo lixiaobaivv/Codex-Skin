@@ -157,7 +157,7 @@ public static class DreamSkinPackageInstaller
             throw Error("DSI_PACKAGE_INVALID", "ZIP 文件名与清单资源声明不一致。");
         }
 
-        libraryRoot = GetLibraryRoot(libraryRoot);
+        libraryRoot = ResolveLibraryRoot(libraryRoot);
         Directory.CreateDirectory(libraryRoot);
         var stagingRoot = Path.Combine(libraryRoot, $".staging-{Guid.NewGuid():N}");
         Directory.CreateDirectory(stagingRoot);
@@ -705,7 +705,7 @@ public static class DreamSkinPackageInstaller
             && HashFile(previewPath).Equals(manifest.Preview.Sha256, StringComparison.Ordinal);
     }
 
-    private static string GetLibraryRoot(string? configuredRoot)
+    public static string ResolveLibraryRoot(string? configuredRoot = null)
     {
         var configured = configuredRoot ?? Environment.GetEnvironmentVariable("CODEX_THEME_LIBRARY_DIR");
         if (!string.IsNullOrWhiteSpace(configured)) return Path.GetFullPath(configured);

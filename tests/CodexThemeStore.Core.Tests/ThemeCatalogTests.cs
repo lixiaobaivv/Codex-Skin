@@ -70,6 +70,26 @@ public sealed class ThemeCatalogTests : IDisposable
         Assert.Equal(expectedSign, Math.Sign(ThemeCatalog.CompareVersions(left, right)));
     }
 
+    [Fact]
+    public void UsesTheConfiguredLibraryForImportAndDiscovery()
+    {
+        var configured = Path.Combine(_root, "configured");
+        var previous = Environment.GetEnvironmentVariable("CODEX_THEME_LIBRARY_DIR");
+        try
+        {
+            Environment.SetEnvironmentVariable("CODEX_THEME_LIBRARY_DIR", configured);
+            var imported = DreamSkinPackageInstaller.ImportLocal(FixturePackage(), platform: "macos");
+
+            var selected = Assert.Single(ThemeCatalog.Load([], platform: "macos"));
+
+            Assert.Equal(imported.ManifestPath, selected.SourcePath);
+        }
+        finally
+        {
+            Environment.SetEnvironmentVariable("CODEX_THEME_LIBRARY_DIR", previous);
+        }
+    }
+
     private string ExtractCatalogTheme(string package, string version)
     {
         var catalog = Path.Combine(_root, $"catalog-{version}");
