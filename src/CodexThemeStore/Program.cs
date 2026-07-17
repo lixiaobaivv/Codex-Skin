@@ -665,7 +665,7 @@ internal sealed class ThemeStoreApp
         for (var i = 0; i < themes.Count; i++)
         {
             var theme = ThemeDefinition.Load(themes[i]);
-            Console.WriteLine($"{i + 1}. {Path.GetFileNameWithoutExtension(themes[i])} - {theme.DisplayName}");
+            Console.WriteLine($"{i + 1}. {theme.CodeThemeId} - {theme.DisplayName}");
         }
         Console.WriteLine("R. 回滚主题");
         Console.WriteLine("S. 查看状态");
@@ -792,7 +792,7 @@ internal sealed class ThemeStoreApp
         foreach (var file in GetThemeFiles())
         {
             var theme = ThemeDefinition.Load(file);
-            Console.WriteLine($"{Path.GetFileNameWithoutExtension(file)}\t{theme.DisplayName}\t{theme.Variant}");
+            Console.WriteLine($"{theme.CodeThemeId}\t{theme.DisplayName}\t{theme.Variant}");
         }
     }
 
