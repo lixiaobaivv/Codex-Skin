@@ -12,7 +12,7 @@ test("application version manifests stay aligned", async () => {
   const version = JSON.parse(npmManifest).version;
   assert.equal(JSON.parse(tauriManifest).version, version);
   assert.match(cargoManifest, new RegExp(`^version = "${version.replaceAll(".", "\\.")}"$`, "m"));
-  assert.match(cargoLock, new RegExp(`name = "codex-skin"\\nversion = "${version.replaceAll(".", "\\.")}"`));
+  assert.match(cargoLock, new RegExp(`name = "codex-skin"\\r?\\nversion = "${version.replaceAll(".", "\\.")}"`));
 });
 
 test("Windows release publishes the Tauri graphical Setup installer", async () => {
