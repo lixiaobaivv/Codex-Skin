@@ -38,10 +38,11 @@ test("Windows client release uses stable English artifact names", async () => {
 });
 
 test("macOS package registers Codex-Skin URL and document activation", async () => {
-  const [plist, project, packageScript] = await Promise.all([
+  const [plist, project, packageScript, icon] = await Promise.all([
     readFile(new URL("../installer/macos/Info.plist", import.meta.url), "utf8"),
     readFile(new URL("../src/CodexThemeStore.Desktop/CodexThemeStore.Desktop.csproj", import.meta.url), "utf8"),
     readFile(new URL("../installer/macos/build-pkg.sh", import.meta.url), "utf8"),
+    readFile(new URL("../installer/macos/AppIcon.png", import.meta.url)),
   ]);
   assert.match(project, /<AssemblyName>Codex-Skin<\/AssemblyName>/);
   assert.match(plist, /<key>CFBundleURLSchemes<\/key>[\s\S]*<string>dreamskin<\/string>/);
@@ -50,7 +51,12 @@ test("macOS package registers Codex-Skin URL and document activation", async () 
   assert.match(packageScript, /Applications\/Codex-Skin\.app/);
   assert.match(packageScript, /Contents\/MacOS\/Codex-Skin/);
   assert.match(packageScript, /iconutil -c icns/);
-  assert.match(packageScript, /docs\/images\/icon\.png/);
+  assert.match(packageScript, /installer\/macos\/AppIcon\.png/);
+  assert.match(packageScript, /Contents\/Resources\/Codex-Skin\.icns/);
+  assert.equal(icon.subarray(1, 4).toString("ascii"), "PNG");
+  assert.equal(icon.readUInt32BE(16), 1024);
+  assert.equal(icon.readUInt32BE(20), 1024);
+  assert.equal(icon[25], 6, "AppIcon.png must be RGBA so macOS keeps transparent corners");
 });
 
 test("macOS release status documents the unsigned graphical client", async () => {
