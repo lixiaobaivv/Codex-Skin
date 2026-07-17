@@ -5,10 +5,10 @@
   "version": "1.0.0",
   "package": {
     "url": "https://github.com/lixiaobaivv/Codex-Skin/releases/download/sample-v1/codex-skin-sample-1.0.0.dreamskin",
-    "sha256": "7a75fff8086fe6949ef9e37e82c161a8e015a1e00e02181938cd479e9ae41387",
-    "size": 2041227
+    "sha256": "46e1e149cb7a0dab898f60a04e07da46cf139b698dbdb3fbd4d1401e83ae49ff",
+    "size": 1233330
   },
-  "installUri": "dreamskin://install?url=https%3A%2F%2Fgithub.com%2Flixiaobaivv%2FCodex-Skin%2Freleases%2Fdownload%2Fsample-v1%2Fcodex-skin-sample-1.0.0.dreamskin&sha256=7a75fff8086fe6949ef9e37e82c161a8e015a1e00e02181938cd479e9ae41387&size=2041227&id=codex-skin.jackson-sage-sample&version=1.0.0",
+  "installUri": "dreamskin://install?url=https%3A%2F%2Fgithub.com%2Flixiaobaivv%2FCodex-Skin%2Freleases%2Fdownload%2Fsample-v1%2Fcodex-skin-sample-1.0.0.dreamskin&sha256=46e1e149cb7a0dab898f60a04e07da46cf139b698dbdb3fbd4d1401e83ae49ff&size=1233330&id=codex-skin.jackson-sage-sample&version=1.0.0",
   "compatibility": {
     "client": ">=1.0.0 <2.0.0",
     "platforms": [
