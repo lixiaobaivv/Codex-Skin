@@ -62,6 +62,10 @@ public sealed class ThemeStateCompilerTests : IDisposable
         Assert.Contains("cancelAnimationFrame(frameId)", payload.JavaScript);
         Assert.Contains("function dispose()", payload.JavaScript);
         Assert.Contains("grid-template-columns: repeat(4, minmax(0, 1fr))", payload.Css);
+        Assert.Contains("aria-label*=\"sidebar\" i", payload.Css);
+        Assert.Contains("aria-label*=\"bottom panel\" i", payload.Css);
+        Assert.Contains("display: inline-flex !important", payload.Css);
+        Assert.Contains("transform: translateY(-36px)", payload.Css);
         Assert.DoesNotContain("repeat(auto-fit", payload.Css);
         Assert.Contains("backdrop-filter: none !important", payload.Css);
         Assert.Contains("function mutationNeedsApply", payload.JavaScript);

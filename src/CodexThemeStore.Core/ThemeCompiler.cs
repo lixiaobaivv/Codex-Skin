@@ -804,6 +804,48 @@ html[data-codex-window-type="electron"] {
   --codex-theme-hero-radius: {{heroRadius}}px;
 }
 
+/* Keep Codex's native layout controls above the theme home surface. */
+html[data-codex-window-type="electron"] :where(button, [role="button"]):is(
+  [aria-label*="sidebar" i],
+  [aria-label*="side bar" i],
+  [aria-label*="侧边栏"],
+  [aria-label*="bottom panel" i],
+  [aria-label*="toggle panel" i],
+  [aria-label*="show panel" i],
+  [aria-label*="hide panel" i],
+  [aria-label*="底部面板"],
+  [aria-label*="切换面板"],
+  [aria-label*="显示面板"],
+  [aria-label*="隐藏面板"],
+  [title*="sidebar" i],
+  [title*="side bar" i],
+  [title*="侧边栏"],
+  [title*="bottom panel" i],
+  [title*="toggle panel" i],
+  [title*="底部面板"],
+  [data-testid*="sidebar-toggle" i],
+  [data-testid*="panel-toggle" i]
+) {
+  display: inline-flex !important;
+  visibility: visible !important;
+  opacity: 1 !important;
+  pointer-events: auto !important;
+  color: {{theme.Ink}} !important;
+  z-index: 12 !important;
+}
+
+html[data-codex-window-type="electron"] :where(button, [role="button"]):is(
+  [aria-label*="sidebar" i],
+  [aria-label*="side bar" i],
+  [aria-label*="侧边栏"],
+  [aria-label*="bottom panel" i],
+  [aria-label*="底部面板"]
+) :where(svg, img) {
+  visibility: visible !important;
+  opacity: 1 !important;
+  color: currentColor !important;
+}
+
 html[data-codex-window-type="electron"] .codex-theme-masthead {
   display: flex;
   align-items: center;
@@ -1001,6 +1043,7 @@ html[data-codex-window-type="electron"] .codex-theme-home-actions {
   z-index: 3;
   gap: 14px;
   margin: -104px 28px 0;
+  transform: translateY(-36px);
 }
 
 html[data-codex-window-type="electron"] .codex-theme-home-action {
