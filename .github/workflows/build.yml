@@ -68,9 +68,14 @@ jobs:
             if (!(Test-Path (Join-Path $publish "previews\$_.png"))) { throw "Missing preview: $_" }
             if (!(Test-Path (Join-Path $publish "themes\$_.json"))) { throw "Missing theme: $_" }
           }
-          @('backgrounds','logos','pets') | ForEach-Object {
+          @('backgrounds','logos') | ForEach-Object {
             $directory = Join-Path $publish $_
             if (!(Test-Path $directory) -or !(Get-ChildItem $directory -File)) { throw "Missing published resource directory: $_" }
+          }
+          $petFiles = @(Get-ChildItem (Join-Path $PWD 'pets') -File -ErrorAction SilentlyContinue)
+          if ($petFiles.Count -gt 0) {
+            $publishedPets = Join-Path $publish 'pets'
+            if (!(Test-Path $publishedPets) -or !(Get-ChildItem $publishedPets -File)) { throw 'Missing published pets.' }
           }
       - name: Build Setup EXE
         shell: pwsh
