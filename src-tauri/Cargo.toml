@@ -10,6 +10,14 @@ default-run = "codex-skin"
 name = "codex_skin_lib"
 crate-type = ["staticlib", "cdylib", "rlib"]
 
+[[bin]]
+name = "catalog-tool"
+path = "src/bin/catalog-tool.rs"
+
+[[bin]]
+name = "dreamskin-verify"
+path = "src/bin/dreamskin-verify.rs"
+
 [build-dependencies]
 tauri-build = { version = "2", features = [] }
 
