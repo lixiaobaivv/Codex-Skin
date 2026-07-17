@@ -102,7 +102,7 @@ async fn sync_from(url: &str) -> Result<usize> {
     Ok(count)
 }
 
-fn allowed(relative: &str) -> bool {
+pub(crate) fn allowed(relative: &str) -> bool {
     if relative == "theme-repository.json" {
         return true;
     }
@@ -176,13 +176,19 @@ fn extract(archive_path: &Path, destination: &Path) -> Result<()> {
     Ok(())
 }
 
-fn validate_repository(root: &Path) -> Result<()> {
+pub(crate) fn validate_repository(root: &Path) -> Result<()> {
     for schema in ["theme-v1.schema.json", "theme-repository-v1.schema.json"] {
         if !root.join("schemas").join(schema).is_file() {
             return Err(AppError::Message(format!("主题仓库缺少 Schema：{schema}")));
         }
     }
     let index: Value = serde_json::from_slice(&fs::read(root.join("theme-repository.json"))?)?;
+    closed_object(
+        &index,
+        &["$schema", "schemaVersion", "name", "updatedAt", "themes"],
+        &["schemaVersion", "name", "updatedAt", "themes"],
+        "theme-repository.json",
+    )?;
     if index.get("schemaVersion").and_then(Value::as_u64) != Some(1) {
         return Err(AppError::Message("只支持主题仓库标准 v1。".into()));
     }
@@ -194,16 +200,271 @@ fn validate_repository(root: &Path) -> Result<()> {
         return Err(AppError::Message("主题数量必须在 1 到 500 之间。".into()));
     }
     let mut ids = HashSet::new();
+    let mut manifests = HashSet::new();
     for entry in entries {
+        closed_object(entry, &["id", "manifest"], &["id", "manifest"], "themes[]")?;
         let id = entry.get("id").and_then(Value::as_str).unwrap_or("");
         let manifest = entry.get("manifest").and_then(Value::as_str).unwrap_or("");
-        if !ids.insert(id)
+        if !valid_catalog_id(id)
+            || !ids.insert(id)
+            || !manifests.insert(manifest.to_owned())
             || manifest != format!("themes/{id}.json")
             || !root.join(manifest).is_file()
         {
             return Err(AppError::Message(format!("主题索引条目无效：{id}")));
         }
+        validate_theme(&root.join(manifest), id, root)?;
     }
+    let actual: HashSet<_> = fs::read_dir(root.join("themes"))?
+        .filter_map(|entry| entry.ok())
+        .filter(|entry| {
+            entry
+                .path()
+                .extension()
+                .is_some_and(|ext| ext.eq_ignore_ascii_case("json"))
+        })
+        .map(|entry| format!("themes/{}", entry.file_name().to_string_lossy()))
+        .collect();
+    if actual != manifests {
+        return Err(AppError::Message("主题索引与 themes 目录不一致。".into()));
+    }
+    Ok(())
+}
+
+fn validate_theme(path: &Path, expected_id: &str, repository: &Path) -> Result<()> {
+    let root: Value = serde_json::from_slice(&fs::read(path)?)?;
+    closed_object(
+        &root,
+        &[
+            "$schema",
+            "schemaVersion",
+            "version",
+            "displayName",
+            "codeThemeId",
+            "category",
+            "description",
+            "author",
+            "variant",
+            "previewImage",
+            "theme",
+            "home",
+            "copy",
+        ],
+        &[
+            "schemaVersion",
+            "version",
+            "displayName",
+            "codeThemeId",
+            "category",
+            "description",
+            "author",
+            "variant",
+            "previewImage",
+            "theme",
+            "home",
+        ],
+        "theme",
+    )?;
+    if root.get("schemaVersion").and_then(Value::as_u64) != Some(1) {
+        return Err(AppError::Message(format!(
+            "远程主题必须使用 schemaVersion 1：{expected_id}"
+        )));
+    }
+    let id = required_text(&root, "codeThemeId", 64)?;
+    if id != expected_id || !valid_catalog_id(id) {
+        return Err(AppError::Message(format!(
+            "主题 ID 与索引不一致：{expected_id}"
+        )));
+    }
+    let version = required_text(&root, "version", 64)?;
+    if semver::Version::parse(version).is_err() {
+        return Err(AppError::Message(format!("主题版本无效：{expected_id}")));
+    }
+    required_text(&root, "displayName", 60)?;
+    required_text(&root, "description", 120)?;
+    required_text(&root, "author", 60)?;
+    if !["人物", "动漫", "游戏", "风景", "极简", "节日", "其他"]
+        .contains(&required_text(&root, "category", 8)?)
+    {
+        return Err(AppError::Message(format!("主题分类无效：{expected_id}")));
+    }
+    if !["light", "dark"].contains(&required_text(&root, "variant", 8)?) {
+        return Err(AppError::Message(format!("主题模式无效：{expected_id}")));
+    }
+    let theme = root
+        .get("theme")
+        .ok_or_else(|| AppError::Message("主题缺少 theme。".into()))?;
+    closed_object(
+        theme,
+        &[
+            "accent",
+            "contrast",
+            "fonts",
+            "ink",
+            "opaqueWindows",
+            "semanticColors",
+            "surface",
+            "backgroundImage",
+            "logoImage",
+            "backgroundImageOpacity",
+            "backgroundImageBlur",
+        ],
+        &["accent", "ink", "surface"],
+        "theme.theme",
+    )?;
+    for key in ["accent", "ink", "surface"] {
+        validate_color(required_text(theme, key, 7)?, key)?;
+    }
+    if let Some(semantic) = theme.get("semanticColors") {
+        closed_object(
+            semantic,
+            &["diffAdded", "diffRemoved", "skill"],
+            &[],
+            "semanticColors",
+        )?;
+        for key in ["diffAdded", "diffRemoved", "skill"] {
+            if let Some(value) = semantic.get(key).and_then(Value::as_str) {
+                validate_color(value, key)?;
+            }
+        }
+    }
+    if let Some(value) = theme.get("contrast").and_then(Value::as_f64)
+        && !(0.0..=100.0).contains(&value)
+    {
+        return Err(AppError::Message("theme.contrast 越界。".into()));
+    }
+    if let Some(value) = theme.get("backgroundImageOpacity").and_then(Value::as_f64)
+        && !(0.0..=1.0).contains(&value)
+    {
+        return Err(AppError::Message("背景透明度越界。".into()));
+    }
+    if let Some(value) = theme.get("backgroundImageBlur").and_then(Value::as_f64)
+        && !(0.0..=24.0).contains(&value)
+    {
+        return Err(AppError::Message("背景模糊度越界。".into()));
+    }
+    validate_asset_path(
+        repository,
+        path,
+        required_text(&root, "previewImage", 180)?,
+        "previews",
+    )?;
+    for (key, directory) in [("backgroundImage", "backgrounds"), ("logoImage", "logos")] {
+        if let Some(value) = theme.get(key).and_then(Value::as_str) {
+            validate_asset_path(repository, path, value, directory)?;
+        }
+    }
+    let home = root.get("home").unwrap();
+    closed_object(
+        home,
+        &[
+            "brand",
+            "eyebrow",
+            "badge",
+            "title",
+            "subtitle",
+            "footerNote",
+            "composerHint",
+            "tags",
+            "sidebarLabels",
+            "quickActions",
+            "pet",
+        ],
+        &["brand", "title", "quickActions"],
+        "home",
+    )?;
+    required_text(home, "brand", 200)?;
+    required_text(home, "title", 200)?;
+    let actions = home
+        .get("quickActions")
+        .and_then(Value::as_array)
+        .ok_or_else(|| AppError::Message("quickActions 必须是数组。".into()))?;
+    if actions.len() != 4 {
+        return Err(AppError::Message("quickActions 必须包含 4 项。".into()));
+    }
+    for action in actions {
+        closed_object(
+            action,
+            &["icon", "title", "description", "prompt"],
+            &["title", "prompt"],
+            "quickActions[]",
+        )?;
+        required_text(action, "title", 200)?;
+        required_text(action, "prompt", 1000)?;
+    }
+    if let Some(pet) = home.get("pet") {
+        closed_object(pet, &["image", "alt", "size"], &["image"], "pet")?;
+        validate_asset_path(repository, path, required_text(pet, "image", 180)?, "pets")?;
+    }
+    Ok(())
+}
+
+fn closed_object(value: &Value, allowed: &[&str], required: &[&str], path: &str) -> Result<()> {
+    let object = value
+        .as_object()
+        .ok_or_else(|| AppError::Message(format!("{path} 必须是对象。")))?;
+    if let Some(key) = object.keys().find(|key| !allowed.contains(&key.as_str())) {
+        return Err(AppError::Message(format!("{path} 包含未知字段：{key}")));
+    }
+    if let Some(key) = required.iter().find(|key| !object.contains_key(**key)) {
+        return Err(AppError::Message(format!("{path} 缺少字段：{key}")));
+    }
+    Ok(())
+}
+fn required_text<'a>(value: &'a Value, key: &str, max: usize) -> Result<&'a str> {
+    let text = value
+        .get(key)
+        .and_then(Value::as_str)
+        .ok_or_else(|| AppError::Message(format!("{key} 必须是字符串。")))?;
+    if text.is_empty() || text.chars().count() > max {
+        return Err(AppError::Message(format!("{key} 长度无效。")));
+    }
+    Ok(text)
+}
+fn valid_catalog_id(value: &str) -> bool {
+    value.len() >= 2
+        && value.len() <= 64
+        && value
+            .chars()
+            .next()
+            .is_some_and(|c| c.is_ascii_lowercase() || c.is_ascii_digit())
+        && value
+            .chars()
+            .all(|c| c.is_ascii_lowercase() || c.is_ascii_digit() || c == '-')
+        && !value.ends_with('-')
+}
+fn validate_color(value: &str, key: &str) -> Result<()> {
+    if value.len() != 7
+        || !value.starts_with('#')
+        || !value[1..].chars().all(|c| c.is_ascii_hexdigit())
+    {
+        return Err(AppError::Message(format!("{key} 颜色无效。")));
+    }
+    Ok(())
+}
+fn validate_asset_path(
+    repository: &Path,
+    manifest: &Path,
+    relative: &str,
+    directory: &str,
+) -> Result<()> {
+    let normalized = relative.replace('\\', "/");
+    if !normalized.starts_with(&format!("../{directory}/"))
+        || normalized[4 + directory.len()..].contains('/')
+        || normalized.contains("/../")
+    {
+        return Err(AppError::Message(format!("主题资源路径无效：{relative}")));
+    }
+    let path = manifest.parent().unwrap().join(relative).canonicalize()?;
+    let root = repository.canonicalize()?;
+    if !path.starts_with(&root) || !path.is_file() {
+        return Err(AppError::Message(format!(
+            "主题资源越界或不存在：{relative}"
+        )));
+    }
+    let bytes = fs::read(&path)?;
+    image::load_from_memory(&bytes)
+        .map_err(|error| AppError::Message(format!("主题图片无法解码：{error}")))?;
     Ok(())
 }
 
@@ -243,4 +504,24 @@ fn copy_tree(source: &Path, target: &Path) -> Result<()> {
         }
     }
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[tokio::test]
+    #[ignore = "requires the public Codex-Skin-Store repository"]
+    async fn syncs_and_validates_official_catalog() {
+        let temporary = tempfile::tempdir().unwrap();
+        unsafe {
+            std::env::set_var("CODEX_THEME_STORE_DATA_DIR", temporary.path());
+        }
+        let result = sync("github").await.unwrap();
+        assert!(result.theme_count >= 5);
+        assert_eq!(catalog::load().unwrap().len(), result.theme_count);
+        unsafe {
+            std::env::remove_var("CODEX_THEME_STORE_DATA_DIR");
+        }
+    }
 }

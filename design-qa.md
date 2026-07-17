@@ -1,71 +1,38 @@
-# Design QA — Codex 主题商店
+# Design QA — Codex-Skin
 
 ## 验收范围
 
-- 项目：WinForms / .NET 8 Codex 主题商店，使用本机回环 `127.0.0.1:9229` CDP 动态注入前端。
-- 验收日期：2026-07-16（Asia/Shanghai）。
-- QA 页面：`qa/codex-fixture.html`，独立 Edge headless 配置，不连接或关闭承载任务的真实 Codex。
-- 参考图和主题数据现由 [Codex-Skin-Store](https://github.com/lixiaobaivv/Codex-Skin-Store) 统一维护；本文件中的 `previews/`、`backgrounds/` 和 `logos/` 路径均相对于该仓库。
-- 实现入口：`src/CodexThemeStore/Program.cs`；客户端仓库不再复制正式主题资源。
+- 项目：Tauri 2 + Rust 跨平台主题客户端，前端使用 TypeScript/Vite。
+- 验收日期：2026-07-17（Asia/Shanghai）。
+- 客户端视口：标准布局 1120×780；最小支持布局 820×620。
+- QA 模式：仅 Vite 开发环境允许 `?qa=1`，发布构建不提供模拟桥接。
+- 正式主题数据由 [Codex-Skin-Store](https://github.com/lixiaobaivv/Codex-Skin-Store) 维护，客户端发布包不内置在线主题资源。
 
-## 四主题全屏证据
+## 客户端界面验证
 
-| 主题 | 参考图 | 实现截图 | 同屏对比 | 视口与状态 |
-| --- | --- | --- | --- | --- |
-| KUN Stage | `previews/kun-stage.png` | `qa/captures/kun-stage-home-final-v3.png` | `qa/comparisons/kun-stage-comparison-v3.png` | 1586×992，空白主页 |
-| Jackson Sage | `previews/jackson-sage.png` | `qa/captures/jackson-sage-home-final-v3.png` | `qa/comparisons/jackson-sage-comparison-v3.png` | 1586×992，空白主页 |
-| ENFP Pop | `previews/enfp-pop.png` | `qa/captures/enfp-pop-home-final-v3.png` | `qa/comparisons/enfp-pop-comparison-v3.png` | 1586×992，空白主页；源参考为 3840×2160，比较板使用 contain 归一化 |
-| Dilraba Star | `previews/dilraba-star.png` | `qa/captures/dilraba-star-home-final-v5.png` | `qa/comparisons/dilraba-star-comparison-v3.png` | 1586×992，空白主页 |
-
-这些截图记录的是早期自定义侧栏实现。当前安全边界已经调整为保留 Codex 原生侧栏，因此截图仅作为 hero、快捷卡、输入框和气泡的历史视觉证据，不能作为当前侧栏 DOM 的验收结论。
-
-## 重点区域证据
-
-- 侧栏：`qa/comparisons/dilraba-sidebar-focus-v3.png`。
-- Hero 与快捷卡：`qa/comparisons/dilraba-hero-cards-focus-v3.png`。
-- 输入框：`qa/comparisons/dilraba-composer-focus-v3.png`。
-- 对话视图：`qa/captures/dilraba-star-chat-final-v3.png`。
-- 快捷卡交互：`qa/captures/dilraba-action-interaction-final-v3.png`。
-- 响应式窄屏：`qa/captures/dilraba-responsive-820x900-final-v3.png`。
-- 响应式中屏：`qa/captures/dilraba-responsive-1200x800-final-v3.png`。
-
-## 响应式与交互诊断
-
-| 状态 | 诊断结果 |
+| 视口 | 结果 |
 | --- | --- |
-| 820×900 空白主页 | `horizontalOverflow=false`；`cardComposerOverlap=false`；主页滚动 617/816；Logo 720×194 已加载；控制台错误 0 |
-| 1200×800 空白主页 | `horizontalOverflow=false`；`cardComposerOverlap=false`；主页滚动 517/536；Logo 720×194 已加载；控制台错误 0 |
-| 1586×992 快捷卡交互 | 第一张卡将“请帮我探索并理解当前代码库，先概览结构、关键模块和主要流程。”写入真实 `.ProseMirror`；无 overflow/重叠；控制台错误 0 |
-| 1586×992 对话视图 | 用户气泡、助手卡片、背景和底部输入框均命中主题；无 overflow/重叠；Logo 已加载；控制台错误 0 |
+| 1120×780 | 分类栏、主题卡片、预览、同步状态、应用/重启/回滚操作均完整显示；无横向溢出 |
+| 820×620 | 主题卡片保持双列紧凑布局，底部操作区可用；无卡片与进度区重叠 |
 
-## P2 问题、修复和复验证据
+- Chromium 控制台：错误 0，警告 0。
+- 隐藏进度元素保留网格行尺寸，避免加载状态变化时卡片区域跳动。
+- Windows 与 macOS 共用相同界面和交互；平台差异仅位于 Rust 系统适配层。
 
-| 之前的 P2 | 修复方式 | 修复后证据 |
-| --- | --- | --- |
-| 侧栏和正文使用 display/serif 字体，中文辨识度不足 | 将 `fonts.ui` 改为中文无衬线字体栈，仅标题使用独立 `fonts.display`；原生侧栏只接受视觉样式和固定导航白名单文案 | 运行时选择器 `.app-shell-left-panel` 与 v1 Schema |
-| 文本 Logo 无法形成四套独立品牌识别 | 每套主题透明 PNG Logo 通过 `theme.logoImage` Base64 data URL 注入 masthead `<img>` | 共享 `JsBuilder` 的 masthead 生成逻辑 |
-| 窄屏卡片可能被固定输入框遮挡 | 按主面板宽度切换 compact/narrow；为输入框动态预留空间并让主页自身滚动 | `qa/captures/dilraba-responsive-820x900-final-v3.png`、`qa/captures/dilraba-responsive-1200x800-final-v3.png`；`cardComposerOverlap=false` |
-| “更多”文字在窄布局换行，视觉不稳定 | 使用本地 Tabler `dots-vertical.svg` 图片，避开 `file://` CSS mask CORS | 两张响应式 final-v3 截图；控制台错误 0 |
-| 主题切换后可能残留旧 resize 逻辑或叠加注入 | 注入前移除旧 new-document script 和 resize listener，再注册当前主题 | 四主题连续切换均只显示当前主题，控制台错误 0 |
+## 运行时与安全验证
 
-## 五项视觉检查
+- Tauri 单实例接收 `dreamskin://` 和 `.dreamskin` 激活并将现有窗口置前。
+- 主题目录下载到临时目录，完成路径、Schema、资源、图片和边界校验后才原子替换缓存。
+- 签名包执行严格 JSON、RFC8785/Ed25519、SHA-256、ZIP 路径、文件数量、媒体格式、尺寸与像素验证。
+- CDP 仅允许本机回环目标，注入脚本持久化到新文档并支持验证和回滚。
+- Rust 自动化测试覆盖签名篡改、ZIP 穿越/重复项、畸形深链接、SemVer 版本选择和状态持久化。
 
-- 字体：正文、导航和辅助信息采用中文无衬线；标题保留 display/serif 氛围；最新字号调整未产生截断或溢出。
-- 间距：侧栏分组、Hero、四卡、输入框层级明确；桌面和中屏无重叠；820 窄屏双列并通过主页滚动完整访问内容。
-- 颜色：四套调色分别为黑金舞台、鼠尾草奶油、ENFP 高饱和青橙、星光蓝紫；气泡、边框、焦点环和辅助文字对比可读。
-- 图片质量：四张 Hero 使用生成式位图并压缩为高质量 JPG；四套 Logo 为独立透明 PNG，浏览器自然尺寸 720×194，运行时成功解码。
-- 文案：Hero 标题/副标题/标签、固定导航白名单、快捷卡标题/描述和输入框占位可按主题配置；项目、任务和账号文案保持原生；快捷卡提示词可写入编辑器。
+## 历史主题效果证据
 
-## 最终图像资产
+`qa/captures/` 与 `qa/comparisons/` 中的图片继续作为 hero、快捷卡、输入框、气泡和主题视觉的历史证据。它们不是当前 Tauri 客户端外壳的截图，也不用于证明 Codex 原生 DOM 在未来版本中保持不变。
 
-- Hero：`backgrounds/kun-stage-hero-v2.jpg`、`backgrounds/jackson-sage-hero-v2.jpg`、`backgrounds/enfp-pop-hero-v2.jpg`、`backgrounds/dilraba-star-hero-v3.jpg`。
-- Logo：`logos/kun-stage-logo-ui-v1.png`、`logos/jackson-sage-logo-ui-v1.png`、`logos/enfp-pop-logo-ui-v1.png`、`logos/dilraba-star-logo-ui-v1.png`。
-- ImageGen 用途：人物主题横幅与舞台/纸张/涂鸦/星空背景；四套品牌字标和配套花朵、星光、彩色字符、蝴蝶等视觉元素。Logo 采用色键生成后去背、裁边并缩放为 UI 资产。
+## 当前结论
 
-## P3 后续项
-
-- 可继续逐件补齐参考图中的拍立得、便签、波形、花朵等独立装饰素材。
-- 可把快捷卡图标进一步放大并改为更有填充感的专属插画；当前使用 Codex 原生/Tabler 视觉语言以保持清晰和交互一致。
-- ENFP 可另做 16:10 专用构图，以减少 16:9 源参考在 1586×992 验收视口中的裁切差异。
+本地前端构建、Rust 测试、签名主题验证、在线目录同步和 Windows Tauri 可执行文件构建均已通过。macOS 代码与 PKG 脚本已迁移，最终发布前仍以 GitHub Actions 的 Apple Silicon/Intel runner 结果作为平台打包门禁。
 
 final result: passed

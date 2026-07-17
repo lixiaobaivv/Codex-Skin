@@ -13,6 +13,23 @@ type Theme = {
 };
 type AppState = { themes: Theme[]; sources: Source[]; selectedSourceId: string };
 
+const qaMode = import.meta.env.DEV && new URLSearchParams(location.search).get("qa") === "1";
+const qaThemes: Theme[] = [
+  ["dilraba-star", "迪丽热巴 · 星愿", "星光舞台与暖金色卡片", "人物", "/qa/captures/dilraba-star-home-final-v5.png"],
+  ["enfp-pop", "ENFP 多巴胺", "明亮活泼的彩色工作空间", "其他", "/qa/captures/enfp-pop-home-final-v3.png"],
+  ["jackson-sage", "千玺 · 鼠尾草", "克制自然的鼠尾草绿", "人物", "/qa/captures/jackson-sage-home-final-v3.png"],
+  ["kun-stage", "舞台 · 银蓝", "深色舞台与银蓝高光", "人物", "/qa/captures/kun-stage-home-final-v3.png"],
+].map(([id, name, description, category, previewPath]) => ({ id, version: "1.0.0", name, description, category, previewPath }));
+
+async function call<T>(command: string, args?: Record<string, unknown>): Promise<T> {
+  if (!qaMode) return invoke<T>(command, args);
+  if (command === "get_app_state") return { themes: qaThemes, sources: [{ id: "github", name: "GitHub 官方" }, { id: "gh-proxy", name: "GH Proxy" }, { id: "ghfast", name: "GHFast" }], selectedSourceId: "github" } as T;
+  if (command === "read_preview") return String(args?.path ?? "") as T;
+  if (command === "pending_activations") return [] as T;
+  if (command === "sync_catalog") return { themeCount: qaThemes.length, sourceId: "github", sourceName: "GitHub 官方" } as T;
+  return "QA 操作已完成" as T;
+}
+
 const categories = ["全部", "人物", "动漫", "游戏", "风景", "极简", "节日", "其他"];
 const previewCache = new Map<string, string>();
 let state: AppState = { themes: [], sources: [], selectedSourceId: "github" };
@@ -82,7 +99,7 @@ function renderCategories(): void {
 async function loadPreview(image: HTMLImageElement, path: string): Promise<void> {
   try {
     let data = previewCache.get(path);
-    if (!data) { data = await invoke<string>("read_preview", { path }); previewCache.set(path, data); }
+    if (!data) { data = await call<string>("read_preview", { path }); previewCache.set(path, data); }
     image.src = data;
   } catch { image.closest("article")?.classList.add("preview-error"); }
 }
@@ -110,7 +127,7 @@ function renderThemes(): void {
 
 async function loadState(): Promise<void> {
   try {
-    state = await invoke<AppState>("get_app_state");
+    state = await call<AppState>("get_app_state");
     selectedTheme = state.themes.find(theme => theme.id === selectedTheme?.id) ?? state.themes[0];
     renderSources(); renderCategories(); renderThemes();
     if (selectedTheme) document.querySelector("#selection")!.textContent = `已选择：${selectedTheme.name}`;
@@ -124,14 +141,14 @@ async function handleActivation(values: string[]): Promise<void> {
     if (value.startsWith("dreamskin:")) {
       if (!window.confirm("是否从网页提供的地址下载主题？\n\n客户端将校验大小、SHA-256、Ed25519 签名和全部图片，下载后不会自动应用。")) continue;
       setBusy(true, "正在下载并验证签名主题…");
-      try { const result = await invoke<{ name:string;version:string }>("install_uri", { uri:value, sourceId:sourceSelect.value }); await loadState(); message(`${result.name} ${result.version} 已安全安装`); }
+      try { const result = await call<{ name:string;version:string }>("install_uri", { uri:value, sourceId:sourceSelect.value }); await loadState(); message(`${result.name} ${result.version} 已安全安装`); }
       catch(error){message(String(error));} finally{setBusy(false);} continue;
     }
     if (!value.toLowerCase().endsWith(".dreamskin")) continue;
     if (!window.confirm(`是否校验并安装本地主题包？\n\n${value}`)) continue;
     setBusy(true, "正在校验主题签名和图片…");
     try {
-      const result = await invoke<{ name: string; version: string; alreadyInstalled: boolean }>("import_local", { path: value });
+      const result = await call<{ name: string; version: string; alreadyInstalled: boolean }>("import_local", { path: value });
       await loadState(); message(`${result.name} ${result.version} ${result.alreadyInstalled ? "已存在" : "已安全安装"}`);
     } catch (error) { message(String(error)); }
     finally { setBusy(false); }
@@ -141,7 +158,7 @@ async function handleActivation(values: string[]): Promise<void> {
 document.querySelector<HTMLButtonElement>("#refresh")!.onclick = async () => {
   setBusy(true, "正在同步主题目录…");
   try {
-    const result = await invoke<{ themeCount: number; sourceId: string; sourceName: string }>("sync_catalog", { sourceId: sourceSelect.value });
+    const result = await call<{ themeCount: number; sourceId: string; sourceName: string }>("sync_catalog", { sourceId: sourceSelect.value });
     previewCache.clear(); await loadState();
     message(`已通过 ${result.sourceName} 更新 ${result.themeCount} 个主题`);
   } catch (error) { message(`同步失败：${String(error)}`); }
@@ -155,11 +172,11 @@ for (const [id, command, label] of [
 ] as const) {
   document.querySelector<HTMLButtonElement>(`#${id}`)!.onclick = async () => {
     setBusy(true, label);
-    try { message(await invoke<string>(command, { themeId: selectedTheme?.id ?? null })); }
+    try { message(await call<string>(command, { themeId: selectedTheme?.id ?? null })); }
     catch (error) { message(String(error)); }
     finally { setBusy(false); }
   };
 }
 
-void listen<string[]>("external-activation", event => void handleActivation(event.payload));
-void loadState().then(async () => handleActivation(await invoke<string[]>("pending_activations")));
+if (!qaMode) void listen<string[]>("external-activation", event => void handleActivation(event.payload));
+void loadState().then(async () => handleActivation(await call<string[]>("pending_activations")));

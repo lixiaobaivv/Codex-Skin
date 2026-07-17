@@ -90,7 +90,7 @@ struct Manifest {
     key_id: String,
     signature: [u8; 64],
 }
-#[derive(serde::Serialize)]
+#[derive(Debug, serde::Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ImportResult {
     pub id: String,
@@ -109,12 +109,24 @@ pub struct Expected {
 }
 
 pub fn import_local(input: &str) -> Result<ImportResult> {
-    import_inner(input, None)
+    import_inner(input, None, None, None)
 }
 pub fn import_expected(input: &str, expected: Expected) -> Result<ImportResult> {
-    import_inner(input, Some(expected))
+    import_inner(input, Some(expected), None, None)
 }
-fn import_inner(input: &str, expected: Option<Expected>) -> Result<ImportResult> {
+pub fn verify_for_platform(input: &str, platform: &str) -> Result<ImportResult> {
+    if !matches!(platform, "windows" | "macos") {
+        return fail("DSI_UNSUPPORTED_PLATFORM", "只支持 Windows 或 macOS。");
+    }
+    let temporary = tempfile::tempdir()?;
+    import_inner(input, None, Some(platform), Some(temporary.path()))
+}
+fn import_inner(
+    input: &str,
+    expected: Option<Expected>,
+    platform: Option<&str>,
+    library_override: Option<&Path>,
+) -> Result<ImportResult> {
     let package = PathBuf::from(input.trim().trim_matches('"')).canonicalize()?;
     if package
         .extension()
@@ -147,7 +159,14 @@ fn import_inner(input: &str, expected: Option<Expected>) -> Result<ImportResult>
         AppError::Message("DSI_MANIFEST_INVALID: theme.json 不是严格 UTF-8。".into())
     })?;
     let root = parse_strict(manifest_text)?;
-    let manifest = validate_manifest(&root)?;
+    let platform = platform.unwrap_or(if cfg!(windows) {
+        "windows"
+    } else if cfg!(target_os = "macos") {
+        "macos"
+    } else {
+        "unsupported"
+    });
+    let manifest = validate_manifest(&root, platform)?;
     if let Some(expected) = &expected {
         if expected.id.as_deref().is_some_and(|v| v != manifest.id) {
             return fail("DSI_MANIFEST_INVALID", "下载包主题 ID 与深链接提示不一致。");
@@ -181,7 +200,10 @@ fn import_inner(input: &str, expected: Option<Expected>) -> Result<ImportResult>
     if manifest_bytes.len() as u64 + background.len() as u64 + preview.len() as u64 > MAX_PACKAGE {
         return fail("DSI_SIZE_LIMIT", "主题包解压后超过 20 MiB。");
     }
-    let library = paths::installed_root()?;
+    let library = library_override
+        .map(Path::to_owned)
+        .map(Ok)
+        .unwrap_or_else(paths::installed_root)?;
     fs::create_dir_all(&library)?;
     let target = library.join(&manifest.id).join(&manifest.version);
     if target.exists() {
@@ -214,9 +236,8 @@ fn import_inner(input: &str, expected: Option<Expected>) -> Result<ImportResult>
     fs::write(staging.path().join(&manifest.preview.path), preview)?;
     fs::create_dir_all(target.parent().unwrap())?;
     let staging_path = staging.keep();
-    fs::rename(&staging_path, &target).map_err(|error| {
+    fs::rename(&staging_path, &target).inspect_err(|_| {
         let _ = fs::remove_dir_all(&staging_path);
-        error
     })?;
     Ok(ImportResult {
         id: manifest.id,
@@ -266,7 +287,7 @@ fn read_entry(archive: &mut zip::ZipArchive<File>, name: &str, limit: u64) -> Re
     Ok(output)
 }
 
-fn validate_manifest(root: &Value) -> Result<Manifest> {
+fn validate_manifest(root: &Value, current_platform: &str) -> Result<Manifest> {
     closed(root, ROOT_ALLOWED, ROOT_REQUIRED, "theme.json")?;
     if integer(root, "schemaVersion")? != 1 || integer(root, "packageVersion")? != 1 {
         return fail(
@@ -274,12 +295,11 @@ fn validate_manifest(root: &Value) -> Result<Manifest> {
             "只支持 schemaVersion=1 和 packageVersion=1。",
         );
     }
-    if let Some(schema) = root.get("$schema") {
-        if string(schema, "$schema")?
+    if let Some(schema) = root.get("$schema")
+        && string(schema, "$schema")?
             != "https://raw.githubusercontent.com/lixiaobaivv/Codex-Skin-Store/main/spec/theme-package.schema.json"
-        {
-            return fail("DSI_MANIFEST_INVALID", "$schema 不是受支持的规范地址。");
-        }
+    {
+        return fail("DSI_MANIFEST_INVALID", "$schema 不是受支持的规范地址。");
     }
     let id = text(root, "id", 128)?;
     if id.len() < 3 || !valid_id(&id) {
@@ -329,15 +349,26 @@ fn validate_manifest(root: &Value) -> Result<Manifest> {
     {
         return fail("DSI_MANIFEST_INVALID", "platforms 包含重复或未知平台。");
     }
-    let current_platform = if cfg!(windows) {
-        "windows"
-    } else if cfg!(target_os = "macos") {
-        "macos"
-    } else {
-        "unsupported"
-    };
     if !values.iter().any(|v| v == current_platform) {
         return fail("DSI_UNSUPPORTED_PLATFORM", "该主题未声明支持当前平台。");
+    }
+    for key in [
+        "brandSubtitle",
+        "projectPrefix",
+        "projectLabel",
+        "statusText",
+        "quote",
+    ] {
+        if let Some(value) = root.get(key)
+            && string(value, key)?.chars().count() > 80
+        {
+            return fail("DSI_MANIFEST_INVALID", &format!("{key} 文本过长。"));
+        }
+    }
+    if let Some(value) = root.get("tagline")
+        && string(value, "tagline")?.chars().count() > 160
+    {
+        return fail("DSI_MANIFEST_INVALID", "tagline 文本过长。");
     }
     let colors = property(root, "colors")?;
     closed(colors, COLORS, COLORS, "colors")?;
@@ -395,6 +426,10 @@ fn validate_manifest(root: &Value) -> Result<Manifest> {
         .all(|c| c.is_ascii_alphanumeric() || "._-".contains(c))
     {
         return fail("DSI_MANIFEST_INVALID", "signature.keyId 格式无效。");
+    }
+    let signed_at = text(signature, "signedAt", 64)?;
+    if chrono::DateTime::parse_from_rfc3339(&signed_at).is_err() {
+        return fail("DSI_MANIFEST_INVALID", "signature.signedAt 不是有效时间。");
     }
     let value = text(signature, "value", 86)?;
     let bytes = base64::engine::general_purpose::URL_SAFE_NO_PAD
@@ -632,7 +667,7 @@ fn valid_id(v: &str) -> bool {
 fn valid_color(v: &str) -> bool {
     (v.len() == 7 && v.starts_with('#') && v[1..].chars().all(|c| c.is_ascii_hexdigit()))
         || regex::Regex::new(
-            r"^rgba\([0-9]{1,3}, ?[0-9]{1,3}, ?[0-9]{1,3}, ?(?:0(?:\.[0-9]+)?|1(?:\.0+)?)\)$",
+            r"^rgba\((25[0-5]|2[0-4][0-9]|1[0-9]{2}|[1-9]?[0-9]),[ ]*(25[0-5]|2[0-4][0-9]|1[0-9]{2}|[1-9]?[0-9]),[ ]*(25[0-5]|2[0-4][0-9]|1[0-9]{2}|[1-9]?[0-9]),[ ]*(0|1|0?\.[0-9]{1,3}|1\.0{1,3})\)$",
         )
         .unwrap()
         .is_match(v)
@@ -739,13 +774,54 @@ fn depth(v: &Value) -> usize {
 #[cfg(test)]
 mod tests {
     use super::*;
-    #[test]
-    fn fixture_import_verifies_signature_and_assets() {
-        let root = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+    use std::io::Write;
+
+    fn fixture_path() -> PathBuf {
+        PathBuf::from(env!("CARGO_MANIFEST_DIR"))
             .parent()
             .unwrap()
-            .to_owned();
-        let package = root.join("samples/dreamskin/codex-skin-sample-1.0.0.dreamskin");
+            .join("samples/dreamskin/codex-skin-sample-1.0.0.dreamskin")
+    }
+
+    fn write_package(entries: &[(String, Vec<u8>)]) -> tempfile::NamedTempFile {
+        let output = tempfile::Builder::new()
+            .suffix(".dreamskin")
+            .tempfile()
+            .unwrap();
+        let mut zip = zip::ZipWriter::new(output.reopen().unwrap());
+        let options = zip::write::SimpleFileOptions::default()
+            .compression_method(zip::CompressionMethod::Deflated)
+            .unix_permissions(0o644);
+        for (name, bytes) in entries {
+            zip.start_file(name, options).unwrap();
+            zip.write_all(bytes).unwrap();
+        }
+        zip.finish().unwrap();
+        output
+    }
+
+    fn fixture_entries() -> Vec<(String, Vec<u8>)> {
+        let mut archive = zip::ZipArchive::new(File::open(fixture_path()).unwrap()).unwrap();
+        (0..archive.len())
+            .map(|index| {
+                let mut entry = archive.by_index(index).unwrap();
+                let mut bytes = Vec::new();
+                entry.read_to_end(&mut bytes).unwrap();
+                (entry.name().to_owned(), bytes)
+            })
+            .collect()
+    }
+
+    #[test]
+    fn rejects_duplicate_json_keys_and_invalid_colors() {
+        assert!(parse_strict(r#"{"a":1,"a":2}"#).is_err());
+        assert!(!valid_color("rgba(999, 0, 0, 1)"));
+        assert!(valid_color("rgba(255, 0, 42, 0.125)"));
+    }
+
+    #[test]
+    fn fixture_import_verifies_signature_and_assets() {
+        let package = fixture_path();
         let temp = tempfile::tempdir().unwrap();
         unsafe {
             std::env::set_var("CODEX_THEME_LIBRARY_DIR", temp.path());
@@ -759,9 +835,58 @@ mod tests {
         let payload = crate::compiler::compile(&result.id).unwrap();
         assert!(payload.css.contains("--codex-theme-id"));
         assert!(payload.javascript.contains("codex-theme-home"));
+        let state = temp.path().join("State");
+        assert_eq!(
+            fs::read_to_string(state.join("codex-theme.css")).unwrap(),
+            payload.css
+        );
+        assert_eq!(
+            fs::read_to_string(state.join("codex-theme.js")).unwrap(),
+            payload.javascript
+        );
+        assert!(
+            fs::read_to_string(state.join("current-theme.json"))
+                .unwrap()
+                .contains("codex-skin.jackson-sage-sample")
+        );
         unsafe {
             std::env::remove_var("CODEX_THEME_LIBRARY_DIR");
             std::env::remove_var("CODEX_THEME_STORE_DATA_DIR");
+        }
+    }
+
+    #[test]
+    fn rejects_tampered_signed_manifest() {
+        let mut entries = fixture_entries();
+        let manifest = entries
+            .iter_mut()
+            .find(|(name, _)| name == "theme.json")
+            .unwrap();
+        let mut root: Value = serde_json::from_slice(&manifest.1).unwrap();
+        root["name"] = Value::String("Tampered theme".into());
+        manifest.1 = serde_json::to_vec(&root).unwrap();
+        let package = write_package(&entries);
+        let error = verify_for_platform(package.path().to_str().unwrap(), "windows").unwrap_err();
+        assert!(error.to_string().contains("DSI_SIGNATURE_INVALID"));
+    }
+
+    #[test]
+    fn rejects_zip_traversal_and_duplicate_names() {
+        for entries in [
+            vec![
+                ("../theme.json".into(), vec![1]),
+                ("background.png".into(), vec![2]),
+                ("preview.png".into(), vec![3]),
+            ],
+            vec![
+                ("theme.json".into(), vec![1]),
+                ("THEME.JSON".into(), vec![2]),
+                ("preview.png".into(), vec![3]),
+            ],
+        ] {
+            let package = write_package(&entries);
+            let mut archive = zip::ZipArchive::new(File::open(package.path()).unwrap()).unwrap();
+            assert!(validate_entries(&mut archive).is_err());
         }
     }
 }

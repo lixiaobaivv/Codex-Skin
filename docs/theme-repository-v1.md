@@ -66,9 +66,9 @@
 ## 标准命令
 
 ```bash
-dotnet run --project src/CodexThemeStore.Cli -- theme-index . "My Theme Repository"
-dotnet run --project src/CodexThemeStore.Cli -- theme-validate .
-dotnet run --project src/CodexThemeStore.Cli -- theme-pack . artifacts/theme-catalog-v1.zip
+cargo run --manifest-path src-tauri/Cargo.toml --bin catalog-tool -- index . "My Theme Repository"
+cargo run --manifest-path src-tauri/Cargo.toml --bin catalog-tool -- validate .
+cargo run --manifest-path src-tauri/Cargo.toml --bin catalog-tool -- pack . artifacts/theme-catalog-v1.zip
 ```
 
 索引必须覆盖 `themes/` 中全部且仅有的主题清单。CI 和客户端使用同一个 Core 校验器，不接受“Schema 通过但资源缺失”的仓库。

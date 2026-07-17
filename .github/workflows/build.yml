@@ -12,47 +12,54 @@ permissions:
 
 jobs:
   test:
-    runs-on: ubuntu-latest
+    runs-on: windows-latest
     steps:
       - uses: actions/checkout@v7
-      - uses: actions/setup-dotnet@v6
+      - uses: actions/setup-node@v7
         with:
-          dotnet-version: 8.0.x
-      - run: dotnet test tests/CodexThemeStore.Core.Tests/CodexThemeStore.Core.Tests.csproj --configuration Release
-      - name: Render macOS theme store UI
-        run: |
-          dotnet run --project tests/CodexThemeStore.Desktop.Headless/CodexThemeStore.Desktop.Headless.csproj --configuration Release -- artifacts/theme-store-ui.png 1120 780
-          dotnet run --project tests/CodexThemeStore.Desktop.Headless/CodexThemeStore.Desktop.Headless.csproj --configuration Release -- artifacts/theme-store-ui-compact.png 820 620
-      - uses: actions/upload-artifact@v7
+          node-version: 22
+          cache: npm
+      - uses: dtolnay/rust-toolchain@stable
         with:
-          name: theme-store-ui-render
-          path: artifacts/theme-store-ui*.png
-          if-no-files-found: error
+          components: clippy, rustfmt
+      - uses: swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri
+      - run: npm ci
+      - run: node --test tests
+      - run: npm run build
+      - run: cargo fmt --manifest-path src-tauri/Cargo.toml -- --check
+      - run: cargo clippy --manifest-path src-tauri/Cargo.toml --all-targets --locked -- -D warnings
+      - run: cargo test --manifest-path src-tauri/Cargo.toml --locked
+
   windows-installer:
     needs: test
     runs-on: windows-latest
     steps:
       - uses: actions/checkout@v7
-      - uses: actions/setup-dotnet@v6
+      - uses: actions/setup-node@v7
         with:
-          dotnet-version: 8.0.x
+          node-version: 22
+          cache: npm
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri
+      - run: npm ci
       - name: Set version
         shell: pwsh
         run: |
           $version = "${{ github.ref_name }}" -replace '^v', ''
           if ($version -notmatch '^\d+\.\d+\.\d+$') { $version = "0.0.${{ github.run_number }}" }
           "PACKAGE_VERSION=$version" >> $env:GITHUB_ENV
-      - name: Publish Windows app
+      - name: Build Windows app
+        run: npm run tauri -- build --no-bundle --config "{`"version`":`"$env:PACKAGE_VERSION`"}"
+      - name: Stage application
         shell: pwsh
         run: |
           $publish = Join-Path $PWD 'artifacts\win-x64'
-          dotnet publish src/CodexThemeStore/CodexThemeStore.csproj `
-            -p:PublishProfile=win-x64 `
-            -p:PublishDir="$publish\" `
-            -p:Version=$env:PACKAGE_VERSION
-          @('themes','previews','backgrounds','logos','pets') | ForEach-Object {
-            if (Test-Path (Join-Path $publish $_)) { throw "Online theme assets must not be bundled: $_" }
-          }
+          New-Item -ItemType Directory -Force $publish | Out-Null
+          Copy-Item 'src-tauri\target\release\codex-skin.exe' (Join-Path $publish 'Codex-Skin.exe')
       - name: Build Setup EXE
         shell: pwsh
         run: |
@@ -76,9 +83,15 @@ jobs:
         rid: [osx-arm64, osx-x64]
     steps:
       - uses: actions/checkout@v7
-      - uses: actions/setup-dotnet@v6
+      - uses: actions/setup-node@v7
         with:
-          dotnet-version: 8.0.x
+          node-version: 22
+          cache: npm
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri
+      - run: npm ci
       - name: Set version
         run: |
           version="${GITHUB_REF_NAME#v}"

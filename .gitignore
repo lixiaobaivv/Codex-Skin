@@ -1,8 +1,9 @@
-# .NET build outputs
+# Build outputs
 **/[Bb]in/
 **/[Oo]bj/
 artifacts/
 publish/
+.playwright-cli/
 
 # Visual Studio
 .vs/

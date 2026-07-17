@@ -15,19 +15,19 @@ const CATEGORIES: [&str; 7] = ["人物", "动漫", "游戏", "风景", "极简",
 pub fn load() -> Result<Vec<ThemeSummary>> {
     let mut newest = HashMap::<String, ThemeSummary>::new();
     if let Ok(directory) = paths::cache_themes() {
-        load_directory(&directory, &mut newest, false)?;
+        load_directory(&directory, &mut newest)?;
     }
-    if let Ok(root) = paths::installed_root() {
-        if root.exists() {
-            for entry in walkdir::WalkDir::new(root)
-                .min_depth(3)
-                .max_depth(3)
-                .into_iter()
-                .filter_map(|item| item.ok())
-            {
-                if entry.file_type().is_file() && entry.file_name() == "theme.json" {
-                    add_manifest(entry.path(), &mut newest, true)?;
-                }
+    if let Ok(root) = paths::installed_root()
+        && root.exists()
+    {
+        for entry in walkdir::WalkDir::new(root)
+            .min_depth(3)
+            .max_depth(3)
+            .into_iter()
+            .filter_map(|item| item.ok())
+        {
+            if entry.file_type().is_file() && entry.file_name() == "theme.json" {
+                let _ = add_manifest(entry.path(), &mut newest);
             }
         }
     }
@@ -40,11 +40,7 @@ pub fn load() -> Result<Vec<ThemeSummary>> {
     Ok(themes)
 }
 
-fn load_directory(
-    directory: &Path,
-    themes: &mut HashMap<String, ThemeSummary>,
-    tolerant: bool,
-) -> Result<()> {
+fn load_directory(directory: &Path, themes: &mut HashMap<String, ThemeSummary>) -> Result<()> {
     if !directory.exists() {
         return Ok(());
     }
@@ -54,21 +50,13 @@ fn load_directory(
             .extension()
             .is_some_and(|ext| ext.eq_ignore_ascii_case("json"))
         {
-            if let Err(error) = add_manifest(&path, themes, tolerant) {
-                if !tolerant {
-                    return Err(error);
-                }
-            }
+            add_manifest(&path, themes)?;
         }
     }
     Ok(())
 }
 
-fn add_manifest(
-    path: &Path,
-    themes: &mut HashMap<String, ThemeSummary>,
-    _tolerant: bool,
-) -> Result<()> {
+fn add_manifest(path: &Path, themes: &mut HashMap<String, ThemeSummary>) -> Result<()> {
     let root: Value = serde_json::from_slice(&fs::read(path)?)?;
     let text = |key: &str| {
         root.get(key)
@@ -89,6 +77,8 @@ fn add_manifest(
         text("codeThemeId")
     };
     let version = text("version");
+    let parsed_version = semver::Version::parse(&version)
+        .map_err(|_| AppError::Message(format!("主题版本无效：{version}")))?;
     let category = if package {
         "其他".to_owned()
     } else {
@@ -136,9 +126,9 @@ fn add_manifest(
     let replace = themes
         .get(&id)
         .map(|old| {
-            semver::Version::parse(&version).unwrap_or_else(|_| semver::Version::new(0, 0, 0))
+            parsed_version
                 > semver::Version::parse(&old.version)
-                    .unwrap_or_else(|_| semver::Version::new(0, 0, 0))
+                    .expect("catalog only stores validated semantic versions")
         })
         .unwrap_or(true);
     if replace {
@@ -195,4 +185,37 @@ pub fn find(id: &str) -> Result<ThemeSummary> {
         .into_iter()
         .find(|theme| theme.id == id)
         .ok_or_else(|| AppError::Message(format!("找不到主题：{id}")))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn selects_newest_semantic_version() {
+        let temp = tempfile::tempdir().unwrap();
+        let mut themes = HashMap::new();
+        for version in ["1.9.0", "1.10.0", "1.2.0"] {
+            let directory = temp.path().join(version);
+            fs::create_dir_all(&directory).unwrap();
+            fs::write(directory.join("preview.png"), b"preview").unwrap();
+            let manifest = directory.join("theme.json");
+            fs::write(
+                &manifest,
+                serde_json::to_vec(&serde_json::json!({
+                    "schemaVersion": 1,
+                    "packageVersion": 1,
+                    "id": "codex-skin.version-test",
+                    "version": version,
+                    "name": "Version test",
+                    "description": "test",
+                    "assets": { "preview": { "path": "preview.png" } }
+                }))
+                .unwrap(),
+            )
+            .unwrap();
+            add_manifest(&manifest, &mut themes).unwrap();
+        }
+        assert_eq!(themes["codex-skin.version-test"].version, "1.10.0");
+    }
 }

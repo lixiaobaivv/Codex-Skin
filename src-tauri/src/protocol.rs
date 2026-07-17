@@ -54,7 +54,7 @@ pub async fn install_uri(input: &str, preferred: Option<&str>) -> Result<ImportR
 }
 
 fn parse(input: &str) -> Result<Request> {
-    if input.is_empty() || input.as_bytes().len() > MAX_URI {
+    if input.is_empty() || input.len() > MAX_URI {
         return fail("DSI_URI_INVALID", "dreamskin URI 为空或超过 4096 字节。");
     }
     let uri = Url::parse(input)
@@ -102,7 +102,7 @@ fn parse(input: &str) -> Result<Request> {
         }
     }
     for key in ["url", "sha256", "size"] {
-        if !values.get(key).is_some_and(|v| !v.is_empty()) {
+        if values.get(key).is_none_or(|v| v.is_empty()) {
             return fail("DSI_URI_INVALID", &format!("缺少查询参数：{key}"));
         }
     }
@@ -420,6 +420,31 @@ mod tests {
             "fe80::1",
         ] {
             assert!(!public_ip(value.parse().unwrap()));
+        }
+    }
+
+    #[test]
+    fn parser_rejects_ambiguous_or_unsafe_links() {
+        let hash = "a".repeat(64);
+        for uri in [
+            format!(
+                "dreamskin://other?url=https%3A%2F%2Fexample.com%2Fa.dreamskin&sha256={hash}&size=1"
+            ),
+            format!("dreamskin://install?url=https://example.com/a.dreamskin&sha256={hash}&size=1"),
+            format!(
+                "dreamskin://install?url=https%3A%2F%2F127.0.0.1%2Fa.dreamskin&sha256={hash}&size=1"
+            ),
+            format!(
+                "dreamskin://install?url=https%3A%2F%2Fexample.com%2Fa.dreamskin&sha256={hash}&sha256={hash}&size=1"
+            ),
+            format!(
+                "dreamskin://install?url=https%3A%2F%2Fexample.com%2Fa.dreamskin&sha256={hash}&size=0"
+            ),
+            format!(
+                "dreamskin://install?url=https%3A%2F%2Fexample.com%2Fa.dreamskin&sha256={hash}&size=1&unknown=x"
+            ),
+        ] {
+            assert!(parse(&uri).is_err(), "unexpectedly accepted {uri}");
         }
     }
 }

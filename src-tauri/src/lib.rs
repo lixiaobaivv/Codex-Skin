@@ -1,3 +1,4 @@
+mod authoring;
 mod catalog;
 mod cdp;
 mod compiler;
@@ -8,6 +9,22 @@ mod paths;
 mod platform;
 mod protocol;
 mod repository;
+
+pub fn verify_dreamskin(path: &str, platform: &str) -> Result<(), String> {
+    dreamskin::verify_for_platform(path, platform)
+        .map(|_| ())
+        .map_err(|error| error.to_string())
+}
+
+pub fn catalog_index(root: &str, name: Option<&str>) -> Result<usize, String> {
+    authoring::index(root, name).map_err(|error| error.to_string())
+}
+pub fn catalog_validate(root: &str) -> Result<usize, String> {
+    authoring::validate(root).map_err(|error| error.to_string())
+}
+pub fn catalog_pack(root: &str, output: &str) -> Result<usize, String> {
+    authoring::pack(root, output).map_err(|error| error.to_string())
+}
 
 use base64::Engine;
 use models::{AppState, SOURCES, SyncResult};

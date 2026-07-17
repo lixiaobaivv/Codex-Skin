@@ -28,20 +28,18 @@ Invoke-RestMethod http://127.0.0.1:9229/json/list |
 
 列表中应出现标题为 `Codex QA Fixture`、类型为 `page` 的目标。注入器和截图脚本都只接受 `127.0.0.1`/`localhost:9229` 的 WebSocket 地址。
 
-## 2. 注入并连续切换主题
+## 2. 使用 Tauri 客户端注入并连续切换主题
 
-保持夹具页和浏览器打开，在项目根目录执行任意命令：
+保持夹具页和浏览器打开，另开一个 PowerShell 构建并启动客户端：
 
 ```powershell
-.\Codex-Skin.exe apply dilraba-star
-.\Codex-Skin.exe apply jackson-sage
-.\Codex-Skin.exe apply kun-stage
-.\Codex-Skin.exe apply enfp-pop
+npm run tauri -- build --no-bundle
+.\src-tauri\target\release\codex-skin.exe
 ```
 
-`apply` 会保存主题，并把 CSS/JS 注入 9229 上标题或 URL 含 `Codex` 的页面。夹具页右上角会显示当前 `--codex-theme-id`。
+在客户端同步目录、选择主题，然后点击“立即应用”。客户端会保存状态，并把 CSS/JS 注入 9229 上标题或 URL 含 `Codex` 的页面。夹具页右上角会显示当前 `--codex-theme-id`。
 
-可直接连续执行不同的 `apply` 命令。注入器会先移除上一条 `Page.addScriptToEvaluateOnNewDocument`，再注册当前主题脚本并替换页面元素；刷新后应只出现最后选择的主题，不应叠加旧主题。
+可连续选择不同主题并点击“立即应用”。注入器会先移除上一条 `Page.addScriptToEvaluateOnNewDocument`，再注册当前主题脚本并替换页面元素；刷新后应只出现最后选择的主题，不应叠加旧主题。
 
 ## 3. 视觉与交互检查
 
@@ -92,4 +90,4 @@ JSON 会报告主题 ID、首页、遗留自定义侧栏、快捷卡数量、Log
 [aria-label="打开设置"]
 ```
 
-测试结束后直接关闭这份独立浏览器配置即可移除运行时页面。`apply` 已更新本机保存主题；如需同时清理保存状态和 hook，再执行 `.\Codex-Skin.exe rollback`。
+测试结束前在客户端点击“恢复默认”清理注入 hook，然后关闭这份独立浏览器配置。客户端保留的主题状态位于兼容旧版本的数据目录中，下次应用其他主题时会原子覆盖。

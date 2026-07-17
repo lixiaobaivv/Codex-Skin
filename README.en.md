@@ -20,7 +20,7 @@ Open the [latest release](https://github.com/lixiaobaivv/Codex-Skin/releases/lat
 
 Windows is distributed only through Setup; portable EXE and ZIP downloads are not published.
 
-The installers include the .NET runtime. No SDK or separate runtime is required. Windows and Apple commercial signing are not currently available, so SmartScreen or Gatekeeper may request explicit approval.
+The clients are built with Tauri 2 and Rust. Windows uses the system WebView2 runtime and macOS uses WKWebView, so no separate application runtime is required. Windows and Apple commercial signing are not currently available, so SmartScreen or Gatekeeper may request explicit approval.
 
 ## Use On Windows
 
