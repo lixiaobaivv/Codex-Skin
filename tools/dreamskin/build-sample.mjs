@@ -6,8 +6,8 @@ import { fileURLToPath } from "node:url";
 const toolDir = dirname(fileURLToPath(import.meta.url));
 const root = resolve(toolDir, "..", "..");
 const outputDir = join(root, "samples", "dreamskin");
-const backgroundPath = join(root, "backgrounds", "jackson-sage-hero-v2.jpg");
-const previewPath = join(root, "previews", "jackson-sage.png");
+const packageName = "codex-skin-sample-1.0.0.dreamskin";
+const packageOutput = join(outputDir, packageName);
 
 // Public development fixture seed. Never use this key for production themes.
 const fixtureSeed = Buffer.from(
@@ -23,8 +23,9 @@ const privateKey = createPrivateKey({
 const publicDer = createPublicKey(privateKey).export({ format: "der", type: "spki" });
 const publicKey = publicDer.subarray(-32);
 
-const background = await readFile(backgroundPath);
-const preview = await readFile(previewPath);
+const fixturePackage = await readFile(packageOutput);
+const background = readStoredZipEntry(fixturePackage, "background.jpg");
+const preview = readStoredZipEntry(fixturePackage, "preview.png");
 const backgroundSize = readJpegSize(background);
 const previewSize = readPngSize(preview);
 
@@ -103,8 +104,6 @@ const packageBytes = createStoredZip([
 ]);
 
 await mkdir(outputDir, { recursive: true });
-const packageName = "codex-skin-sample-1.0.0.dreamskin";
-const packageOutput = join(outputDir, packageName);
 const packageUrl = `https://github.com/lixiaobaivv/Codex-Skin/releases/download/sample-v1/${packageName}`;
 const packageSha256 = sha256(packageBytes);
 const installParameters = new URLSearchParams({
@@ -185,6 +184,27 @@ function readJpegSize(bytes) {
     offset += 2 + length;
   }
   throw new Error("Cannot read JPEG dimensions.");
+}
+
+function readStoredZipEntry(archive, wantedName) {
+  let offset = 0;
+  while (offset + 30 <= archive.length && archive.readUInt32LE(offset) === 0x04034b50) {
+    const method = archive.readUInt16LE(offset + 8);
+    const compressedSize = archive.readUInt32LE(offset + 18);
+    const nameLength = archive.readUInt16LE(offset + 26);
+    const extraLength = archive.readUInt16LE(offset + 28);
+    const nameStart = offset + 30;
+    const dataStart = nameStart + nameLength + extraLength;
+    const dataEnd = dataStart + compressedSize;
+    if (dataEnd > archive.length) throw new Error("Fixture package contains a truncated ZIP entry.");
+    const name = archive.subarray(nameStart, nameStart + nameLength).toString("utf8");
+    if (name === wantedName) {
+      if (method !== 0) throw new Error(`${wantedName} must use the deterministic stored ZIP method.`);
+      return archive.subarray(dataStart, dataEnd);
+    }
+    offset = dataEnd;
+  }
+  throw new Error(`Fixture package is missing ${wantedName}.`);
 }
 
 function createStoredZip(files) {
