@@ -18,6 +18,14 @@ test("Windows client release uses stable English artifact names", async () => {
   assert.match(release, /SHA256SUMS\.txt/);
   assert.match(release, /PublishSingleFile=true/);
   assert.match(release, /IncludeAllContentForSelfExtract=true/);
+  assert.equal(
+    (project.match(/ExcludeFromSingleFile="true"/g) ?? []).length,
+    6,
+    "all mutable theme resource groups must remain beside the single-file executable",
+  );
+  for (const directory of ["themes", "previews", "backgrounds", "logos", "pets"]) {
+    assert.match(project, new RegExp(`\\\\${directory}\\\\`));
+  }
   assert.match(readme, /Codex-Skin-win-x64\.exe/);
   assert.doesNotMatch(`${readme}\n${program}\n${ci}\n${release}`, /Codex主题商店\.exe/);
 });

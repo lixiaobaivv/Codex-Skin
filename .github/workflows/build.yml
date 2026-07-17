@@ -68,6 +68,10 @@ jobs:
             if (!(Test-Path (Join-Path $publish "previews\$_.png"))) { throw "Missing preview: $_" }
             if (!(Test-Path (Join-Path $publish "themes\$_.json"))) { throw "Missing theme: $_" }
           }
+          @('backgrounds','logos','pets') | ForEach-Object {
+            $directory = Join-Path $publish $_
+            if (!(Test-Path $directory) -or !(Get-ChildItem $directory -File)) { throw "Missing published resource directory: $_" }
+          }
       - name: Build Setup EXE
         shell: pwsh
         run: |
