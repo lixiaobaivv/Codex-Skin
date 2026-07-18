@@ -250,3 +250,7 @@ Windows Setup 和两个 macOS PKG 由 [Build and package](https://github.com/lix
 ## 反馈与贡献
 
 客户端问题请提交到 [Codex-Skin Issues](https://github.com/lixiaobaivv/Codex-Skin/issues)，并附上操作系统、Codex 版本、Codex-Skin 版本、复现步骤和错误信息。代码贡献应先通过上述全部本地检查。
+
+## 友链
+
+**LinuxDo** — [https://linux.do](https://linux.do/)
