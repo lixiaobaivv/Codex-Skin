@@ -430,7 +430,7 @@ const JS_TEMPLATE: &str = r#"
   const applyCopy=()=>{if(cfg.copy?.title)document.title=cfg.copy.title;const replacements=cfg.copy?.replacePlaceholders||{};for(const node of document.querySelectorAll('[placeholder],[data-placeholder]'))for(const attr of ['placeholder','data-placeholder']){const value=node.getAttribute(attr);if(value&&replacements[value])node.setAttribute(attr,replacements[value]);}const editor=document.querySelector('.ProseMirror,[contenteditable="true"][role="textbox"]');if(editor&&cfg.home?.composerHint){editor.setAttribute('aria-label',cfg.home.composerHint);editor.dataset.placeholder=cfg.home.composerHint;}};
   const ensureSidebarLogo=()=>{if(sidebarLogo?.isConnected||!cfg.logo)return;const sidebar=document.querySelector('.app-shell-left-panel');if(!sidebar)return;sidebarLogo=make('img','codex-theme-sidebar-logo');sidebarLogo.src=assetUrl(cfg.logo);sidebarLogo.alt=cfg.home?.brand||'';sidebarLogo.decoding='async';sidebar.append(sidebarLogo);};
   const composerRegionTop=(composer,mainRect)=>{const composerRect=composer.getBoundingClientRect();let top=composerRect.top;const maxRegionHeight=Math.min(480,mainRect.height*.55);for(let node=composer.parentElement;node&&node!==main;node=node.parentElement){const rect=node.getBoundingClientRect();const hugsBottom=rect.bottom>=composerRect.bottom-24&&rect.bottom<=mainRect.bottom+24;const isComposerRegion=rect.height>0&&rect.height<=maxRegionHeight&&rect.top>=mainRect.top+44;if(hugsBottom&&isComposerRegion)top=Math.min(top,rect.top);}return top;};
-  const update=()=>{const hasThreadContext=!!main.querySelector('[data-thread-scroll-footer],[data-thread-find-composer],[data-message-author-role],[data-user-message-bubble="true"],[data-content-search-unit-key$=":assistant"]');main.classList.toggle('codex-theme-home-active',!hasThreadContext);const composer=document.querySelector('.composer-surface-chrome');if(composer){const mainRect=main.getBoundingClientRect(),regionTop=composerRegionTop(composer,mainRect),reserve=Math.min(500,Math.max(148,Math.ceil(mainRect.bottom-regionTop+28)));home.style.bottom=`${reserve}px`;}else home.style.removeProperty('bottom');updateHeroFit();applyCopy();ensureSidebarLogo();};
+  const update=()=>{const composer=document.querySelector('.composer-surface-chrome'),composerRoot=document.querySelector('[data-codex-composer-root]');const hasThreadContext=!!main.querySelector('[data-thread-scroll-footer],[data-thread-find-composer],[data-message-author-role],[data-user-message-bubble="true"],[data-content-search-unit-key$=":assistant"]');const hasComposerContext=!!composerRoot&&[...composerRoot.children].some(child=>child!==composer&&(!composer||!child.contains(composer))&&child.childElementCount>0);main.classList.toggle('codex-theme-home-active',!hasThreadContext&&!hasComposerContext);if(composer){const mainRect=main.getBoundingClientRect(),regionTop=composerRegionTop(composer,mainRect),reserve=Math.min(500,Math.max(148,Math.ceil(mainRect.bottom-regionTop+28)));home.style.bottom=`${reserve}px`;}else home.style.removeProperty('bottom');updateHeroFit();applyCopy();ensureSidebarLogo();};
   const observer=new MutationObserver(update);observer.observe(main,{childList:true,subtree:true});update();
   backgroundImage?.addEventListener('load',updateHeroFit);
   const heroResizeObserver=new ResizeObserver(updateHeroFit);heroResizeObserver.observe(hero);
@@ -449,5 +449,12 @@ mod tests {
         assert!(JS_TEMPLATE.contains("[data-thread-scroll-footer]"));
         assert!(JS_TEMPLATE.contains("[data-thread-find-composer]"));
         assert!(JS_TEMPLATE.contains("!hasThreadContext"));
+    }
+
+    #[test]
+    fn theme_home_stays_hidden_when_the_composer_has_project_context() {
+        assert!(JS_TEMPLATE.contains("[data-codex-composer-root]"));
+        assert!(JS_TEMPLATE.contains("hasComposerContext"));
+        assert!(JS_TEMPLATE.contains("!hasThreadContext&&!hasComposerContext"));
     }
 }
