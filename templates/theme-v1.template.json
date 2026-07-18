@@ -16,7 +16,6 @@
     "contrast": 55,
     "opaqueWindows": true,
     "backgroundImage": "../backgrounds/example-theme.jpg",
-    "backgroundFit": "smart",
     "backgroundPosition": "center",
     "logoImage": "../logos/example-theme.png",
     "backgroundImageOpacity": 1,

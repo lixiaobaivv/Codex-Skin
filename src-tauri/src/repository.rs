@@ -678,7 +678,6 @@ fn validate_theme(path: &Path, expected_id: &str, repository: &Path) -> Result<(
             "semanticColors",
             "surface",
             "backgroundImage",
-            "backgroundFit",
             "backgroundPosition",
             "logoImage",
             "backgroundImageOpacity",
@@ -735,14 +734,6 @@ fn validate_theme(path: &Path, expected_id: &str, repository: &Path) -> Result<(
         .contains(&value)
         {
             return Err(AppError::Message("背景定位值无效。".into()));
-        }
-    }
-    if let Some(value) = theme.get("backgroundFit") {
-        let value = value
-            .as_str()
-            .ok_or_else(|| AppError::Message("背景适配模式必须是字符串。".into()))?;
-        if !["smart", "cover", "contain"].contains(&value) {
-            return Err(AppError::Message("背景适配模式无效。".into()));
         }
     }
     validate_asset_path(
@@ -886,6 +877,18 @@ fn validate_asset_path(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn rejects_background_fit_in_public_theme_contract() {
+        let theme = serde_json::json!({"backgroundFit": "cover"});
+        let error =
+            closed_object(&theme, &["accent", "ink", "surface"], &[], "theme.theme").unwrap_err();
+        assert!(
+            error
+                .to_string()
+                .contains("theme.theme 包含未知字段：backgroundFit")
+        );
+    }
 
     fn remote_catalog_fixture() -> RemoteCatalog {
         let preview = RemoteResource {
