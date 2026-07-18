@@ -834,7 +834,8 @@ mod tests {
         assert!(catalog.iter().any(|theme| theme.id == result.id));
         let payload = crate::compiler::compile(&result.id).unwrap();
         assert!(payload.css.contains("--codex-theme-id"));
-        assert!(payload.javascript.contains("codex-theme-home"));
+        assert!(payload.javascript.contains("codex-theme-native-home"));
+        assert!(!payload.javascript.contains("id='codex-theme-home'"));
         let state = temp.path().join("State");
         assert_eq!(
             fs::read_to_string(state.join("codex-theme.css")).unwrap(),

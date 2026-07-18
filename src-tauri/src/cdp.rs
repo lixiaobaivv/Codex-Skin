@@ -92,7 +92,7 @@ async fn inject_inner(payload: &Payload) -> Result<usize> {
     );
     let expected_theme = serde_json::to_string(&payload.theme_id)?;
     let verification = format!(
-        "(() => {{ let active=false; try {{ active=localStorage.getItem({active_json})==={id_json}; }} catch {{}} const style=document.getElementById({}); const store=globalThis.__codexThemeStore; const actualTheme=document.getElementById('codex-theme-home')?.dataset?.themeId||''; return active && style?.dataset.codexThemeStoreInjectionId==={id_json} && !!store && store.injectionId==={id_json} && actualTheme.length>0 && ({expected_theme}===null || actualTheme==={expected_theme}); }})()",
+        "(() => {{ let active=false; try {{ active=localStorage.getItem({active_json})==={id_json}; }} catch {{}} const style=document.getElementById({}); const store=globalThis.__codexThemeStore; const root=document.documentElement; const actualTheme=root?.dataset?.codexThemeId||''; return active && style?.dataset.codexThemeStoreInjectionId==={id_json} && !!store && store.injectionId==={id_json} && root?.classList.contains('codex-theme-native') && actualTheme.length>0 && ({expected_theme}===null || actualTheme==={expected_theme}); }})()",
         serde_json::to_string(LIVE_STYLE_ID)?
     );
     let mut successes = 0;
@@ -114,7 +114,7 @@ pub async fn remove(timeout: std::time::Duration) -> Result<usize> {
 }
 
 async fn remove_inner() -> Result<usize> {
-    const CLEANUP: &str = "(() => { try { localStorage.removeItem('__codexThemeStoreActiveInjection'); localStorage.removeItem('__codexThemeStoreNewDocumentScript'); } catch {} globalThis.__codexThemeStore?.dispose?.(); globalThis.__codexThemeStore?.observer?.disconnect(); globalThis.__codexThemeStore?.resizeHandler && window.removeEventListener('resize',globalThis.__codexThemeStore.resizeHandler); delete globalThis.__codexThemeStore; document.getElementById('codex-theme-store-live-style')?.remove(); document.getElementById('codex-theme-home')?.remove(); document.documentElement.removeAttribute('data-codex-theme-id'); setTimeout(()=>location.reload(),0); return true; })()";
+    const CLEANUP: &str = "(() => { try { localStorage.removeItem('__codexThemeStoreActiveInjection'); localStorage.removeItem('__codexThemeStoreNewDocumentScript'); } catch {} globalThis.__codexThemeStore?.dispose?.(); globalThis.__codexThemeStore?.observer?.disconnect(); globalThis.__codexThemeStore?.resizeHandler && window.removeEventListener('resize',globalThis.__codexThemeStore.resizeHandler); delete globalThis.__codexThemeStore; document.getElementById('codex-theme-store-live-style')?.remove(); document.getElementById('codex-theme-home')?.remove(); document.documentElement.classList.remove('codex-theme-native'); document.documentElement.removeAttribute('data-codex-theme-id'); document.documentElement.style.removeProperty('--codex-theme-background-size'); setTimeout(()=>location.reload(),0); return true; })()";
     let mut successes = 0;
     for target in targets().await? {
         if remove_target(&target, CLEANUP).await.unwrap_or(false) {

@@ -375,67 +375,51 @@ html[data-codex-window-type="electron"] :is([role="dialog"],[role="menu"],[role=
 html[data-codex-window-type="electron"] [role="tooltip"] { color:{{INK}}!important; background:{{ELEVATED}}!important; border:1px solid {{BORDER}}!important; }
 html[data-codex-window-type="electron"] [data-content-search-unit-key$=":assistant"],html[data-codex-window-type="electron"] [data-message-author-role="assistant"] { color:{{INK}}!important; }
 html[data-codex-window-type="electron"] [data-user-message-bubble="true"] { background:rgb(from {{ACCENT}} r g b / .15)!important; border:1px solid {{BORDER}}!important; }
-html[data-codex-window-type="electron"] #codex-theme-home { display:none; position:absolute!important; inset:44px 0 clamp(118px,15vh,145px); z-index:6!important; container-type:inline-size; overflow:auto; overscroll-behavior:contain; padding:clamp(14px,2.4vw,24px) clamp(16px,2.8vw,30px); color:{{INK}}; background:{{SURFACE}}; font-family:{{UI_FONT}}; }
-html[data-codex-window-type="electron"] .codex-theme-home-active #codex-theme-home { display:block; }
-.codex-theme-sidebar-logo { position:absolute; top:10px; left:16px; z-index:20; width:min(112px,55%); height:30px; padding-right:6px; object-fit:contain; object-position:left center; pointer-events:none; background:{{UNDER}}; }
-.codex-theme-home-shell { width:min(1440px,100%); min-width:0; margin:auto; }
-.codex-theme-home-hero { position:relative; min-height:340px; height:clamp(340px,42vh,480px); display:block; overflow:hidden; isolation:isolate; padding:0; border:1px solid {{BORDER}}; border-radius:clamp(18px,2.2cqw,28px); background:{{SURFACE}}; box-shadow:0 18px 44px rgb(from {{SHADOW}} r g b / .18); }
-.codex-theme-home-hero::before { content:""; position:absolute; inset:0; background-image:{{BACKGROUND}}; background-size:cover; background-position:{{BACKGROUND_POSITION}}; opacity:{{BACKGROUND_OPACITY}}; filter:blur({{BACKGROUND_BLUR}}); transform:scale(1.02); }
-.codex-theme-home-image { position:absolute; inset:0; z-index:1; width:100%; height:100%; display:none; object-fit:contain; object-position:{{BACKGROUND_POSITION}}; opacity:{{BACKGROUND_OPACITY}}; pointer-events:none; user-select:none; }
-.codex-theme-home-hero[data-image-fit="contain"]::before { opacity:.48; filter:blur(18px); transform:scale(1.1); }
-.codex-theme-home-hero[data-image-fit="contain"] .codex-theme-home-image { display:block; }
-.codex-theme-home-copy { position:absolute; inset:46% auto auto clamp(24px,3.2cqw,42px); width:min(46%,600px); min-width:0; z-index:2; transform:translateY(-14%); color:{{INK}}; text-shadow:0 1px 10px rgb(from {{SURFACE}} r g b / .72); }
-.codex-theme-home-brand { display:none; }
-.codex-theme-home-eyebrow { display:inline-flex; margin:0 0 12px; padding:6px 10px; color:{{INK}}; background:rgb(from {{SURFACE}} r g b / .76); border:1px solid {{BORDER}}; border-radius:999px; backdrop-filter:blur(10px); font-size:11px; letter-spacing:.08em; }
-.codex-theme-home-title { margin:0 0 10px; font-family:{{DISPLAY_FONT}}; font-size:clamp(28px,3.2cqw,44px); line-height:1.16; font-weight:900; letter-spacing:-.035em; overflow-wrap:anywhere; }
-.codex-theme-home-subtitle { max-width:520px; margin:0; color:{{SECONDARY}}; font-size:clamp(14px,1.35cqw,18px); line-height:1.55; font-weight:650; overflow-wrap:anywhere; }
-.codex-theme-home-badge { position:absolute; top:clamp(16px,2cqw,26px); right:clamp(16px,2cqw,26px); z-index:2; max-width:36%; padding:7px 12px; overflow:hidden; color:{{ACCENT}}; background:rgb(from {{SURFACE}} r g b / .82); border:1px dashed {{ACCENT}}; border-radius:999px; backdrop-filter:blur(10px); font-size:11px; font-weight:800; text-overflow:ellipsis; white-space:nowrap; }
-.codex-theme-home-tags { display:flex; flex-wrap:wrap; gap:7px; margin-top:15px; }
-.codex-theme-home-tag { padding:5px 9px; color:{{INK}}; background:rgb(from {{SURFACE}} r g b / .78); border:1px solid {{BORDER}}; border-radius:999px; backdrop-filter:blur(9px); font-size:11px; font-weight:750; }
-.codex-theme-home-actions { display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:clamp(10px,1.2cqw,14px); margin-top:clamp(12px,1.5cqw,18px); }
-.codex-theme-home-action { min-width:0; min-height:clamp(138px,13cqw,154px); display:grid; grid-template-rows:42px auto 1fr; justify-items:center; gap:8px; padding:12px; text-align:center; overflow-wrap:anywhere; color:{{INK}}; background:rgb(from {{ELEVATED}} r g b / .96); border:1px solid {{BORDER}}; border-radius:clamp(18px,2cqw,24px); box-shadow:0 12px 28px rgb(from {{SHADOW}} r g b / .18); cursor:pointer; transition:transform .16s ease,border-color .16s ease,box-shadow .16s ease; }
-.codex-theme-home-action:nth-child(1) { background:color-mix(in srgb,{{ELEVATED}} 88%,{{REMOVED}}); }
-.codex-theme-home-action:nth-child(2) { background:color-mix(in srgb,{{ELEVATED}} 88%,{{ADDED}}); }
-.codex-theme-home-action:nth-child(3) { background:color-mix(in srgb,{{ELEVATED}} 88%,{{ACCENT}}); }
-.codex-theme-home-action:nth-child(4) { background:color-mix(in srgb,{{ELEVATED}} 88%,{{SKILL}}); }
-.codex-theme-home-action:focus-visible { outline:2px solid {{ACCENT}}; outline-offset:2px; }
-@media(hover:hover){.codex-theme-home-action:hover { transform:translateY(-4px); border-color:{{ACCENT}}; box-shadow:0 18px 34px rgb(from {{SHADOW}} r g b / .26); }}
-.codex-theme-home-action-icon { width:42px; height:42px; display:grid; place-items:center; color:{{ACCENT}}; background:rgb(from {{SURFACE}} r g b / .84); border:1px solid {{BORDER}}; border-radius:50%; font-family:{{CODE_FONT}}; font-size:18px; }
-.codex-theme-home-action-title { align-self:center; font-size:15px; line-height:1.35; font-weight:850; }
-.codex-theme-home-action-description { margin-top:6px; color:{{SECONDARY}}; font-size:12px; line-height:1.5; }
-.codex-theme-home-pet { position:absolute; right:clamp(12px,2cqw,24px); bottom:12px; max-width:clamp(112px,16cqw,180px); max-height:clamp(112px,16cqw,180px); object-fit:contain; z-index:1; }
-.codex-theme-home-footer { margin:14px 4px 0; color:{{SECONDARY}}; font-size:12px; text-align:right; }
-@container(max-width:820px){.codex-theme-home-actions{grid-template-columns:repeat(2,minmax(0,1fr))}.codex-theme-home-copy{width:60%}.codex-theme-home-hero{min-height:310px;height:clamp(310px,40vh,400px)}}
-@container(max-width:520px){.codex-theme-home-hero{min-height:300px}.codex-theme-home-copy{inset-inline:20px;width:auto}.codex-theme-home-badge,.codex-theme-home-tags{display:none}.codex-theme-home-actions{grid-template-columns:1fr}.codex-theme-home-action{min-height:118px}.codex-theme-home-pet{opacity:.58}.codex-theme-home-footer{text-align:left}}
-@media(max-height:760px){html[data-codex-window-type="electron"] #codex-theme-home{inset-bottom:112px;padding-block:12px}.codex-theme-home-hero{min-height:280px;height:280px}.codex-theme-home-action{min-height:124px;padding-block:10px}.codex-theme-home-actions{margin-top:12px}}
-@media(prefers-reduced-motion:reduce){.codex-theme-home-action{transition:none}}
+html[data-codex-window-type="electron"].codex-theme-native body { background-color:{{UNDER}}!important; background-image:linear-gradient(rgb(from {{UNDER}} r g b / calc(1 - {{BACKGROUND_OPACITY}})),rgb(from {{UNDER}} r g b / calc(1 - {{BACKGROUND_OPACITY}}))),{{BACKGROUND}}!important; background-repeat:no-repeat,no-repeat!important; background-position:center,{{BACKGROUND_POSITION}}!important; background-size:cover,var(--codex-theme-background-size,cover)!important; background-attachment:fixed,fixed!important; }
+.codex-theme-sidebar-logo { position:absolute; top:10px; left:16px; z-index:20; width:min(112px,55%); height:30px; padding-right:6px; object-fit:contain; object-position:left center; pointer-events:none; background:transparent; filter:drop-shadow(0 1px 8px rgb(from {{SURFACE}} r g b / .78)); }
+html[data-codex-window-type="electron"] main.codex-theme-native-home-shell { background:linear-gradient(90deg,rgb(from {{SURFACE}} r g b / .58),rgb(from {{SURFACE}} r g b / .28) 60%,rgb(from {{SURFACE}} r g b / .16))!important; border:0!important; box-shadow:none!important; }
+html[data-codex-window-type="electron"] main.codex-theme-native-task-shell { background:linear-gradient(rgb(from {{SURFACE}} r g b / .90),rgb(from {{SURFACE}} r g b / .94))!important; }
+html[data-codex-window-type="electron"] main.codex-theme-native-home-shell > header.app-header-tint { background:transparent!important; border-color:transparent!important; box-shadow:none!important; backdrop-filter:none!important; text-shadow:0 1px 10px rgb(from {{SURFACE}} r g b / .88); }
+html[data-codex-window-type="electron"] aside.codex-theme-native-home-sidebar { background:linear-gradient(90deg,rgb(from {{UNDER}} r g b / .88),rgb(from {{UNDER}} r g b / .62))!important; border-color:transparent!important; box-shadow:none!important; backdrop-filter:none!important; }
+html[data-codex-window-type="electron"] .codex-theme-native-home { --thread-content-max-width:min(1180px,calc(100cqw - 48px))!important; color:{{INK}}!important; background:transparent!important; container-type:inline-size; }
+.codex-theme-native-home > div:first-child { min-height:100%!important; padding-top:clamp(14px,2.2vh,28px)!important; }
+.codex-theme-native-home-hero { position:relative!important; isolation:isolate; width:calc(100% - clamp(28px,4cqw,56px))!important; max-width:1180px!important; min-height:clamp(280px,38vh,470px)!important; margin-inline:auto!important; padding:clamp(24px,4cqw,54px)!important; overflow:hidden!important; border:1px solid {{BORDER}}!important; border-radius:clamp(18px,2.2cqw,28px)!important; background:linear-gradient(90deg,rgb(from {{SURFACE}} r g b / .78),rgb(from {{SURFACE}} r g b / .25) 58%,transparent)!important; box-shadow:0 20px 54px rgb(from {{SHADOW}} r g b / .24)!important; }
+.codex-theme-native-home-hero::before { content:""; position:absolute; z-index:0; inset:0; pointer-events:none; background:linear-gradient(135deg,rgb(from {{SURFACE}} r g b / .12),transparent 58%); backdrop-filter:blur({{BACKGROUND_BLUR}}); }
+.codex-theme-native-home-hero::after { content:""; position:absolute; z-index:0; inset:0; pointer-events:none; background:linear-gradient(90deg,rgb(from {{SURFACE}} r g b / .76),rgb(from {{SURFACE}} r g b / .18) 62%,transparent); }
+.codex-theme-native-home-copy { position:relative!important; z-index:1!important; width:min(54%,620px)!important; min-height:100%!important; align-items:flex-start!important; justify-content:center!important; text-align:left!important; color:{{INK}}!important; text-shadow:0 1px 12px rgb(from {{SURFACE}} r g b / .78); }
+.codex-theme-native-home-copy [data-testid="home-icon"] { display:none!important; }
+.codex-theme-native-home-copy :is(h1,h2,[class*="text-"]) { color:{{INK}}!important; font-family:{{DISPLAY_FONT}}!important; }
+.codex-theme-native-home-suggestions { overflow:visible!important; }
+.codex-theme-native-home-suggestions button { min-height:112px!important; padding:15px 14px!important; color:{{INK}}!important; border:1px solid {{BORDER}}!important; border-radius:18px!important; background:rgb(from {{ELEVATED}} r g b / .86)!important; box-shadow:0 12px 30px rgb(from {{SHADOW}} r g b / .20)!important; backdrop-filter:blur(12px) saturate(1.08)!important; transition:transform .16s ease,border-color .16s ease,background-color .16s ease!important; }
+.codex-theme-native-home-suggestions button:nth-child(1){background:color-mix(in srgb,rgb(from {{ELEVATED}} r g b / .90) 90%,{{REMOVED}})!important}.codex-theme-native-home-suggestions button:nth-child(2){background:color-mix(in srgb,rgb(from {{ELEVATED}} r g b / .90) 90%,{{ADDED}})!important}.codex-theme-native-home-suggestions button:nth-child(3){background:color-mix(in srgb,rgb(from {{ELEVATED}} r g b / .90) 90%,{{ACCENT}})!important}.codex-theme-native-home-suggestions button:nth-child(4){background:color-mix(in srgb,rgb(from {{ELEVATED}} r g b / .90) 90%,{{SKILL}})!important}
+@media(hover:hover){.codex-theme-native-home-suggestions button:hover{transform:translateY(-3px);border-color:{{ACCENT}}!important;background:rgb(from {{ELEVATED}} r g b / .96)!important}}
+.codex-theme-native-home-utility { border:1px solid {{BORDER}}!important; border-bottom:0!important; border-radius:18px 18px 0 0!important; background:rgb(from {{ELEVATED}} r g b / .88)!important; box-shadow:none!important; backdrop-filter:blur(14px) saturate(1.06)!important; }
+.codex-theme-native-home:has(.codex-theme-native-home-utility) .composer-surface-chrome { border-radius:0 0 18px 18px!important; border-top:0!important; }
+.codex-theme-native-task { position:relative; isolation:isolate; background:rgb(from {{SURFACE}} r g b / .82)!important; }
+@container(max-width:760px){.codex-theme-native-home-hero{min-height:260px;padding:24px}.codex-theme-native-home-copy{width:68%!important}.codex-theme-native-home-suggestions button{min-height:102px;padding:12px 10px!important}}
+@container(max-width:520px){.codex-theme-native-home-hero{min-height:240px}.codex-theme-native-home-copy{width:100%!important}.codex-theme-native-home-hero::after{background:rgb(from {{SURFACE}} r g b / .58)}}
+@media(max-height:760px){.codex-theme-native-home-hero{min-height:240px!important}.codex-theme-native-home-suggestions button{min-height:94px!important}}
+@media(prefers-reduced-motion:reduce){.codex-theme-native-home-suggestions button{transition:none!important}}
 "#;
 
 const JS_TEMPLATE: &str = r#"
 (() => {
   globalThis.__codexThemeStore?.dispose?.();
-  const cfg=__codexSkinConfig, make=(tag,cls,text)=>{const el=document.createElement(tag);if(cls)el.className=cls;if(text!=null)el.textContent=String(text);return el;},assetUrl=value=>value?.startsWith('url("')?value.slice(5,-2):'';
-  let home=document.getElementById('codex-theme-home'); if(home)home.remove(); home=make('section');home.id='codex-theme-home';home.dataset.themeId=cfg.themeId;
-  const shell=make('div','codex-theme-home-shell'),hero=make('div','codex-theme-home-hero'),copy=make('div','codex-theme-home-copy');
-  let backgroundImage=null;if(cfg.background){backgroundImage=make('img','codex-theme-home-image');backgroundImage.src=assetUrl(cfg.background);backgroundImage.alt='';backgroundImage.decoding='async';backgroundImage.draggable=false;hero.append(backgroundImage);}
-  for(const [tag,cls,key] of [['h1','codex-theme-home-brand','brand'],['p','codex-theme-home-eyebrow','eyebrow'],['h2','codex-theme-home-title','title'],['p','codex-theme-home-subtitle','subtitle']]){if(cfg.home?.[key])copy.append(make(tag,cls,cfg.home[key]));}
-  if(cfg.home?.tags?.length){const tags=make('div','codex-theme-home-tags');for(const value of cfg.home.tags)tags.append(make('span','codex-theme-home-tag',value));copy.append(tags);}
-  hero.append(copy); if(cfg.pet){const pet=make('img','codex-theme-home-pet');pet.src=cfg.pet.slice(5,-2);pet.alt=cfg.home?.pet?.alt||'';hero.append(pet);} shell.append(hero);
-  if(cfg.home?.badge){hero.append(make('div','codex-theme-home-badge',`${cfg.home.badge} ${String(cfg.themeId).toUpperCase()}`));}
-  const actions=make('div','codex-theme-home-actions'); for(const [index,action] of (cfg.home?.quickActions||[]).entries()){const button=make('button','codex-theme-home-action');button.type='button';button.append(make('span','codex-theme-home-action-icon',action.icon||String(index+1)),make('div','codex-theme-home-action-title',action.title),make('div','codex-theme-home-action-description',action.description||''));button.addEventListener('click',()=>{const input=document.querySelector('textarea,[contenteditable="true"]');if(!input)return;if('value' in input)input.value=action.prompt;else input.textContent=action.prompt;input.dispatchEvent(new InputEvent('input',{bubbles:true,inputType:'insertText',data:action.prompt}));input.focus();});actions.append(button);} shell.append(actions);home.append(shell);
-  if(cfg.home?.footerNote)shell.append(make('div','codex-theme-home-footer',cfg.home.footerNote));
-  const main=document.querySelector('.main-surface,.browser-main-surface,main.main-surface')||document.body;main.append(home);document.documentElement.dataset.codexThemeId=cfg.themeId;
-  let sidebarLogo=null;
-  const updateHeroFit=()=>{if(!backgroundImage)return;const requested=cfg.backgroundFit||'smart';let fit=requested;if(requested==='smart'&&backgroundImage.naturalWidth&&backgroundImage.naturalHeight){const rect=hero.getBoundingClientRect(),imageRatio=backgroundImage.naturalWidth/backgroundImage.naturalHeight,boxRatio=rect.width/Math.max(1,rect.height),visibleFraction=Math.min(imageRatio/boxRatio,boxRatio/imageRatio);fit=1-visibleFraction>.34?'contain':'cover';}hero.dataset.imageFit=fit==='contain'?'contain':'cover';};
+  const cfg=__codexSkinConfig,root=document.documentElement,assetUrl=value=>value?.startsWith('url("')?value.slice(5,-2):'';
+  root.classList.add('codex-theme-native');root.dataset.codexThemeId=cfg.themeId;
+  let sidebarLogo=null,scheduled=false;
+  const decorated=['codex-theme-native-home','codex-theme-native-task','codex-theme-native-home-hero','codex-theme-native-home-copy','codex-theme-native-home-suggestions','codex-theme-native-home-utility','codex-theme-native-home-shell','codex-theme-native-task-shell','codex-theme-native-home-sidebar','codex-theme-native-task-sidebar'];
+  const clearDecorations=()=>{for(const cls of decorated)for(const node of document.querySelectorAll(`.${cls}`))node.classList.remove(cls);};
+  const updateBackgroundFit=()=>{const image=globalThis.__codexThemeStore?.backgroundImage;if(!image?.naturalWidth||!image.naturalHeight)return;let fit=cfg.backgroundFit||'smart';if(fit==='smart'){const imageRatio=image.naturalWidth/image.naturalHeight,windowRatio=innerWidth/Math.max(1,innerHeight),visible=Math.min(imageRatio/windowRatio,windowRatio/imageRatio);fit=1-visible>.34?'contain':'cover';}root.style.setProperty('--codex-theme-background-size',fit==='contain'?'contain':'cover');};
   const applyCopy=()=>{if(cfg.copy?.title)document.title=cfg.copy.title;const replacements=cfg.copy?.replacePlaceholders||{};for(const node of document.querySelectorAll('[placeholder],[data-placeholder]'))for(const attr of ['placeholder','data-placeholder']){const value=node.getAttribute(attr);if(value&&replacements[value])node.setAttribute(attr,replacements[value]);}const editor=document.querySelector('.ProseMirror,[contenteditable="true"][role="textbox"]');if(editor&&cfg.home?.composerHint){editor.setAttribute('aria-label',cfg.home.composerHint);editor.dataset.placeholder=cfg.home.composerHint;}};
-  const ensureSidebarLogo=()=>{if(sidebarLogo?.isConnected||!cfg.logo)return;const sidebar=document.querySelector('.app-shell-left-panel');if(!sidebar)return;sidebarLogo=make('img','codex-theme-sidebar-logo');sidebarLogo.src=assetUrl(cfg.logo);sidebarLogo.alt=cfg.home?.brand||'';sidebarLogo.decoding='async';sidebar.append(sidebarLogo);};
-  const composerRegionTop=(composer,mainRect)=>{const composerRect=composer.getBoundingClientRect();let top=composerRect.top;const maxRegionHeight=Math.min(480,mainRect.height*.55);for(let node=composer.parentElement;node&&node!==main;node=node.parentElement){const rect=node.getBoundingClientRect();const hugsBottom=rect.bottom>=composerRect.bottom-24&&rect.bottom<=mainRect.bottom+24;const isComposerRegion=rect.height>0&&rect.height<=maxRegionHeight&&rect.top>=mainRect.top+44;if(hugsBottom&&isComposerRegion)top=Math.min(top,rect.top);}return top;};
-  const update=()=>{const composer=document.querySelector('.composer-surface-chrome'),composerRoot=document.querySelector('[data-codex-composer-root]');const hasThreadContext=!!main.querySelector('[data-thread-scroll-footer],[data-thread-find-composer],[data-message-author-role],[data-user-message-bubble="true"],[data-content-search-unit-key$=":assistant"]');const hasComposerContext=!!composerRoot&&[...composerRoot.children].some(child=>child!==composer&&(!composer||!child.contains(composer))&&child.childElementCount>0);main.classList.toggle('codex-theme-home-active',!hasThreadContext&&!hasComposerContext);if(composer){const mainRect=main.getBoundingClientRect(),regionTop=composerRegionTop(composer,mainRect),reserve=Math.min(500,Math.max(148,Math.ceil(mainRect.bottom-regionTop+28)));home.style.bottom=`${reserve}px`;}else home.style.removeProperty('bottom');updateHeroFit();applyCopy();ensureSidebarLogo();};
-  const observer=new MutationObserver(update);observer.observe(main,{childList:true,subtree:true});update();
-  backgroundImage?.addEventListener('load',updateHeroFit);
-  const heroResizeObserver=new ResizeObserver(updateHeroFit);heroResizeObserver.observe(hero);
-  const resizeHandler=()=>update();window.addEventListener('resize',resizeHandler);
-  globalThis.__codexThemeStore={observer,resizeHandler,dispose(){observer.disconnect();heroResizeObserver.disconnect();window.removeEventListener('resize',resizeHandler);home.remove();sidebarLogo?.remove();main.classList.remove('codex-theme-home-active');}};
+  const ensureSidebarLogo=()=>{if(sidebarLogo?.isConnected||!cfg.logo)return;const sidebar=document.querySelector('.app-shell-left-panel');if(!sidebar)return;sidebarLogo=document.createElement('img');sidebarLogo.className='codex-theme-sidebar-logo';sidebarLogo.src=assetUrl(cfg.logo);sidebarLogo.alt=cfg.home?.brand||'';sidebarLogo.decoding='async';sidebar.append(sidebarLogo);};
+  const update=()=>{scheduled=false;clearDecorations();const shell=document.querySelector('main.main-surface,.browser-main-surface');if(!shell){applyCopy();return;}const home=document.querySelector('[role="main"]:has([data-testid="home-icon"])');for(const route of document.querySelectorAll('[role="main"]'))route.classList.add(route===home?'codex-theme-native-home':'codex-theme-native-task');shell.classList.add(home?'codex-theme-native-home-shell':'codex-theme-native-task-shell');document.querySelector('.app-shell-left-panel')?.classList.add(home?'codex-theme-native-home-sidebar':'codex-theme-native-task-sidebar');if(home){const icon=home.querySelector('[data-testid="home-icon"]'),copy=icon?.parentElement,hero=copy?.parentElement?.parentElement;if(hero)hero.classList.add('codex-theme-native-home-hero');if(copy)copy.classList.add('codex-theme-native-home-copy');for(const candidate of home.querySelectorAll('[class*="home-suggestions"],[class*="homeSuggestions"]'))candidate.classList.add('codex-theme-native-home-suggestions');for(const area of home.querySelectorAll('[data-composer-utility-bar-scroll-area]'))area.parentElement?.classList.add('codex-theme-native-home-utility');}applyCopy();ensureSidebarLogo();updateBackgroundFit();};
+  const schedule=()=>{if(scheduled)return;scheduled=true;requestAnimationFrame(update);};
+  const observer=new MutationObserver(schedule);observer.observe(root,{childList:true,subtree:true});
+  const resizeHandler=()=>{updateBackgroundFit();schedule();};window.addEventListener('resize',resizeHandler);
+  const backgroundImage=cfg.background?new Image():null;if(backgroundImage){backgroundImage.addEventListener('load',updateBackgroundFit);backgroundImage.src=assetUrl(cfg.background);}
+  globalThis.__codexThemeStore={observer,resizeHandler,backgroundImage,injectionId:null,dispose(){observer.disconnect();window.removeEventListener('resize',resizeHandler);clearDecorations();sidebarLogo?.remove();root.classList.remove('codex-theme-native');root.removeAttribute('data-codex-theme-id');root.style.removeProperty('--codex-theme-background-size');}};
+  update();
   return true;
 })();
 "#;
@@ -445,16 +429,12 @@ mod tests {
     use super::JS_TEMPLATE;
 
     #[test]
-    fn theme_home_stays_hidden_in_empty_thread_contexts() {
-        assert!(JS_TEMPLATE.contains("[data-thread-scroll-footer]"));
-        assert!(JS_TEMPLATE.contains("[data-thread-find-composer]"));
-        assert!(JS_TEMPLATE.contains("!hasThreadContext"));
-    }
-
-    #[test]
-    fn theme_home_stays_hidden_when_the_composer_has_project_context() {
-        assert!(JS_TEMPLATE.contains("[data-codex-composer-root]"));
-        assert!(JS_TEMPLATE.contains("hasComposerContext"));
-        assert!(JS_TEMPLATE.contains("!hasThreadContext&&!hasComposerContext"));
+    fn native_renderer_decorates_codex_routes_without_a_covering_home_node() {
+        assert!(JS_TEMPLATE.contains("[role=\"main\"]:has([data-testid=\"home-icon\"])"));
+        assert!(JS_TEMPLATE.contains("codex-theme-native-home"));
+        assert!(JS_TEMPLATE.contains("codex-theme-native-task"));
+        assert!(JS_TEMPLATE.contains("codex-theme-native-home-sidebar"));
+        assert!(!JS_TEMPLATE.contains("createElement('section')"));
+        assert!(!JS_TEMPLATE.contains("id='codex-theme-home'"));
     }
 }
