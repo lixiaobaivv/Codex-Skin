@@ -679,6 +679,9 @@ fn validate_theme(path: &Path, expected_id: &str, repository: &Path) -> Result<(
             "surface",
             "backgroundImage",
             "backgroundPosition",
+            "backgroundFocus",
+            "visualIntensity",
+            "effects",
             "logoImage",
             "backgroundImageOpacity",
             "backgroundImageBlur",
@@ -736,6 +739,78 @@ fn validate_theme(path: &Path, expected_id: &str, repository: &Path) -> Result<(
             return Err(AppError::Message("背景定位值无效。".into()));
         }
     }
+    if let Some(focus) = theme.get("backgroundFocus") {
+        validate_background_focus(focus)?;
+    }
+    if let Some(value) = theme.get("visualIntensity") {
+        let value = value
+            .as_str()
+            .ok_or_else(|| AppError::Message("视觉强度必须是字符串。".into()))?;
+        if !["clear", "balanced", "immersive"].contains(&value) {
+            return Err(AppError::Message("视觉强度无效。".into()));
+        }
+    }
+    if let Some(effects) = theme.get("effects") {
+        closed_object(
+            effects,
+            &["ambient", "intensity", "overlay", "composerAccent"],
+            &[],
+            "theme.effects",
+        )?;
+        if let Some(value) = effects.get("ambient") {
+            let value = value
+                .as_str()
+                .ok_or_else(|| AppError::Message("氛围特效必须是字符串。".into()))?;
+            if !["none", "rain", "particles", "storm"].contains(&value) {
+                return Err(AppError::Message("氛围特效无效。".into()));
+            }
+        }
+        if let Some(value) = effects.get("intensity") {
+            let value = value
+                .as_str()
+                .ok_or_else(|| AppError::Message("特效强度必须是字符串。".into()))?;
+            if !["subtle", "balanced", "vivid"].contains(&value) {
+                return Err(AppError::Message("特效强度无效。".into()));
+            }
+        }
+        if let Some(overlay) = effects.get("overlay") {
+            closed_object(
+                overlay,
+                &["image", "triggers", "position", "widthPercent"],
+                &["image", "triggers"],
+                "theme.effects.overlay",
+            )?;
+            validate_effect_triggers(overlay.get("triggers").unwrap())?;
+            if let Some(position) = overlay.get("position") {
+                validate_background_focus(position)?;
+            }
+            if let Some(width) = overlay.get("widthPercent") {
+                let width = width
+                    .as_u64()
+                    .ok_or_else(|| AppError::Message("瞬时叠加素材宽度必须是整数。".into()))?;
+                if !(10..=80).contains(&width) {
+                    return Err(AppError::Message("瞬时叠加素材宽度越界。".into()));
+                }
+            }
+        }
+        if let Some(accent) = effects.get("composerAccent") {
+            closed_object(
+                accent,
+                &["image", "triggers", "widthPx"],
+                &["image", "triggers"],
+                "theme.effects.composerAccent",
+            )?;
+            validate_effect_triggers(accent.get("triggers").unwrap())?;
+            if let Some(width) = accent.get("widthPx") {
+                let width = width
+                    .as_u64()
+                    .ok_or_else(|| AppError::Message("输入框装饰素材宽度必须是整数。".into()))?;
+                if !(48..=240).contains(&width) {
+                    return Err(AppError::Message("输入框装饰素材宽度越界。".into()));
+                }
+            }
+        }
+    }
     validate_asset_path(
         repository,
         path,
@@ -745,6 +820,17 @@ fn validate_theme(path: &Path, expected_id: &str, repository: &Path) -> Result<(
     for (key, directory) in [("backgroundImage", "backgrounds"), ("logoImage", "logos")] {
         if let Some(value) = theme.get(key).and_then(Value::as_str) {
             validate_asset_path(repository, path, value, directory)?;
+        }
+    }
+    if let Some(effects) = theme.get("effects") {
+        for role in ["overlay", "composerAccent"] {
+            if let Some(value) = effects
+                .get(role)
+                .and_then(|value| value.get("image"))
+                .and_then(Value::as_str)
+            {
+                validate_asset_path(repository, path, value, "effects")?;
+            }
         }
     }
     let home = root.get("home").unwrap();
@@ -801,6 +887,41 @@ fn closed_object(value: &Value, allowed: &[&str], required: &[&str], path: &str)
     }
     if let Some(key) = required.iter().find(|key| !object.contains_key(**key)) {
         return Err(AppError::Message(format!("{path} 缺少字段：{key}")));
+    }
+    Ok(())
+}
+
+fn validate_background_focus(focus: &Value) -> Result<()> {
+    closed_object(focus, &["x", "y"], &["x", "y"], "theme.backgroundFocus")?;
+    for axis in ["x", "y"] {
+        let value = focus
+            .get(axis)
+            .and_then(Value::as_u64)
+            .ok_or_else(|| AppError::Message(format!("背景焦点 {axis} 必须是 0–100 的整数。")))?;
+        if value > 100 {
+            return Err(AppError::Message(format!(
+                "背景焦点 {axis} 必须是 0–100 的整数。"
+            )));
+        }
+    }
+    Ok(())
+}
+
+fn validate_effect_triggers(value: &Value) -> Result<()> {
+    let triggers = value
+        .as_array()
+        .ok_or_else(|| AppError::Message("特效触发器必须是数组。".into()))?;
+    if triggers.is_empty() || triggers.len() > 2 {
+        return Err(AppError::Message("特效触发器数量无效。".into()));
+    }
+    let mut seen = std::collections::HashSet::new();
+    for trigger in triggers {
+        let trigger = trigger
+            .as_str()
+            .ok_or_else(|| AppError::Message("特效触发器必须是字符串。".into()))?;
+        if !["task-start", "message-send"].contains(&trigger) || !seen.insert(trigger) {
+            return Err(AppError::Message("特效触发器无效或重复。".into()));
+        }
     }
     Ok(())
 }
@@ -869,8 +990,19 @@ fn validate_asset_path(
         )));
     }
     let bytes = fs::read(&path)?;
-    image::load_from_memory(&bytes)
+    let image = image::load_from_memory(&bytes)
         .map_err(|error| AppError::Message(format!("主题图片无法解码：{error}")))?;
+    let (max_bytes, max_dimension) = match directory {
+        "previews" => (2 * 1024 * 1024, 2400),
+        "backgrounds" => (16 * 1024 * 1024, 8192),
+        "effects" => (4 * 1024 * 1024, 4096),
+        _ => (20 * 1024 * 1024, 8192),
+    };
+    if bytes.len() > max_bytes || image.width() > max_dimension || image.height() > max_dimension {
+        return Err(AppError::Message(format!(
+            "主题图片超过 {directory} 的大小或尺寸限制：{relative}"
+        )));
+    }
     Ok(())
 }
 
@@ -888,6 +1020,24 @@ mod tests {
                 .to_string()
                 .contains("theme.theme 包含未知字段：backgroundFit")
         );
+    }
+
+    #[test]
+    fn validates_precise_background_focus() {
+        validate_background_focus(&serde_json::json!({"x": 72, "y": 24})).unwrap();
+        assert!(validate_background_focus(&serde_json::json!({"x": 101, "y": 24})).is_err());
+        assert!(validate_background_focus(&serde_json::json!({"x": 50.5, "y": 24})).is_err());
+        assert!(validate_background_focus(&serde_json::json!({"x": 50, "y": 24, "z": 1})).is_err());
+    }
+
+    #[test]
+    fn validates_safe_effect_triggers() {
+        validate_effect_triggers(&serde_json::json!(["task-start", "message-send"])).unwrap();
+        assert!(
+            validate_effect_triggers(&serde_json::json!(["task-start", "task-start"])).is_err()
+        );
+        assert!(validate_effect_triggers(&serde_json::json!(["click-anywhere"])).is_err());
+        assert!(validate_effect_triggers(&serde_json::json!([])).is_err());
     }
 
     fn remote_catalog_fixture() -> RemoteCatalog {

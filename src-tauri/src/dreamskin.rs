@@ -17,10 +17,11 @@ use std::{
     path::{Path, PathBuf},
 };
 
-const MAX_PACKAGE: u64 = 20 * 1024 * 1024;
+const MAX_PACKAGE: u64 = 28 * 1024 * 1024;
 const MAX_MANIFEST: u64 = 64 * 1024;
 const MAX_BACKGROUND: u64 = 16 * 1024 * 1024;
 const MAX_PREVIEW: u64 = 2 * 1024 * 1024;
+const MAX_EFFECT: u64 = 4 * 1024 * 1024;
 const ROOT_ALLOWED: &[&str] = &[
     "$schema",
     "schemaVersion",
@@ -41,6 +42,7 @@ const ROOT_ALLOWED: &[&str] = &[
     "image",
     "colors",
     "assets",
+    "effects",
     "signature",
 ];
 const ROOT_REQUIRED: &[&str] = &[
@@ -87,6 +89,7 @@ struct Manifest {
     version: String,
     background: Asset,
     preview: Asset,
+    effect_assets: Vec<Asset>,
     key_id: String,
     signature: [u8; 64],
 }
@@ -138,7 +141,7 @@ fn import_inner(
     }
     let metadata = fs::metadata(&package)?;
     if metadata.len() == 0 || metadata.len() > MAX_PACKAGE {
-        return fail("DSI_SIZE_LIMIT", "主题包大小必须在 1 到 20 MiB 之间。");
+        return fail("DSI_SIZE_LIMIT", "主题包大小必须在 1 到 28 MiB 之间。");
     }
     let package_hash = hash_file(&package)?;
     if let Some(expected) = &expected {
@@ -180,13 +183,19 @@ fn import_inner(
         }
     }
     verify_signature(&root, &manifest)?;
-    let expected: HashSet<_> = [
+    let mut expected: HashSet<&str> = [
         "theme.json",
         manifest.background.path.as_str(),
         manifest.preview.path.as_str(),
     ]
     .into_iter()
     .collect();
+    expected.extend(
+        manifest
+            .effect_assets
+            .iter()
+            .map(|asset| asset.path.as_str()),
+    );
     let actual: HashSet<_> = (0..archive.len())
         .map(|index| archive.by_index(index).unwrap().name().to_owned())
         .collect();
@@ -197,8 +206,21 @@ fn import_inner(
     validate_asset(&background, &manifest.background, 40_000_000)?;
     let preview = read_entry(&mut archive, &manifest.preview.path, MAX_PREVIEW)?;
     validate_asset(&preview, &manifest.preview, 8_000_000)?;
-    if manifest_bytes.len() as u64 + background.len() as u64 + preview.len() as u64 > MAX_PACKAGE {
-        return fail("DSI_SIZE_LIMIT", "主题包解压后超过 20 MiB。");
+    let mut effect_bytes = Vec::new();
+    for effect in &manifest.effect_assets {
+        let bytes = read_entry(&mut archive, &effect.path, MAX_EFFECT)?;
+        validate_asset(&bytes, effect, 16_000_000)?;
+        effect_bytes.push((effect, bytes));
+    }
+    let expanded = manifest_bytes.len() as u64
+        + background.len() as u64
+        + preview.len() as u64
+        + effect_bytes
+            .iter()
+            .map(|(_, bytes)| bytes.len() as u64)
+            .sum::<u64>();
+    if expanded > MAX_PACKAGE {
+        return fail("DSI_SIZE_LIMIT", "主题包解压后超过 28 MiB。");
     }
     let library = library_override
         .map(Path::to_owned)
@@ -215,7 +237,10 @@ fn import_inner(
             && hash_file(&target.join(&manifest.preview.path))
                 .ok()
                 .as_deref()
-                == Some(&manifest.preview.sha256);
+                == Some(&manifest.preview.sha256)
+            && manifest.effect_assets.iter().all(|asset| {
+                hash_file(&target.join(&asset.path)).ok().as_deref() == Some(&asset.sha256)
+            });
         if !matches {
             return fail("DSI_INSTALL_CONFLICT", "同一 ID 和版本已存在，但内容不同。");
         }
@@ -234,6 +259,9 @@ fn import_inner(
     fs::write(staging.path().join("theme.json"), &manifest_bytes)?;
     fs::write(staging.path().join(&manifest.background.path), background)?;
     fs::write(staging.path().join(&manifest.preview.path), preview)?;
+    for (effect, bytes) in effect_bytes {
+        fs::write(staging.path().join(&effect.path), bytes)?;
+    }
     fs::create_dir_all(target.parent().unwrap())?;
     let staging_path = staging.keep();
     fs::rename(&staging_path, &target).inspect_err(|_| {
@@ -250,8 +278,8 @@ fn import_inner(
 }
 
 fn validate_entries(archive: &mut zip::ZipArchive<File>) -> Result<()> {
-    if archive.len() != 3 {
-        return fail("DSI_PACKAGE_INVALID", "主题包必须恰好包含三个根目录文件。");
+    if !(3..=5).contains(&archive.len()) {
+        return fail("DSI_PACKAGE_INVALID", "主题包必须包含 3–5 个根目录文件。");
     }
     let mut names = HashSet::new();
     for index in 0..archive.len() {
@@ -384,18 +412,25 @@ fn validate_manifest(root: &Value, current_platform: &str) -> Result<Manifest> {
     let assets = property(root, "assets")?;
     closed(
         assets,
-        &["background", "preview"],
+        &["background", "preview", "effectOverlay", "composerAccent"],
         &["background", "preview"],
         "assets",
     )?;
-    let background = asset(property(assets, "background")?, true)?;
-    let preview = asset(property(assets, "preview")?, false)?;
+    let background = asset(property(assets, "background")?, "background")?;
+    let preview = asset(property(assets, "preview")?, "preview")?;
+    let mut effect_assets = Vec::new();
+    for role in ["effectOverlay", "composerAccent"] {
+        if let Some(value) = assets.get(role) {
+            effect_assets.push(asset(value, role)?);
+        }
+    }
     if text(root, "image", 32)? != background.path {
         return fail(
             "DSI_MANIFEST_INVALID",
             "image 必须等于 assets.background.path。",
         );
     }
+    validate_package_effects(root.get("effects"), assets)?;
     let signature = property(root, "signature")?;
     closed(
         signature,
@@ -446,13 +481,107 @@ fn validate_manifest(root: &Value, current_platform: &str) -> Result<Manifest> {
         version,
         background,
         preview,
+        effect_assets,
         key_id,
         signature,
     })
 }
 
-fn asset(value: &Value, background: bool) -> Result<Asset> {
-    let role = if background { "background" } else { "preview" };
+fn validate_package_effects(effects: Option<&Value>, assets: &Value) -> Result<()> {
+    let has_overlay_asset = assets.get("effectOverlay").is_some();
+    let has_composer_asset = assets.get("composerAccent").is_some();
+    let Some(effects) = effects else {
+        if has_overlay_asset || has_composer_asset {
+            return fail("DSI_MANIFEST_INVALID", "特效资源缺少 effects 声明。");
+        }
+        return Ok(());
+    };
+    closed(
+        effects,
+        &["ambient", "intensity", "overlay", "composerAccent"],
+        &[],
+        "effects",
+    )?;
+    if let Some(value) = effects.get("ambient")
+        && !["none", "rain", "particles", "storm"].contains(&string(value, "effects.ambient")?)
+    {
+        return fail("DSI_MANIFEST_INVALID", "effects.ambient 无效。");
+    }
+    if let Some(value) = effects.get("intensity")
+        && !["subtle", "balanced", "vivid"].contains(&string(value, "effects.intensity")?)
+    {
+        return fail("DSI_MANIFEST_INVALID", "effects.intensity 无效。");
+    }
+    if let Some(overlay) = effects.get("overlay") {
+        closed(
+            overlay,
+            &["image", "triggers", "position", "widthPercent"],
+            &["image", "triggers"],
+            "effects.overlay",
+        )?;
+        if text(overlay, "image", 32)? != "effect-overlay.png" || !has_overlay_asset {
+            return fail("DSI_MANIFEST_INVALID", "瞬时叠加素材声明与资源不一致。");
+        }
+        validate_package_triggers(property(overlay, "triggers")?)?;
+        if let Some(position) = overlay.get("position") {
+            closed(
+                position,
+                &["x", "y"],
+                &["x", "y"],
+                "effects.overlay.position",
+            )?;
+            for axis in ["x", "y"] {
+                if !(0..=100).contains(&integer(position, axis)?) {
+                    return fail("DSI_MANIFEST_INVALID", "特效位置越界。");
+                }
+            }
+        }
+        if overlay.get("widthPercent").is_some()
+            && !(10..=80).contains(&integer(overlay, "widthPercent")?)
+        {
+            return fail("DSI_MANIFEST_INVALID", "瞬时叠加素材宽度越界。");
+        }
+    } else if has_overlay_asset {
+        return fail("DSI_MANIFEST_INVALID", "瞬时叠加资源缺少声明。");
+    }
+    if let Some(accent) = effects.get("composerAccent") {
+        closed(
+            accent,
+            &["image", "triggers", "widthPx"],
+            &["image", "triggers"],
+            "effects.composerAccent",
+        )?;
+        if text(accent, "image", 32)? != "composer-accent.png" || !has_composer_asset {
+            return fail("DSI_MANIFEST_INVALID", "输入框装饰声明与资源不一致。");
+        }
+        validate_package_triggers(property(accent, "triggers")?)?;
+        if accent.get("widthPx").is_some() && !(48..=240).contains(&integer(accent, "widthPx")?) {
+            return fail("DSI_MANIFEST_INVALID", "输入框装饰宽度越界。");
+        }
+    } else if has_composer_asset {
+        return fail("DSI_MANIFEST_INVALID", "输入框装饰资源缺少声明。");
+    }
+    Ok(())
+}
+
+fn validate_package_triggers(value: &Value) -> Result<()> {
+    let values = value
+        .as_array()
+        .ok_or_else(|| AppError::Message("DSI_MANIFEST_INVALID: 特效触发器必须是数组。".into()))?;
+    if values.is_empty() || values.len() > 2 {
+        return fail("DSI_MANIFEST_INVALID", "特效触发器数量无效。");
+    }
+    let mut seen = HashSet::new();
+    for value in values {
+        let value = string(value, "effects.triggers[]")?;
+        if !["task-start", "message-send"].contains(&value) || !seen.insert(value) {
+            return fail("DSI_MANIFEST_INVALID", "特效触发器无效或重复。");
+        }
+    }
+    Ok(())
+}
+
+fn asset(value: &Value, role: &str) -> Result<Asset> {
     let keys = ["path", "mediaType", "bytes", "width", "height", "sha256"];
     closed(value, &keys, &keys, &format!("assets.{role}"))?;
     let path = text(value, "path", 32)?;
@@ -468,6 +597,8 @@ fn asset(value: &Value, background: bool) -> Result<Asset> {
         ("preview", "image/png") => path == "preview.png",
         ("preview", "image/jpeg") => path == "preview.jpg" || path == "preview.jpeg",
         ("preview", "image/webp") => path == "preview.webp",
+        ("effectOverlay", "image/png") => path == "effect-overlay.png",
+        ("composerAccent", "image/png") => path == "composer-accent.png",
         _ => false,
     };
     if !valid_path {
@@ -476,10 +607,10 @@ fn asset(value: &Value, background: bool) -> Result<Asset> {
             &format!("assets.{role} 的路径与媒体类型不匹配。"),
         );
     }
-    let (max_bytes, max_dimension) = if background {
-        (MAX_BACKGROUND, 8192)
-    } else {
-        (MAX_PREVIEW, 2400)
+    let (max_bytes, max_dimension) = match role {
+        "background" => (MAX_BACKGROUND, 8192),
+        "preview" => (MAX_PREVIEW, 2400),
+        _ => (MAX_EFFECT, 4096),
     };
     if bytes > max_bytes || width > max_dimension || height > max_dimension || !hash_valid(&sha256)
     {
@@ -817,6 +948,26 @@ mod tests {
         assert!(parse_strict(r#"{"a":1,"a":2}"#).is_err());
         assert!(!valid_color("rgba(999, 0, 0, 1)"));
         assert!(valid_color("rgba(255, 0, 42, 0.125)"));
+    }
+
+    #[test]
+    fn accepts_only_declarative_effect_triggers() {
+        let assets = serde_json::json!({"effectOverlay": {}});
+        let effects = serde_json::json!({
+            "ambient": "storm",
+            "intensity": "balanced",
+            "overlay": {
+                "image": "effect-overlay.png",
+                "triggers": ["task-start", "message-send"],
+                "position": {"x": 72, "y": 28},
+                "widthPercent": 42
+            }
+        });
+        validate_package_effects(Some(&effects), &assets).unwrap();
+        let unsafe_effects = serde_json::json!({
+            "overlay": {"image": "effect-overlay.png", "triggers": ["click-anywhere"]}
+        });
+        assert!(validate_package_effects(Some(&unsafe_effects), &assets).is_err());
     }
 
     #[test]

@@ -16,7 +16,12 @@
     "contrast": 55,
     "opaqueWindows": true,
     "backgroundImage": "../backgrounds/example-theme.jpg",
-    "backgroundPosition": "center",
+    "backgroundFocus": { "x": 50, "y": 50 },
+    "visualIntensity": "balanced",
+    "effects": {
+      "ambient": "none",
+      "intensity": "balanced"
+    },
     "logoImage": "../logos/example-theme.png",
     "backgroundImageOpacity": 1,
     "backgroundImageBlur": 0,

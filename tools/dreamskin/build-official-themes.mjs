@@ -56,6 +56,20 @@ for (const id of ids) {
   const backgroundType = backgroundName.endsWith(".png") ? "image/png" : "image/jpeg";
   const backgroundSize = readImageSize(background, backgroundName);
   const previewSize = readImageSize(preview, "preview.png");
+  const overlaySource = definition.theme.effects?.overlay?.image
+    ? resolveThemeAsset(definition.theme.effects.overlay.image, "effects")
+    : null;
+  const composerSource = definition.theme.effects?.composerAccent?.image
+    ? resolveThemeAsset(definition.theme.effects.composerAccent.image, "effects")
+    : null;
+  const overlayBytes = overlaySource ? await readFile(overlaySource) : null;
+  const composerBytes = composerSource ? await readFile(composerSource) : null;
+  const packageEffects = definition.theme.effects ? {
+    ambient: definition.theme.effects.ambient ?? "none",
+    intensity: definition.theme.effects.intensity ?? "balanced",
+    ...(definition.theme.effects.overlay ? { overlay: { ...definition.theme.effects.overlay, image: "effect-overlay.png" } } : {}),
+    ...(definition.theme.effects.composerAccent ? { composerAccent: { ...definition.theme.effects.composerAccent, image: "composer-accent.png" } } : {}),
+  } : undefined;
   const surface = definition.theme.surface;
   const ink = definition.theme.ink;
 
@@ -92,9 +106,12 @@ for (const id of ids) {
       muted: mixHex(ink, surface, 0.48),
       line: mixHex(ink, surface, 0.76),
     },
+    ...(packageEffects ? { effects: packageEffects } : {}),
     assets: {
       background: asset(backgroundName, backgroundType, background, backgroundSize),
       preview: asset("preview.png", "image/png", preview, previewSize),
+      ...(overlayBytes ? { effectOverlay: asset("effect-overlay.png", "image/png", overlayBytes, readImageSize(overlayBytes, "effect-overlay.png")) } : {}),
+      ...(composerBytes ? { composerAccent: asset("composer-accent.png", "image/png", composerBytes, readImageSize(composerBytes, "composer-accent.png")) } : {}),
     },
     signature: {
       algorithm: "Ed25519",
@@ -113,6 +130,8 @@ for (const id of ids) {
     ["theme.json", Buffer.from(`${JSON.stringify(manifest, null, 2)}\n`, "utf8")],
     [backgroundName, background],
     ["preview.png", preview],
+    ...(overlayBytes ? [["effect-overlay.png", overlayBytes]] : []),
+    ...(composerBytes ? [["composer-accent.png", composerBytes]] : []),
   ]);
   await writeFile(join(outputDir, packageName), bytes);
   entries.push({

@@ -73,6 +73,8 @@ test("official theme publishing reads the Store source of truth", async () => {
   assert.match(workflow, /libayatana-appindicator3-dev/);
   assert.match(builder, /CODEX_SKIN_THEME_SOURCE/);
   assert.match(builder, /theme-repository\.json/);
+  assert.match(builder, /effect-overlay\.png/);
+  assert.match(builder, /composer-accent\.png/);
   assert.doesNotMatch(builder, /const ids = \["dilraba-star"/);
   assert.match(discovery, /catalog\.package === null/);
   assert.match(cargo, /name = "dreamskin-verify"[\s\S]*path = "src\/bin\/dreamskin-verify\.rs"/);

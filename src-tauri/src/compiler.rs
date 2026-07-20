@@ -20,7 +20,7 @@ pub fn compile(theme_id: &str) -> Result<Payload> {
     let package = root.get("packageVersion").and_then(Value::as_u64) == Some(1);
     let theme_value = if package {
         let colors = root.get("colors").cloned().unwrap_or_else(|| json!({}));
-        json!({"accent":colors.get("accent"),"ink":colors.get("text"),"surface":colors.get("panel"),"semanticColors":{"diffAdded":colors.get("highlight"),"diffRemoved":colors.get("accentAlt"),"skill":colors.get("secondary")},"backgroundImageOpacity":0.22})
+        json!({"accent":colors.get("accent"),"ink":colors.get("text"),"surface":colors.get("panel"),"semanticColors":{"diffAdded":colors.get("highlight"),"diffRemoved":colors.get("accentAlt"),"skill":colors.get("secondary")},"backgroundImageOpacity":0.22,"effects":root.get("effects")})
     } else {
         root.get("theme").cloned().unwrap_or(Value::Null)
     };
@@ -86,6 +86,39 @@ pub fn compile(theme_id: &str) -> Result<Payload> {
         asset(theme.get("backgroundImage"), manifest_dir, "backgrounds")?
     };
     let background = data_url(background_path)?;
+    let effects = theme.get("effects").and_then(Value::as_object);
+    let overlay = effects
+        .and_then(|value| value.get("overlay"))
+        .and_then(Value::as_object);
+    let composer_accent = effects
+        .and_then(|value| value.get("composerAccent"))
+        .and_then(Value::as_object);
+    let effect_asset = |value: Option<&Value>| {
+        if package {
+            package_asset(value, manifest_dir)
+        } else {
+            asset(value, manifest_dir, "effects")
+        }
+    };
+    let overlay_image = data_url(effect_asset(overlay.and_then(|value| value.get("image")))?)?;
+    let composer_accent_image = data_url(effect_asset(
+        composer_accent.and_then(|value| value.get("image")),
+    )?)?;
+    let effects_config = json!({
+        "ambient": effects.and_then(|value| value.get("ambient")).and_then(Value::as_str).unwrap_or("none"),
+        "intensity": effects.and_then(|value| value.get("intensity")).and_then(Value::as_str).unwrap_or("balanced"),
+        "overlay": overlay.map(|value| json!({
+            "image": overlay_image,
+            "triggers": value.get("triggers"),
+            "position": value.get("position"),
+            "widthPercent": value.get("widthPercent")
+        })),
+        "composerAccent": composer_accent.map(|value| json!({
+            "image": composer_accent_image,
+            "triggers": value.get("triggers"),
+            "widthPx": value.get("widthPx")
+        }))
+    });
     let logo = if package {
         None
     } else {
@@ -131,23 +164,52 @@ pub fn compile(theme_id: &str) -> Result<Payload> {
         "zhu-xudan-racing" => "center 30%",
         _ => "center",
     };
-    let background_position = match theme.get("backgroundPosition").and_then(Value::as_str) {
-        Some(value)
-            if [
-                "center",
-                "center top",
-                "center 20%",
-                "center 30%",
-                "center 40%",
-                "center bottom",
-                "left center",
-                "right center",
-            ]
-            .contains(&value) =>
-        {
-            value
+    let background_position = if let Some(focus) = theme.get("backgroundFocus") {
+        let x = focus
+            .get("x")
+            .and_then(Value::as_u64)
+            .unwrap_or(50)
+            .min(100);
+        let y = focus
+            .get("y")
+            .and_then(Value::as_u64)
+            .unwrap_or(50)
+            .min(100);
+        format!("{x}% {y}%")
+    } else {
+        match theme.get("backgroundPosition").and_then(Value::as_str) {
+            Some(value)
+                if [
+                    "center",
+                    "center top",
+                    "center 20%",
+                    "center 30%",
+                    "center 40%",
+                    "center bottom",
+                    "left center",
+                    "right center",
+                ]
+                .contains(&value) =>
+            {
+                value.to_owned()
+            }
+            _ => default_background_position.to_owned(),
         }
-        _ => default_background_position,
+    };
+    let visual_intensity = theme
+        .get("visualIntensity")
+        .and_then(Value::as_str)
+        .unwrap_or("balanced");
+    let intensity = match visual_intensity {
+        "clear" => [
+            ".78", ".58", ".42", ".90", ".42", ".88", ".34", ".96", ".94", ".94", ".78",
+        ],
+        "immersive" => [
+            ".34", ".16", ".08", ".56", ".12", ".54", ".08", ".76", ".78", ".74", ".46",
+        ],
+        _ => [
+            ".58", ".28", ".16", ".78", ".25", ".76", ".18", ".86", ".82", ".88", ".62",
+        ],
     };
     // `backgroundFit` is intentionally not part of the public theme manifest: Codex
     // rejects unknown fields in `theme.theme`. Curated hero art still uses a safe
@@ -181,7 +243,18 @@ pub fn compile(theme_id: &str) -> Result<Payload> {
         ("UI_FONT", ui_font),
         ("CODE_FONT", code_font),
         ("DISPLAY_FONT", display_font),
-        ("BACKGROUND_POSITION", background_position),
+        ("BACKGROUND_POSITION", background_position.as_str()),
+        ("HOME_SHELL_STRONG", intensity[0]),
+        ("HOME_SHELL_MID", intensity[1]),
+        ("HOME_SHELL_WEAK", intensity[2]),
+        ("HERO_STRONG", intensity[3]),
+        ("HERO_MID", intensity[4]),
+        ("HERO_OVERLAY_STRONG", intensity[5]),
+        ("HERO_OVERLAY_MID", intensity[6]),
+        ("PANEL_ALPHA", intensity[7]),
+        ("TASK_ALPHA", intensity[8]),
+        ("SIDEBAR_STRONG", intensity[9]),
+        ("SIDEBAR_MID", intensity[10]),
     ] {
         css = css.replace(&format!("{{{{{key}}}}}"), value);
     }
@@ -197,6 +270,7 @@ pub fn compile(theme_id: &str) -> Result<Payload> {
         "copy": copy,
         "background": background,
         "backgroundFit": background_fit,
+        "effects": effects_config,
         "logo": logo,
         "pet": pet
     });
@@ -377,29 +451,44 @@ html[data-codex-window-type="electron"] [data-content-search-unit-key$=":assista
 html[data-codex-window-type="electron"] [data-user-message-bubble="true"] { background:rgb(from {{ACCENT}} r g b / .15)!important; border:1px solid {{BORDER}}!important; }
 html[data-codex-window-type="electron"].codex-theme-native body { background-color:{{UNDER}}!important; background-image:linear-gradient(rgb(from {{UNDER}} r g b / calc(1 - {{BACKGROUND_OPACITY}})),rgb(from {{UNDER}} r g b / calc(1 - {{BACKGROUND_OPACITY}}))),{{BACKGROUND}}!important; background-repeat:no-repeat,no-repeat!important; background-position:center,{{BACKGROUND_POSITION}}!important; background-size:cover,var(--codex-theme-background-size,cover)!important; background-attachment:fixed,fixed!important; }
 .codex-theme-sidebar-logo { position:absolute; top:10px; left:16px; z-index:20; width:min(112px,55%); height:30px; padding-right:6px; object-fit:contain; object-position:left center; pointer-events:none; background:transparent; filter:drop-shadow(0 1px 8px rgb(from {{SURFACE}} r g b / .78)); }
-html[data-codex-window-type="electron"] main.codex-theme-native-home-shell { background:linear-gradient(90deg,rgb(from {{SURFACE}} r g b / .58),rgb(from {{SURFACE}} r g b / .28) 60%,rgb(from {{SURFACE}} r g b / .16))!important; border:0!important; box-shadow:none!important; }
-html[data-codex-window-type="electron"] main.codex-theme-native-task-shell { background:linear-gradient(rgb(from {{SURFACE}} r g b / .90),rgb(from {{SURFACE}} r g b / .94))!important; }
+html[data-codex-window-type="electron"] main.codex-theme-native-home-shell { background:linear-gradient(90deg,rgb(from {{SURFACE}} r g b / {{HOME_SHELL_STRONG}}),rgb(from {{SURFACE}} r g b / {{HOME_SHELL_MID}}) 60%,rgb(from {{SURFACE}} r g b / {{HOME_SHELL_WEAK}}))!important; border:0!important; box-shadow:none!important; }
+html[data-codex-window-type="electron"] main.codex-theme-native-task-shell { background:linear-gradient(rgb(from {{SURFACE}} r g b / {{TASK_ALPHA}}),rgb(from {{SURFACE}} r g b / calc({{TASK_ALPHA}} + .04)))!important; }
 html[data-codex-window-type="electron"] main.codex-theme-native-home-shell > header.app-header-tint { background:transparent!important; border-color:transparent!important; box-shadow:none!important; backdrop-filter:none!important; text-shadow:0 1px 10px rgb(from {{SURFACE}} r g b / .88); }
-html[data-codex-window-type="electron"] aside.codex-theme-native-home-sidebar { background:linear-gradient(90deg,rgb(from {{UNDER}} r g b / .88),rgb(from {{UNDER}} r g b / .62))!important; border-color:transparent!important; box-shadow:none!important; backdrop-filter:none!important; }
+html[data-codex-window-type="electron"] aside.codex-theme-native-home-sidebar { background:linear-gradient(90deg,rgb(from {{UNDER}} r g b / {{SIDEBAR_STRONG}}),rgb(from {{UNDER}} r g b / {{SIDEBAR_MID}}))!important; border-color:transparent!important; box-shadow:none!important; backdrop-filter:none!important; }
 html[data-codex-window-type="electron"] .codex-theme-native-home { --thread-content-max-width:min(1180px,calc(100cqw - 48px))!important; color:{{INK}}!important; background:transparent!important; container-type:inline-size; }
 .codex-theme-native-home > div:first-child { min-height:100%!important; padding-top:clamp(14px,2.2vh,28px)!important; }
-.codex-theme-native-home-hero { position:relative!important; isolation:isolate; width:calc(100% - clamp(28px,4cqw,56px))!important; max-width:1180px!important; min-height:clamp(280px,38vh,470px)!important; margin-inline:auto!important; padding:clamp(24px,4cqw,54px)!important; overflow:hidden!important; border:1px solid {{BORDER}}!important; border-radius:clamp(18px,2.2cqw,28px)!important; background:linear-gradient(90deg,rgb(from {{SURFACE}} r g b / .78),rgb(from {{SURFACE}} r g b / .25) 58%,transparent)!important; box-shadow:0 20px 54px rgb(from {{SHADOW}} r g b / .24)!important; }
+.codex-theme-native-home-hero { position:relative!important; isolation:isolate; width:calc(100% - clamp(28px,4cqw,56px))!important; max-width:1180px!important; min-height:clamp(280px,38vh,470px)!important; margin-inline:auto!important; padding:clamp(24px,4cqw,54px)!important; overflow:hidden!important; border:1px solid {{BORDER}}!important; border-radius:clamp(18px,2.2cqw,28px)!important; background:linear-gradient(90deg,rgb(from {{SURFACE}} r g b / {{HERO_STRONG}}),rgb(from {{SURFACE}} r g b / {{HERO_MID}}) 58%,transparent)!important; box-shadow:0 20px 54px rgb(from {{SHADOW}} r g b / .24)!important; }
 .codex-theme-native-home-hero::before { content:""; position:absolute; z-index:0; inset:0; pointer-events:none; background:linear-gradient(135deg,rgb(from {{SURFACE}} r g b / .12),transparent 58%); backdrop-filter:blur({{BACKGROUND_BLUR}}); }
-.codex-theme-native-home-hero::after { content:""; position:absolute; z-index:0; inset:0; pointer-events:none; background:linear-gradient(90deg,rgb(from {{SURFACE}} r g b / .76),rgb(from {{SURFACE}} r g b / .18) 62%,transparent); }
+.codex-theme-native-home-hero::after { content:""; position:absolute; z-index:0; inset:0; pointer-events:none; background:linear-gradient(90deg,rgb(from {{SURFACE}} r g b / {{HERO_OVERLAY_STRONG}}),rgb(from {{SURFACE}} r g b / {{HERO_OVERLAY_MID}}) 62%,transparent); }
 .codex-theme-native-home-copy { position:relative!important; z-index:1!important; width:min(54%,620px)!important; min-height:100%!important; align-items:flex-start!important; justify-content:center!important; text-align:left!important; color:{{INK}}!important; text-shadow:0 1px 12px rgb(from {{SURFACE}} r g b / .78); }
 .codex-theme-native-home-copy [data-testid="home-icon"] { display:none!important; }
 .codex-theme-native-home-copy :is(h1,h2,[class*="text-"]) { color:{{INK}}!important; font-family:{{DISPLAY_FONT}}!important; }
 .codex-theme-native-home-suggestions { overflow:visible!important; }
-.codex-theme-native-home-suggestions button { min-height:112px!important; padding:15px 14px!important; color:{{INK}}!important; border:1px solid {{BORDER}}!important; border-radius:18px!important; background:rgb(from {{ELEVATED}} r g b / .86)!important; box-shadow:0 12px 30px rgb(from {{SHADOW}} r g b / .20)!important; backdrop-filter:blur(12px) saturate(1.08)!important; transition:transform .16s ease,border-color .16s ease,background-color .16s ease!important; }
-.codex-theme-native-home-suggestions button:nth-child(1){background:color-mix(in srgb,rgb(from {{ELEVATED}} r g b / .90) 90%,{{REMOVED}})!important}.codex-theme-native-home-suggestions button:nth-child(2){background:color-mix(in srgb,rgb(from {{ELEVATED}} r g b / .90) 90%,{{ADDED}})!important}.codex-theme-native-home-suggestions button:nth-child(3){background:color-mix(in srgb,rgb(from {{ELEVATED}} r g b / .90) 90%,{{ACCENT}})!important}.codex-theme-native-home-suggestions button:nth-child(4){background:color-mix(in srgb,rgb(from {{ELEVATED}} r g b / .90) 90%,{{SKILL}})!important}
+.codex-theme-native-home-suggestions button { min-height:112px!important; padding:15px 14px!important; color:{{INK}}!important; border:1px solid {{BORDER}}!important; border-radius:18px!important; background:rgb(from {{ELEVATED}} r g b / {{PANEL_ALPHA}})!important; box-shadow:0 12px 30px rgb(from {{SHADOW}} r g b / .20)!important; backdrop-filter:blur(12px) saturate(1.08)!important; transition:transform .16s ease,border-color .16s ease,background-color .16s ease!important; }
+.codex-theme-native-home-suggestions button:nth-child(1){background:color-mix(in srgb,rgb(from {{ELEVATED}} r g b / {{PANEL_ALPHA}}) 90%,{{REMOVED}})!important}.codex-theme-native-home-suggestions button:nth-child(2){background:color-mix(in srgb,rgb(from {{ELEVATED}} r g b / {{PANEL_ALPHA}}) 90%,{{ADDED}})!important}.codex-theme-native-home-suggestions button:nth-child(3){background:color-mix(in srgb,rgb(from {{ELEVATED}} r g b / {{PANEL_ALPHA}}) 90%,{{ACCENT}})!important}.codex-theme-native-home-suggestions button:nth-child(4){background:color-mix(in srgb,rgb(from {{ELEVATED}} r g b / {{PANEL_ALPHA}}) 90%,{{SKILL}})!important}
 @media(hover:hover){.codex-theme-native-home-suggestions button:hover{transform:translateY(-3px);border-color:{{ACCENT}}!important;background:rgb(from {{ELEVATED}} r g b / .96)!important}}
-.codex-theme-native-home-utility { border:1px solid {{BORDER}}!important; border-bottom:0!important; border-radius:18px 18px 0 0!important; background:rgb(from {{ELEVATED}} r g b / .88)!important; box-shadow:none!important; backdrop-filter:blur(14px) saturate(1.06)!important; }
+.codex-theme-native-home-utility { border:1px solid {{BORDER}}!important; border-bottom:0!important; border-radius:18px 18px 0 0!important; background:rgb(from {{ELEVATED}} r g b / {{PANEL_ALPHA}})!important; box-shadow:none!important; backdrop-filter:blur(14px) saturate(1.06)!important; }
 .codex-theme-native-home:has(.codex-theme-native-home-utility) .composer-surface-chrome { border-radius:0 0 18px 18px!important; border-top:0!important; }
-.codex-theme-native-task { position:relative; isolation:isolate; background:rgb(from {{SURFACE}} r g b / .82)!important; }
+.codex-theme-native-task { position:relative; isolation:isolate; background:rgb(from {{SURFACE}} r g b / {{TASK_ALPHA}})!important; }
+#codex-theme-effect-ambient { position:fixed; z-index:1; inset:0; overflow:hidden; pointer-events:none; opacity:var(--codex-effect-opacity,.5); }
+#codex-theme-effect-ambient i { position:absolute; display:block; left:calc(2% + var(--effect-index) * 5%); top:calc(4% + var(--effect-index) * 3%); animation-delay:calc(var(--effect-index) * -.37s); }
+#codex-theme-effect-ambient b { position:absolute; display:block; left:calc(8% + var(--effect-index) * 8%); top:calc(18% + var(--effect-index) * 5%); width:3px; height:3px; border-radius:50%; background:{{ACCENT}}; box-shadow:0 0 8px 3px rgb(from {{ACCENT}} r g b / .34); animation:codex-theme-particle 8s ease-in-out infinite; animation-delay:calc(var(--effect-index) * -1.3s); }
+#codex-theme-effect-ambient[data-kind="rain"] i,#codex-theme-effect-ambient[data-kind="storm"] i { width:1.5px; height:18px; border-radius:99px; background:linear-gradient(transparent,rgb(from {{INK}} r g b / .66),transparent); transform:rotate(20deg); animation:codex-theme-rain 3.2s linear infinite; }
+#codex-theme-effect-ambient[data-kind="particles"] i { width:3px; height:3px; border-radius:50%; background:{{ACCENT}}; box-shadow:0 0 8px 3px rgb(from {{ACCENT}} r g b / .34); animation:codex-theme-particle 8s ease-in-out infinite; }
+#codex-theme-effect-ambient[data-kind="storm"]::after { content:""; position:absolute; width:min(42vw,520px); height:3px; right:-3%; top:20%; background:white; box-shadow:0 0 8px 3px {{ACCENT}},0 0 24px 8px rgb(from {{ACCENT}} r g b / .45); clip-path:polygon(0 40%,42% 0,38% 44%,72% 25%,58% 64%,100% 48%,55% 100%,62% 62%,22% 82%,34% 48%); animation:codex-theme-lightning 11s steps(1,end) infinite; }
+#codex-theme-effect-overlay { position:fixed; z-index:18; left:var(--codex-effect-x,72%); top:var(--codex-effect-y,28%); width:var(--codex-effect-width,42%); max-height:72vh; object-fit:contain; opacity:0; transform:translate(-50%,-50%) scale(.92); filter:drop-shadow(0 0 14px rgb(from {{ACCENT}} r g b / .46)); pointer-events:none; }
+#codex-theme-effect-overlay.is-active { animation:codex-theme-overlay 1.35s cubic-bezier(.18,.74,.18,1) both; }
+#codex-theme-composer-accent { position:fixed; z-index:24; width:var(--codex-effect-composer-width,120px); max-height:180px; object-fit:contain; opacity:0; transform:translate3d(55vw,-44vh,0) rotate(720deg) scale(.7); transform-origin:center; filter:drop-shadow(0 5px 8px rgb(from {{SHADOW}} r g b / .58)) drop-shadow(0 0 7px rgb(from {{ACCENT}} r g b / .52)); pointer-events:none; }
+#codex-theme-composer-accent.is-active { animation:codex-theme-composer-arrive 1.05s cubic-bezier(.16,.72,.18,1) both; }
+@keyframes codex-theme-rain { from { translate:0 -80px; } to { translate:-24px 110vh; } }
+@keyframes codex-theme-particle { 0%,100% { translate:0 20px; opacity:.16; } 50% { translate:26px -70px; opacity:.9; } }
+@keyframes codex-theme-lightning { 0%,92.5%,93.4%,94.1%,100% { opacity:0; } 92.8%,93.1% { opacity:.9; } 93.7% { opacity:.4; } }
+@keyframes codex-theme-overlay { 0% { opacity:0; transform:translate(-50%,-50%) scale(.90); } 18% { opacity:var(--codex-effect-opacity,.6); transform:translate(-50%,-50%) scale(1); } 62% { opacity:calc(var(--codex-effect-opacity,.6) * .82); } 100% { opacity:0; transform:translate(-50%,-50%) scale(1.04); } }
+@keyframes codex-theme-composer-arrive { 0% { opacity:0; transform:translate3d(55vw,-44vh,0) rotate(720deg) scale(.7); } 8% { opacity:var(--codex-effect-opacity,.6); } 100% { opacity:var(--codex-effect-opacity,.6); transform:translate3d(0,0,0) rotate(-10deg) scale(1); } }
 @container(max-width:760px){.codex-theme-native-home-hero{min-height:260px;padding:24px}.codex-theme-native-home-copy{width:68%!important}.codex-theme-native-home-suggestions button{min-height:102px;padding:12px 10px!important}}
 @container(max-width:520px){.codex-theme-native-home-hero{min-height:240px}.codex-theme-native-home-copy{width:100%!important}.codex-theme-native-home-hero::after{background:rgb(from {{SURFACE}} r g b / .58)}}
 @media(max-height:760px){.codex-theme-native-home-hero{min-height:240px!important}.codex-theme-native-home-suggestions button{min-height:94px!important}}
-@media(prefers-reduced-motion:reduce){.codex-theme-native-home-suggestions button{transition:none!important}}
+@media(prefers-reduced-motion:reduce){.codex-theme-native-home-suggestions button{transition:none!important}#codex-theme-effect-ambient{display:none!important}#codex-theme-effect-overlay,#codex-theme-composer-accent{animation:none!important;display:none!important}}
 "#;
 
 const JS_TEMPLATE: &str = r#"
@@ -407,18 +496,26 @@ const JS_TEMPLATE: &str = r#"
   globalThis.__codexThemeStore?.dispose?.();
   const cfg=__codexSkinConfig,root=document.documentElement,assetUrl=value=>value?.startsWith('url("')?value.slice(5,-2):'';
   root.classList.add('codex-theme-native');root.dataset.codexThemeId=cfg.themeId;
-  let sidebarLogo=null,scheduled=false;
+  let sidebarLogo=null,scheduled=false,lastRunning=false,ambientLayer=null,effectOverlay=null,composerAccent=null;
   const decorated=['codex-theme-native-home','codex-theme-native-task','codex-theme-native-home-hero','codex-theme-native-home-copy','codex-theme-native-home-suggestions','codex-theme-native-home-utility','codex-theme-native-home-shell','codex-theme-native-task-shell','codex-theme-native-home-sidebar','codex-theme-native-task-sidebar'];
   const clearDecorations=()=>{for(const cls of decorated)for(const node of document.querySelectorAll(`.${cls}`))node.classList.remove(cls);};
   const updateBackgroundFit=()=>{const image=globalThis.__codexThemeStore?.backgroundImage;if(!image?.naturalWidth||!image.naturalHeight)return;let fit=cfg.backgroundFit||'smart';if(fit==='smart'){const imageRatio=image.naturalWidth/image.naturalHeight,windowRatio=innerWidth/Math.max(1,innerHeight),visible=Math.min(imageRatio/windowRatio,windowRatio/imageRatio);fit=1-visible>.34?'contain':'cover';}root.style.setProperty('--codex-theme-background-size',fit==='contain'?'contain':'cover');};
   const applyCopy=()=>{if(cfg.copy?.title)document.title=cfg.copy.title;const replacements=cfg.copy?.replacePlaceholders||{};for(const node of document.querySelectorAll('[placeholder],[data-placeholder]'))for(const attr of ['placeholder','data-placeholder']){const value=node.getAttribute(attr);if(value&&replacements[value])node.setAttribute(attr,replacements[value]);}const editor=document.querySelector('.ProseMirror,[contenteditable="true"][role="textbox"]');if(editor&&cfg.home?.composerHint){editor.setAttribute('aria-label',cfg.home.composerHint);editor.dataset.placeholder=cfg.home.composerHint;}};
   const ensureSidebarLogo=()=>{if(sidebarLogo?.isConnected||!cfg.logo)return;const sidebar=document.querySelector('.app-shell-left-panel');if(!sidebar)return;sidebarLogo=document.createElement('img');sidebarLogo.className='codex-theme-sidebar-logo';sidebarLogo.src=assetUrl(cfg.logo);sidebarLogo.alt=cfg.home?.brand||'';sidebarLogo.decoding='async';sidebar.append(sidebarLogo);};
-  const update=()=>{scheduled=false;clearDecorations();const shell=document.querySelector('main.main-surface,.browser-main-surface');if(!shell){applyCopy();return;}const home=document.querySelector('[role="main"]:has([data-testid="home-icon"])');for(const route of document.querySelectorAll('[role="main"]'))route.classList.add(route===home?'codex-theme-native-home':'codex-theme-native-task');shell.classList.add(home?'codex-theme-native-home-shell':'codex-theme-native-task-shell');document.querySelector('.app-shell-left-panel')?.classList.add(home?'codex-theme-native-home-sidebar':'codex-theme-native-task-sidebar');if(home){const icon=home.querySelector('[data-testid="home-icon"]'),copy=icon?.parentElement,hero=copy?.parentElement?.parentElement;if(hero)hero.classList.add('codex-theme-native-home-hero');if(copy)copy.classList.add('codex-theme-native-home-copy');for(const candidate of home.querySelectorAll('[class*="home-suggestions"],[class*="homeSuggestions"]'))candidate.classList.add('codex-theme-native-home-suggestions');for(const area of home.querySelectorAll('[data-composer-utility-bar-scroll-area]'))area.parentElement?.classList.add('codex-theme-native-home-utility');}applyCopy();ensureSidebarLogo();updateBackgroundFit();};
+  const reducedMotion=()=>matchMedia('(prefers-reduced-motion: reduce)').matches;
+  const triggers=(entry,type)=>Array.isArray(entry?.triggers)&&entry.triggers.includes(type);
+  const restart=node=>{if(!node||reducedMotion())return;node.classList.remove('is-active');void node.offsetWidth;node.classList.add('is-active');};
+  const positionComposerAccent=()=>{if(!composerAccent)return;const composer=document.querySelector('.composer-surface-chrome'),rect=composer?.getBoundingClientRect();if(!rect)return;const width=Number(cfg.effects?.composerAccent?.widthPx)||120;composerAccent.style.left=`${Math.round(rect.left-width*.28)}px`;composerAccent.style.top=`${Math.round(rect.top-width*.62)}px`;};
+  const triggerEffects=type=>{if(triggers(cfg.effects?.overlay,type))restart(effectOverlay);if(triggers(cfg.effects?.composerAccent,type)){positionComposerAccent();restart(composerAccent);}else if(type==='message-send')composerAccent?.classList.remove('is-active');};
+  const ensureEffects=()=>{const effects=cfg.effects||{},opacity=effects.intensity==='subtle'?'.28':effects.intensity==='vivid'?'.82':'.52';root.style.setProperty('--codex-effect-opacity',opacity);if(!ambientLayer&&effects.ambient&&effects.ambient!=='none'){ambientLayer=document.createElement('div');ambientLayer.id='codex-theme-effect-ambient';ambientLayer.dataset.kind=effects.ambient;ambientLayer.setAttribute('aria-hidden','true');for(let index=0;index<20;index++){const drop=document.createElement('i');drop.style.setProperty('--effect-index',String(index));ambientLayer.append(drop);}if(effects.ambient==='storm')for(let index=0;index<10;index++){const particle=document.createElement('b');particle.style.setProperty('--effect-index',String(index));ambientLayer.append(particle);}document.body.append(ambientLayer);}if(!effectOverlay&&effects.overlay?.image){effectOverlay=document.createElement('img');effectOverlay.id='codex-theme-effect-overlay';effectOverlay.alt='';effectOverlay.src=assetUrl(effects.overlay.image);effectOverlay.style.setProperty('--codex-effect-x',`${effects.overlay.position?.x??72}%`);effectOverlay.style.setProperty('--codex-effect-y',`${effects.overlay.position?.y??28}%`);effectOverlay.style.setProperty('--codex-effect-width',`${effects.overlay.widthPercent??42}%`);document.body.append(effectOverlay);}if(!composerAccent&&effects.composerAccent?.image){composerAccent=document.createElement('img');composerAccent.id='codex-theme-composer-accent';composerAccent.alt='';composerAccent.src=assetUrl(effects.composerAccent.image);composerAccent.style.setProperty('--codex-effect-composer-width',`${effects.composerAccent.widthPx??120}px`);document.body.append(composerAccent);positionComposerAccent();}};
+  const runningTask=()=>Boolean(document.querySelector('[data-app-action-sidebar-thread-running="true"],[data-app-action-sidebar-thread-is-running="true"],[data-thread-running="true"],[data-is-running="true"],[aria-label*="正在运行"]'));
+  const update=()=>{scheduled=false;clearDecorations();ensureEffects();const shell=document.querySelector('main.main-surface,.browser-main-surface');if(!shell){applyCopy();return;}const home=document.querySelector('[role="main"]:has([data-testid="home-icon"])');for(const route of document.querySelectorAll('[role="main"]'))route.classList.add(route===home?'codex-theme-native-home':'codex-theme-native-task');shell.classList.add(home?'codex-theme-native-home-shell':'codex-theme-native-task-shell');document.querySelector('.app-shell-left-panel')?.classList.add(home?'codex-theme-native-home-sidebar':'codex-theme-native-task-sidebar');if(home){const icon=home.querySelector('[data-testid="home-icon"]'),copy=icon?.parentElement,hero=copy?.parentElement?.parentElement;if(hero)hero.classList.add('codex-theme-native-home-hero');if(copy)copy.classList.add('codex-theme-native-home-copy');for(const candidate of home.querySelectorAll('[class*="home-suggestions"],[class*="homeSuggestions"]'))candidate.classList.add('codex-theme-native-home-suggestions');for(const area of home.querySelectorAll('[data-composer-utility-bar-scroll-area]'))area.parentElement?.classList.add('codex-theme-native-home-utility');}const running=runningTask();if(running&&!lastRunning)triggerEffects('task-start');lastRunning=running;positionComposerAccent();applyCopy();ensureSidebarLogo();updateBackgroundFit();};
   const schedule=()=>{if(scheduled)return;scheduled=true;requestAnimationFrame(update);};
-  const observer=new MutationObserver(schedule);observer.observe(root,{childList:true,subtree:true});
+  const observer=new MutationObserver(schedule);observer.observe(root,{childList:true,subtree:true,attributes:true,attributeFilter:['aria-label','data-app-action-sidebar-thread-running','data-app-action-sidebar-thread-is-running','data-thread-running','data-is-running']});
   const resizeHandler=()=>{updateBackgroundFit();schedule();};window.addEventListener('resize',resizeHandler);
+  const sendHandler=event=>{if(!(event.target instanceof Element))return;const byClick=event.type==='click'&&event.target.closest('button[type="submit"],[data-testid*="send"]'),byKey=event.type==='keydown'&&event.key==='Enter'&&!event.shiftKey&&event.target.closest('textarea,input,[contenteditable="true"]');if(byClick||byKey)triggerEffects('message-send');};document.addEventListener('click',sendHandler,true);document.addEventListener('keydown',sendHandler,true);
   const backgroundImage=cfg.background?new Image():null;if(backgroundImage){backgroundImage.addEventListener('load',updateBackgroundFit);backgroundImage.src=assetUrl(cfg.background);}
-  globalThis.__codexThemeStore={observer,resizeHandler,backgroundImage,injectionId:null,dispose(){observer.disconnect();window.removeEventListener('resize',resizeHandler);clearDecorations();sidebarLogo?.remove();root.classList.remove('codex-theme-native');root.removeAttribute('data-codex-theme-id');root.style.removeProperty('--codex-theme-background-size');}};
+  globalThis.__codexThemeStore={observer,resizeHandler,backgroundImage,injectionId:null,dispose(){observer.disconnect();window.removeEventListener('resize',resizeHandler);document.removeEventListener('click',sendHandler,true);document.removeEventListener('keydown',sendHandler,true);clearDecorations();sidebarLogo?.remove();ambientLayer?.remove();effectOverlay?.remove();composerAccent?.remove();root.classList.remove('codex-theme-native');root.removeAttribute('data-codex-theme-id');root.style.removeProperty('--codex-theme-background-size');root.style.removeProperty('--codex-effect-opacity');}};
   update();
   return true;
 })();
@@ -434,7 +531,11 @@ mod tests {
         assert!(JS_TEMPLATE.contains("codex-theme-native-home"));
         assert!(JS_TEMPLATE.contains("codex-theme-native-task"));
         assert!(JS_TEMPLATE.contains("codex-theme-native-home-sidebar"));
+        assert!(JS_TEMPLATE.contains("codex-theme-effect-ambient"));
+        assert!(JS_TEMPLATE.contains("prefers-reduced-motion: reduce"));
+        assert!(JS_TEMPLATE.contains("triggerEffects('message-send')"));
         assert!(!JS_TEMPLATE.contains("createElement('section')"));
+        assert!(!JS_TEMPLATE.contains("innerHTML"));
         assert!(!JS_TEMPLATE.contains("id='codex-theme-home'"));
     }
 }

@@ -47,7 +47,11 @@ pets/
 - `variant` 描述主题本身的明暗模式，不跟随系统自动切换。
 - `accent`、`ink`、`surface` 使用六位十六进制颜色，并保证正文可读。
 - 背景展示策略由 Codex-Skin 在编译时自动选择；主题清单不得包含 `theme.backgroundFit`，否则 Codex 会拒绝未知字段。
-- `theme.backgroundPosition` 用于保护人物或主体焦点，只能使用模板列出的安全定位值；人物头部靠近画面上缘时优先使用 `center top`。
+- 新主题优先使用 `theme.backgroundFocus: { "x": 50, "y": 30 }` 标记人物面部或画面主体，横纵坐标均为 0–100 的整数；客户端会在不同窗口比例下以该焦点裁切背景。旧主题的 `theme.backgroundPosition` 仍兼容。
+- `theme.visualIntensity` 可选 `clear`、`balanced`、`immersive`，分别表示内容优先、平衡和背景优先。任务内容始终保留可读性遮罩。
+- 背景适配由客户端安全决定，不要在公共主题清单中添加 `backgroundFit`。
+- `theme.effects.ambient` 可声明 `none`、`rain`、`particles` 或 `storm`；`intensity` 可声明 `subtle`、`balanced` 或 `vivid`。动画由客户端内置实现，并自动遵守系统“减少动态效果”设置。
+- 可选的 `theme.effects.overlay` 使用 `../effects/` 下的 PNG，在 `task-start` 或 `message-send` 时短暂显示；`composerAccent` 使用同目录 PNG 并由客户端安全锚定输入框。主题不得携带脚本、CSS 或自定义选择器。
 - `home.quickActions` 必须正好四项；点击后只向真实输入框写入 `prompt`。
 - `home.pet` 只能提供图片、替代文本和 48–220 的显示尺寸，不能包含脚本或点击行为。
 - `home.sidebarLabels` 只能修改新建任务、已安排、插件和设置四个固定入口。

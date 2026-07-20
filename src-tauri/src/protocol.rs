@@ -15,7 +15,7 @@ use tokio::io::AsyncWriteExt;
 use url::Url;
 
 const MAX_URI: usize = 4096;
-const MAX_PACKAGE: u64 = 20 * 1024 * 1024;
+const MAX_PACKAGE: u64 = 28 * 1024 * 1024;
 #[derive(Clone, Debug)]
 struct Request {
     url: Url,
@@ -122,7 +122,7 @@ fn parse(input: &str) -> Result<Request> {
         .ok()
         .filter(|v| *v > 0 && *v <= MAX_PACKAGE)
         .ok_or_else(|| {
-            AppError::Message("DSI_URI_INVALID: size 必须是 1 到 20971520 的十进制整数。".into())
+            AppError::Message("DSI_URI_INVALID: size 必须是 1 到 29360128 的十进制整数。".into())
         })?;
     let id = values.remove("id");
     if id
@@ -278,7 +278,7 @@ async fn download(initial: &Url, request: &Request, destination: &Path) -> Resul
             if length == 0 || length > MAX_PACKAGE {
                 return fail(
                     "DSI_SIZE_LIMIT",
-                    "服务器声明的主题包大小无效或超过 20 MiB。",
+                    "服务器声明的主题包大小无效或超过 28 MiB。",
                 );
             }
             if length != request.size {
@@ -296,7 +296,7 @@ async fn download(initial: &Url, request: &Request, destination: &Path) -> Resul
             let chunk = chunk?;
             total += chunk.len() as u64;
             if total > MAX_PACKAGE || total > request.size {
-                return fail("DSI_SIZE_LIMIT", "主题包响应体超过声明大小或 20 MiB 限制。");
+                return fail("DSI_SIZE_LIMIT", "主题包响应体超过声明大小或 28 MiB 限制。");
             }
             hash.update(&chunk);
             output.write_all(&chunk).await?;
