@@ -239,16 +239,29 @@ async fn download(initial: &Url, request: &Request, destination: &Path) -> Resul
     for redirects in 0..=3 {
         current = validate_url(current.as_str())?;
         let host = current.host_str().unwrap().to_owned();
-        let addresses = resolve_public(&host).await?;
-        let client = reqwest::Client::builder()
-            .no_proxy()
+        let builder = reqwest::Client::builder()
             .redirect(reqwest::redirect::Policy::none())
-            .timeout(std::time::Duration::from_secs(45))
-            .resolve_to_addrs(&host, &addresses)
-            .build()?;
+            .connect_timeout(std::time::Duration::from_secs(8))
+            .timeout(std::time::Duration::from_secs(25));
+        // Corporate networks commonly expose GitHub through the operating system proxy
+        // or resolve its public names to a private egress address. Exact GitHub-owned
+        // download hosts may use that proxy path; every other host keeps DNS pinning and
+        // the public-IP SSRF guard.
+        let client = if trusted_github_download_host(&host) {
+            builder.build()?
+        } else {
+            let addresses = resolve_public(&host).await?;
+            builder
+                .no_proxy()
+                .resolve_to_addrs(&host, &addresses)
+                .build()?
+        };
         let response = client
             .get(current.clone())
-            .header("User-Agent", "Codex-Skin/2")
+            .header(
+                "User-Agent",
+                concat!("Codex-Skin/", env!("CARGO_PKG_VERSION")),
+            )
             .header("Accept", "application/vnd.codex-dream-skin+zip")
             .send()
             .await?;
@@ -317,6 +330,17 @@ async fn download(initial: &Url, request: &Request, destination: &Path) -> Resul
         return Ok(());
     }
     fail("DSI_DOWNLOAD_FAILED", "主题包下载失败。")
+}
+
+fn trusted_github_download_host(host: &str) -> bool {
+    [
+        "github.com",
+        "release-assets.githubusercontent.com",
+        "objects.githubusercontent.com",
+        "github-releases.githubusercontent.com",
+    ]
+    .iter()
+    .any(|candidate| host.eq_ignore_ascii_case(candidate))
 }
 
 async fn resolve_public(host: &str) -> Result<Vec<SocketAddr>> {
@@ -421,6 +445,16 @@ mod tests {
         ] {
             assert!(!public_ip(value.parse().unwrap()));
         }
+    }
+
+    #[test]
+    fn system_proxy_is_limited_to_exact_github_download_hosts() {
+        assert!(trusted_github_download_host("github.com"));
+        assert!(trusted_github_download_host(
+            "release-assets.githubusercontent.com"
+        ));
+        assert!(!trusted_github_download_host("github.com.example.org"));
+        assert!(!trusted_github_download_host("raw.githubusercontent.com"));
     }
 
     #[test]
