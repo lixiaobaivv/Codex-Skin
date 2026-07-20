@@ -104,6 +104,11 @@ fn read_preview(path: String) -> error::Result<String> {
 }
 
 #[tauri::command]
+async fn theme_runtime_ready() -> bool {
+    cdp::is_ready().await
+}
+
+#[tauri::command]
 async fn apply_theme(theme_id: String) -> error::Result<String> {
     let payload = compiler::compile(&theme_id)?;
     if cdp::inject(&payload, std::time::Duration::from_secs(15)).await? == 0 {
@@ -179,6 +184,7 @@ pub fn run() {
             install_uri,
             pending_activations,
             read_preview,
+            theme_runtime_ready,
             apply_theme,
             restart_and_apply,
             rollback_theme
