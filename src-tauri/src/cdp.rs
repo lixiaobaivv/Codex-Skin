@@ -21,18 +21,18 @@ pub struct Payload {
 type Socket = WebSocketStream<MaybeTlsStream<tokio::net::TcpStream>>;
 
 pub async fn is_ready() -> bool {
-    let Ok(response) = reqwest::Client::builder()
+    let Ok(client) = reqwest::Client::builder()
+        .no_proxy()
         .timeout(std::time::Duration::from_secs(3))
         .build()
-        .and_then(|client| {
-            client
-                .get(format!("http://127.0.0.1:{DEBUG_PORT}/json/version"))
-                .build()
-        })
     else {
         return false;
     };
-    let Ok(response) = reqwest::Client::new().execute(response).await else {
+    let Ok(response) = client
+        .get(format!("http://127.0.0.1:{DEBUG_PORT}/json/version"))
+        .send()
+        .await
+    else {
         return false;
     };
     let Ok(value) = response.json::<Value>().await else {
@@ -136,6 +136,7 @@ fn theme_expression(payload: &Payload, injection_id: &str) -> String {
 
 async fn targets() -> Result<Vec<String>> {
     let response = reqwest::Client::builder()
+        .no_proxy()
         .timeout(std::time::Duration::from_secs(3))
         .build()?
         .get(format!("http://127.0.0.1:{DEBUG_PORT}/json/list"))

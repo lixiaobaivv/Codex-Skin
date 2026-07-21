@@ -165,10 +165,24 @@ async fn rollback_theme() -> error::Result<String> {
     if !cdp::is_ready().await {
         return Ok("当前已经是默认主题".into());
     }
-    if cdp::remove(std::time::Duration::from_secs(15)).await? == 0 {
-        return Err(error::AppError::Message("未连接到 Codex 主题端口。".into()));
+    let mut last_error = None;
+    for attempt in 0..3 {
+        match cdp::remove(std::time::Duration::from_secs(15)).await {
+            Ok(0) => return Ok("当前已经是默认主题".into()),
+            Ok(_) => return Ok("已恢复默认主题".into()),
+            Err(error) => last_error = Some(error.to_string()),
+        }
+        if attempt < 2 {
+            tokio::time::sleep(std::time::Duration::from_millis(350)).await;
+        }
     }
-    Ok("已恢复默认主题".into())
+    if !cdp::is_ready().await {
+        return Ok("当前已经是默认主题".into());
+    }
+    Err(error::AppError::Message(format!(
+        "恢复默认主题失败，请关闭并重新打开 Codex 后重试：{}",
+        last_error.unwrap_or_else(|| "本机主题端口暂时不可用".into())
+    )))
 }
 
 #[tauri::command]

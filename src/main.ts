@@ -305,10 +305,6 @@ document.querySelector<HTMLButtonElement>("#apply")!.onclick = async () => {
   setBusy(true, "正在检查 Codex 主题模式…");
   try {
     const ready = await call<boolean>("theme_runtime_ready");
-    if (!ready && !window.confirm("当前 Codex 没有启用本机主题端口，需要重启后应用主题。是否继续？")) {
-      message("已取消应用主题");
-      return;
-    }
     message(ready ? "正在应用主题…" : "正在重启 Codex 并应用主题…");
     const result = await call<string>(ready ? "apply_theme" : "restart_and_apply", { themeId });
     await loadState();
