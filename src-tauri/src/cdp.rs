@@ -9,6 +9,7 @@ const MAX_MESSAGE: usize = 4 * 1024 * 1024;
 const LIVE_STYLE_ID: &str = "codex-theme-store-live-style";
 const ACTIVE_KEY: &str = "__codexThemeStoreActiveInjection";
 const SCRIPT_KEY: &str = "__codexThemeStoreNewDocumentScript";
+const CLEANUP: &str = "(() => { try { localStorage.removeItem('__codexThemeStoreActiveInjection'); localStorage.removeItem('__codexThemeStoreNewDocumentScript'); } catch {} globalThis.__codexThemeStore?.dispose?.(); globalThis.__codexThemeStore?.observer?.disconnect(); globalThis.__codexThemeStore?.resizeHandler && window.removeEventListener('resize',globalThis.__codexThemeStore.resizeHandler); delete globalThis.__codexThemeStore; document.querySelectorAll('.codex-theme-sidebar-logo,#codex-theme-effect-ambient,#codex-theme-effect-overlay,#codex-theme-composer-accent').forEach(node=>node.remove()); document.getElementById('codex-theme-store-live-style')?.remove(); document.getElementById('codex-theme-home')?.remove(); document.documentElement.classList.remove('codex-theme-native'); document.documentElement.removeAttribute('data-codex-theme-id'); document.documentElement.style.removeProperty('--codex-theme-background-size'); setTimeout(()=>location.reload(),0); return true; })()";
 
 #[derive(Clone, Debug)]
 pub struct Payload {
@@ -114,7 +115,6 @@ pub async fn remove(timeout: std::time::Duration) -> Result<usize> {
 }
 
 async fn remove_inner() -> Result<usize> {
-    const CLEANUP: &str = "(() => { try { localStorage.removeItem('__codexThemeStoreActiveInjection'); localStorage.removeItem('__codexThemeStoreNewDocumentScript'); } catch {} globalThis.__codexThemeStore?.dispose?.(); globalThis.__codexThemeStore?.observer?.disconnect(); globalThis.__codexThemeStore?.resizeHandler && window.removeEventListener('resize',globalThis.__codexThemeStore.resizeHandler); delete globalThis.__codexThemeStore; document.getElementById('codex-theme-store-live-style')?.remove(); document.getElementById('codex-theme-home')?.remove(); document.documentElement.classList.remove('codex-theme-native'); document.documentElement.removeAttribute('data-codex-theme-id'); document.documentElement.style.removeProperty('--codex-theme-background-size'); setTimeout(()=>location.reload(),0); return true; })()";
     let mut successes = 0;
     for target in targets().await? {
         if remove_target(&target, CLEANUP).await.unwrap_or(false) {
@@ -316,6 +316,13 @@ fn is_true(value: &Value) -> bool {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn cleanup_removes_orphaned_theme_nodes() {
+        assert!(CLEANUP.contains(".codex-theme-sidebar-logo"));
+        assert!(CLEANUP.contains("#codex-theme-effect-overlay"));
+        assert!(CLEANUP.contains("querySelectorAll"));
+    }
     #[test]
     fn only_loopback_cdp_urls_are_allowed() {
         assert!(allowed_socket("ws://127.0.0.1:9229/devtools/page/abc-123"));
