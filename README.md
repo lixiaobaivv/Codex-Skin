@@ -28,6 +28,7 @@ Codex-Skin 让主题的浏览、按需下载、验证、安装、增量更新和
 - 通过轻量远程索引增量检查更新，在 GitHub、GH Proxy 和 GHFast 之间自动回退；
 - 预览图进入可视区域时才下载，完整主题资源在应用前按需下载并持久缓存；
 - 显示在线、已下载和有更新状态，支持订阅主题并在刷新目录时自动更新本地资源；
+- 启动时自动检查客户端版本，可在应用内下载、校验并启动 GitHub Release 更新安装包；
 - 使用单实例窗口接收网页链接和文件激活，避免重复启动客户端。
 
 ## 下载
@@ -43,6 +44,8 @@ Codex-Skin 让主题的浏览、按需下载、验证、安装、增量更新和
 Windows 仅提供 Setup 安装器。Windows 使用系统 WebView2，macOS 使用系统 WKWebView，不需要额外安装应用运行时。
 
 当前发布包没有商业代码签名：Windows SmartScreen 或 macOS Gatekeeper 可能要求手动确认。运行前请从同一 Release 下载 `Codex-Skin-installers-SHA256SUMS.txt` 并核对文件哈希。
+
+安装一次后可直接使用客户端右上角的“检查更新”。客户端会自动选择当前平台的安装包、核对 Release 路径、文件大小和 SHA-256；Windows 下载后静默启动更新，macOS 下载后直接打开 PKG。
 
 Windows PowerShell：
 

@@ -116,6 +116,29 @@ test("Tauri desktop uses horizontal categories and single-instance activation", 
   assert.match(rustApp, /external-activation/);
 });
 
+test("desktop client updates use the published platform installers", async () => {
+  const [frontend, updater, workflow] = await Promise.all([
+    readFile(new URL("../src/main.ts", import.meta.url), "utf8"),
+    readFile(new URL("../src-tauri/src/updater.rs", import.meta.url), "utf8"),
+    readFile(new URL("../.github/workflows/build.yml", import.meta.url), "utf8"),
+  ]);
+  for (const asset of [
+    "Codex-Skin-Setup-win-x64.exe",
+    "Codex-Skin-osx-arm64.pkg",
+    "Codex-Skin-osx-x64.pkg",
+    "Codex-Skin-installers-SHA256SUMS.txt",
+  ]) {
+    assert.match(updater, new RegExp(asset.replaceAll(".", "\\.")));
+    assert.match(workflow, new RegExp(asset.replaceAll(".", "\\.")));
+  }
+  assert.match(updater, /api\.github\.com\/repos\/lixiaobaivv\/Codex-Skin\/releases\?per_page=100/);
+  assert.match(updater, /select_latest_release/);
+  assert.match(updater, /SHA-256 校验失败/);
+  assert.match(frontend, /check_app_update/);
+  assert.match(frontend, /app-update-progress/);
+  assert.match(frontend, /install_app_update/);
+});
+
 test("theme application uses one adaptive action and production rejects fixture trust", async () => {
   const [frontend, styles, rustApp, dreamskin, compiler, repository] = await Promise.all([
     readFile(new URL("../src/main.ts", import.meta.url), "utf8"),

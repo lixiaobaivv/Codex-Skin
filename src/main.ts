@@ -16,6 +16,8 @@ type Theme = {
   updateAvailable: boolean;
 };
 type AppState = { themes: Theme[]; sources: Source[]; selectedSourceId: string };
+type AppUpdate = { version: string; notes: string; size: number };
+type UpdateProgress = { downloaded: number; total: number };
 
 const qaMode = import.meta.env.DEV && new URLSearchParams(location.search).get("qa") === "1";
 const qaThemes: Theme[] = [
@@ -38,6 +40,8 @@ async function call<T>(command: string, args?: Record<string, unknown>): Promise
   if (command === "set_theme_subscription") return undefined as T;
   if (command === "delete_theme") return "主题已从本地删除" as T;
   if (command === "theme_runtime_ready") return true as T;
+  if (command === "check_app_update") return null as T;
+  if (command === "install_app_update") return "更新安装程序已启动" as T;
   return "QA 操作已完成" as T;
 }
 
@@ -47,6 +51,8 @@ let state: AppState = { themes: [], sources: [], selectedSourceId: "github" };
 let selectedCategory = "全部";
 let selectedTheme: Theme | undefined;
 let busy = false;
+let checkingUpdate = false;
+let availableUpdate: AppUpdate | null = null;
 let previewObserver: IntersectionObserver | undefined;
 
 document.querySelector<HTMLDivElement>("#app")!.innerHTML = `
@@ -55,6 +61,7 @@ document.querySelector<HTMLDivElement>("#app")!.innerHTML = `
       <section class="brand"><h1>Codex-Skin</h1><p id="catalog-count">主题目录</p></section>
       <select id="source" aria-label="主题下载线路"></select>
       <button id="refresh" class="button">刷新</button>
+      <button id="app-update" class="button">检查更新</button>
       <nav id="categories" class="categories" aria-label="主题分类"></nav>
     </header>
     <div id="progress" class="progress" hidden><i></i></div>
@@ -73,6 +80,7 @@ document.querySelector<HTMLDivElement>("#app")!.innerHTML = `
 const sourceSelect = document.querySelector<HTMLSelectElement>("#source")!;
 const themeGrid = document.querySelector<HTMLElement>("#themes")!;
 const status = document.querySelector<HTMLElement>("#status")!;
+const updateButton = document.querySelector<HTMLButtonElement>("#app-update")!;
 
 function message(value: string): void { status.textContent = value; }
 
@@ -86,6 +94,7 @@ function setBusy(value: boolean, text?: string): void {
 }
 
 function updateCommands(): void {
+  updateButton.disabled = busy || checkingUpdate;
   document.querySelector<HTMLButtonElement>("#apply")!.disabled = busy || !selectedTheme;
   const subscribe = document.querySelector<HTMLButtonElement>("#subscribe")!;
   const download = document.querySelector<HTMLButtonElement>("#download")!;
@@ -95,6 +104,51 @@ function updateCommands(): void {
   subscribe.textContent = selectedTheme?.subscribed ? "取消订阅" : "订阅";
   download.disabled = busy || !selectedTheme?.remoteVersion || (!!selectedTheme.installedVersion && !selectedTheme.updateAvailable);
   download.textContent = selectedTheme?.updateAvailable ? "下载更新" : selectedTheme?.installedVersion ? "已下载" : "下载主题";
+}
+
+function renderAppUpdate(): void {
+  updateButton.textContent = availableUpdate ? `更新到 v${availableUpdate.version}` : "检查更新";
+  updateButton.classList.toggle("primary", availableUpdate !== null);
+  updateCommands();
+}
+
+async function checkForAppUpdate(interactive: boolean): Promise<AppUpdate | null> {
+  if (checkingUpdate) return availableUpdate;
+  checkingUpdate = true;
+  updateButton.textContent = "检查中…";
+  updateCommands();
+  try {
+    availableUpdate = await call<AppUpdate | null>("check_app_update");
+    renderAppUpdate();
+    if (availableUpdate) {
+      message(`Codex-Skin v${availableUpdate.version} 可以更新`);
+    } else if (interactive) {
+      message("当前已是最新版本");
+    }
+    return availableUpdate;
+  } catch (error) {
+    if (interactive) message(`检查更新失败：${String(error)}`);
+    return null;
+  } finally {
+    checkingUpdate = false;
+    renderAppUpdate();
+  }
+}
+
+async function installAppUpdate(update: AppUpdate): Promise<void> {
+  const size = update.size > 0 ? `（${(update.size / 1024 / 1024).toFixed(1)} MB）` : "";
+  const notes = update.notes.trim();
+  const detail = notes ? `\n\n${notes.slice(0, 500)}` : "";
+  if (!window.confirm(`下载并安装 Codex-Skin v${update.version}${size}？${detail}`)) return;
+  setBusy(true, "正在下载客户端更新…");
+  try {
+    const result = await call<string>("install_app_update", { version: update.version });
+    message(result);
+  } catch (error) {
+    message(`更新失败：${String(error)}`);
+  } finally {
+    setBusy(false);
+  }
 }
 
 function themeState(theme: Theme): string {
@@ -273,5 +327,18 @@ document.querySelector<HTMLButtonElement>("#rollback")!.onclick = async () => {
   finally { setBusy(false); }
 };
 
+updateButton.onclick = async () => {
+  const update = availableUpdate ?? await checkForAppUpdate(true);
+  if (update) await installAppUpdate(update);
+};
+
 if (!qaMode) void listen<string[]>("external-activation", event => void handleActivation(event.payload));
-void loadState().then(async () => handleActivation(await call<string[]>("pending_activations")));
+if (!qaMode) void listen<UpdateProgress>("app-update-progress", event => {
+  const { downloaded, total } = event.payload;
+  const percent = total > 0 ? Math.min(100, Math.round(downloaded * 100 / total)) : 0;
+  message(`正在下载客户端更新… ${percent}%`);
+});
+void loadState().then(async () => {
+  await handleActivation(await call<string[]>("pending_activations"));
+  await checkForAppUpdate(false);
+});

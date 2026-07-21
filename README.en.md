@@ -28,6 +28,7 @@ Codex-Skin provides a complete, auditable path from discovery and on-demand down
 - Check for updates through a lightweight incremental index with fallback across GitHub, GH Proxy, and GHFast.
 - Download previews only as they enter the viewport, then fetch and persist complete theme assets only before application.
 - Show online, downloaded, and update-available states, with subscriptions that refresh local theme resources when the catalog is refreshed.
+- Check the client version at startup, then download, verify, and launch GitHub Release updates inside the app.
 - Forward web and file activations to one application instance.
 
 ## Download
@@ -43,6 +44,8 @@ Download the package for your platform from the [latest release](https://github.
 Windows is distributed through the Setup installer. It uses the system WebView2 runtime; macOS uses WKWebView. No separate application runtime is required.
 
 Current packages do not have commercial code signing. Windows SmartScreen or macOS Gatekeeper may require explicit approval. Before running a package, download `Codex-Skin-installers-SHA256SUMS.txt` from the same release and verify its hash.
+
+After the first installation, use **Check for updates** in the upper-right corner. The client selects the package for the current platform and verifies its Release path, size, and SHA-256. Windows starts the update silently after download; macOS opens the downloaded PKG directly.
 
 Windows PowerShell:
 

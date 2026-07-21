@@ -9,6 +9,7 @@ mod paths;
 mod platform;
 mod protocol;
 mod repository;
+mod updater;
 
 pub fn verify_dreamskin(path: &str, platform: &str) -> Result<(), String> {
     dreamskin::verify_for_platform(path, platform)
@@ -164,6 +165,16 @@ async fn rollback_theme() -> error::Result<String> {
     Ok("已恢复默认主题".into())
 }
 
+#[tauri::command]
+async fn check_app_update() -> error::Result<Option<updater::UpdateInfo>> {
+    updater::check().await
+}
+
+#[tauri::command]
+async fn install_app_update(app: tauri::AppHandle, version: String) -> error::Result<String> {
+    updater::install(app, version).await
+}
+
 pub fn run() {
     tauri::Builder::default()
         .manage(ActivationQueue(std::sync::Mutex::new(Vec::new())))
@@ -223,7 +234,9 @@ pub fn run() {
             theme_runtime_ready,
             apply_theme,
             restart_and_apply,
-            rollback_theme
+            rollback_theme,
+            check_app_update,
+            install_app_update
         ])
         .run(tauri::generate_context!())
         .expect("failed to run Codex-Skin");
