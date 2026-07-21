@@ -159,6 +159,12 @@ async fn restart_and_apply(theme_id: String) -> error::Result<String> {
 }
 #[tauri::command]
 async fn rollback_theme() -> error::Result<String> {
+    // A fresh Codex process has no theme injection to remove. In particular,
+    // macOS does not expose the local CDP endpoint until Codex has been started
+    // in theme mode, so restoring defaults must be a safe no-op in that state.
+    if !cdp::is_ready().await {
+        return Ok("当前已经是默认主题".into());
+    }
     if cdp::remove(std::time::Duration::from_secs(15)).await? == 0 {
         return Err(error::AppError::Message("未连接到 Codex 主题端口。".into()));
     }

@@ -154,6 +154,7 @@ test("theme application uses one adaptive action and production rejects fixture 
   assert.match(frontend, /ready \? "apply_theme" : "restart_and_apply"/);
   assert.match(styles, /grid-template-columns: 1fr repeat\(5, auto\)/);
   assert.match(rustApp, /async fn theme_runtime_ready\(\) -> bool/);
+  assert.match(rustApp, /async fn rollback_theme\(\)[\s\S]*if !cdp::is_ready\(\)\.await[\s\S]*当前已经是默认主题/);
   assert.match(dreamskin, /#\[cfg\(test\)\]\s+"codex-skin\.sample\.2026-01"/);
   assert.match(compiler, /fn font_stack\(value: &str\)/);
   assert.match(repository, /fn validate_font_stack\(value: &str\)/);
