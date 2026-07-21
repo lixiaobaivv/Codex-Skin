@@ -133,21 +133,27 @@ pub fn compile(theme_id: &str) -> Result<Payload> {
             "pets",
         )?)?
     };
-    let ui_font = theme
-        .get("fonts")
-        .and_then(|v| v.get("ui"))
-        .and_then(Value::as_str)
-        .unwrap_or("Inter, system-ui, sans-serif");
-    let code_font = theme
-        .get("fonts")
-        .and_then(|v| v.get("code"))
-        .and_then(Value::as_str)
-        .unwrap_or("ui-monospace, monospace");
-    let display_font = theme
-        .get("fonts")
-        .and_then(|v| v.get("display"))
-        .and_then(Value::as_str)
-        .unwrap_or(ui_font);
+    let ui_font = font_stack(
+        theme
+            .get("fonts")
+            .and_then(|v| v.get("ui"))
+            .and_then(Value::as_str)
+            .unwrap_or("Inter, system-ui, sans-serif"),
+    )?;
+    let code_font = font_stack(
+        theme
+            .get("fonts")
+            .and_then(|v| v.get("code"))
+            .and_then(Value::as_str)
+            .unwrap_or("ui-monospace, monospace"),
+    )?;
+    let display_font = font_stack(
+        theme
+            .get("fonts")
+            .and_then(|v| v.get("display"))
+            .and_then(Value::as_str)
+            .unwrap_or(ui_font),
+    )?;
     let opacity = theme
         .get("backgroundImageOpacity")
         .and_then(Value::as_f64)
@@ -297,6 +303,34 @@ fn color(value: Option<&Value>, fallback: &str) -> Result<String> {
         Ok(value.to_ascii_lowercase())
     } else {
         Err(AppError::Message(format!("主题颜色无效：{value}")))
+    }
+}
+fn font_stack(value: &str) -> Result<&str> {
+    let valid = !value.is_empty()
+        && value.chars().count() <= 300
+        && value.split(',').all(|family| {
+            let family = family.trim();
+            if family.is_empty() {
+                return false;
+            }
+            let quoted = family.len() >= 2
+                && ((family.starts_with('"') && family.ends_with('"'))
+                    || (family.starts_with('\'') && family.ends_with('\'')));
+            let unquoted = if quoted {
+                &family[1..family.len() - 1]
+            } else {
+                family
+            };
+            !unquoted.is_empty()
+                && !unquoted.contains(['"', '\''])
+                && unquoted
+                    .chars()
+                    .all(|c| c.is_alphanumeric() || c == ' ' || "._-".contains(c))
+        });
+    if valid {
+        Ok(value)
+    } else {
+        Err(AppError::Message("主题字体配置无效。".into()))
     }
 }
 fn rgb(value: &str) -> Result<(u8, u8, u8)> {
@@ -523,7 +557,17 @@ const JS_TEMPLATE: &str = r#"
 
 #[cfg(test)]
 mod tests {
-    use super::JS_TEMPLATE;
+    use super::{JS_TEMPLATE, font_stack};
+
+    #[test]
+    fn rejects_css_in_font_stacks() {
+        assert!(font_stack("Inter, system-ui, sans-serif").is_ok());
+        assert!(font_stack("\"Microsoft YaHei UI\", \"PingFang SC\", sans-serif").is_ok());
+        assert!(font_stack("sans-serif; } body { display: none").is_err());
+        assert!(font_stack("url(https://example.com/font.woff)").is_err());
+        assert!(font_stack("\"unterminated").is_err());
+        assert!(font_stack("\"").is_err());
+    }
 
     #[test]
     fn native_renderer_decorates_codex_routes_without_a_covering_home_node() {

@@ -692,6 +692,16 @@ fn validate_theme(path: &Path, expected_id: &str, repository: &Path) -> Result<(
     for key in ["accent", "ink", "surface"] {
         validate_color(required_text(theme, key, 7)?, key)?;
     }
+    if let Some(fonts) = theme.get("fonts") {
+        closed_object(fonts, &["ui", "code", "display"], &[], "theme.fonts")?;
+        for key in ["ui", "code", "display"] {
+            if let Some(value) = fonts.get(key) {
+                validate_font_stack(value.as_str().ok_or_else(|| {
+                    AppError::Message(format!("theme.fonts.{key} 必须是字符串。"))
+                })?)?;
+            }
+        }
+    }
     if let Some(semantic) = theme.get("semanticColors") {
         closed_object(
             semantic,
@@ -969,6 +979,34 @@ fn validate_color(value: &str, key: &str) -> Result<()> {
     }
     Ok(())
 }
+fn validate_font_stack(value: &str) -> Result<()> {
+    let valid = !value.is_empty()
+        && value.chars().count() <= 300
+        && value.split(',').all(|family| {
+            let family = family.trim();
+            if family.is_empty() {
+                return false;
+            }
+            let quoted = family.len() >= 2
+                && ((family.starts_with('"') && family.ends_with('"'))
+                    || (family.starts_with('\'') && family.ends_with('\'')));
+            let unquoted = if quoted {
+                &family[1..family.len() - 1]
+            } else {
+                family
+            };
+            !unquoted.is_empty()
+                && !unquoted.contains(['"', '\''])
+                && unquoted
+                    .chars()
+                    .all(|c| c.is_alphanumeric() || c == ' ' || "._-".contains(c))
+        });
+    if valid {
+        Ok(())
+    } else {
+        Err(AppError::Message("主题字体配置无效。".into()))
+    }
+}
 fn validate_asset_path(
     repository: &Path,
     manifest: &Path,
@@ -1009,6 +1047,15 @@ fn validate_asset_path(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn rejects_unsafe_font_stacks() {
+        assert!(validate_font_stack("Inter, system-ui, sans-serif").is_ok());
+        assert!(validate_font_stack("\"Microsoft YaHei UI\", sans-serif").is_ok());
+        assert!(validate_font_stack("sans-serif; } body { display: none").is_err());
+        assert!(validate_font_stack("url(https://example.com/font.woff)").is_err());
+        assert!(validate_font_stack("\"").is_err());
+    }
 
     #[test]
     fn rejects_background_fit_in_public_theme_contract() {

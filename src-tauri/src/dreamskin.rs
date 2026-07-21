@@ -631,6 +631,7 @@ fn asset(value: &Value, role: &str) -> Result<Asset> {
 
 fn verify_signature(root: &Value, manifest: &Manifest) -> Result<()> {
     let public = match manifest.key_id.as_str() {
+        #[cfg(test)]
         "codex-skin.sample.2026-01" => "kuf25VngYoeAC2TDJ2kPGRfKGJZvQhZrdVnQhGvQ3fM",
         "codex-skin.official.2026-01" => "PjtdEbIyuynRaE30OrFEB-k6jakgnL3Mzl6cyqZ-8xM",
         _ => {

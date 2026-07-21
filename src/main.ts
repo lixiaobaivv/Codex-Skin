@@ -37,6 +37,7 @@ async function call<T>(command: string, args?: Record<string, unknown>): Promise
   if (command === "sync_subscribed_themes") return 0 as T;
   if (command === "set_theme_subscription") return undefined as T;
   if (command === "delete_theme") return "主题已从本地删除" as T;
+  if (command === "theme_runtime_ready") return true as T;
   return "QA 操作已完成" as T;
 }
 
@@ -64,8 +65,7 @@ document.querySelector<HTMLDivElement>("#app")!.innerHTML = `
       <button id="delete" class="button danger">删除主题</button>
       <button id="subscribe" class="button">订阅</button>
       <button id="download" class="button">下载主题</button>
-      <button id="apply" class="button">应用主题</button>
-      <button id="restart" class="button primary">应用并重启 Codex</button>
+      <button id="apply" class="button primary">应用主题</button>
     </footer>
   </main>
 `;
@@ -87,7 +87,6 @@ function setBusy(value: boolean, text?: string): void {
 
 function updateCommands(): void {
   document.querySelector<HTMLButtonElement>("#apply")!.disabled = busy || !selectedTheme;
-  document.querySelector<HTMLButtonElement>("#restart")!.disabled = busy || !selectedTheme;
   const subscribe = document.querySelector<HTMLButtonElement>("#subscribe")!;
   const download = document.querySelector<HTMLButtonElement>("#download")!;
   const remove = document.querySelector<HTMLButtonElement>("#delete")!;
@@ -246,18 +245,33 @@ document.querySelector<HTMLButtonElement>("#delete")!.onclick = async () => {
   finally { setBusy(false); }
 };
 
-for (const [id, command, label] of [
-  ["apply", "apply_theme", "正在应用主题…"],
-  ["restart", "restart_and_apply", "正在重启 Codex 并应用主题…"],
-  ["rollback", "rollback_theme", "正在恢复默认主题…"],
-] as const) {
-  document.querySelector<HTMLButtonElement>(`#${id}`)!.onclick = async () => {
-    setBusy(true, label);
-    try { const result = await call<string>(command, { themeId: selectedTheme?.id ?? null }); await loadState(); message(result); }
-    catch (error) { message(String(error)); }
-    finally { setBusy(false); }
-  };
-}
+document.querySelector<HTMLButtonElement>("#apply")!.onclick = async () => {
+  if (!selectedTheme) return;
+  const themeId = selectedTheme.id;
+  setBusy(true, "正在检查 Codex 主题模式…");
+  try {
+    const ready = await call<boolean>("theme_runtime_ready");
+    if (!ready && !window.confirm("当前 Codex 没有启用本机主题端口，需要重启后应用主题。是否继续？")) {
+      message("已取消应用主题");
+      return;
+    }
+    message(ready ? "正在应用主题…" : "正在重启 Codex 并应用主题…");
+    const result = await call<string>(ready ? "apply_theme" : "restart_and_apply", { themeId });
+    await loadState();
+    message(result);
+  } catch (error) { message(String(error)); }
+  finally { setBusy(false); }
+};
+
+document.querySelector<HTMLButtonElement>("#rollback")!.onclick = async () => {
+  setBusy(true, "正在恢复默认主题…");
+  try {
+    const result = await call<string>("rollback_theme");
+    await loadState();
+    message(result);
+  } catch (error) { message(String(error)); }
+  finally { setBusy(false); }
+};
 
 if (!qaMode) void listen<string[]>("external-activation", event => void handleActivation(event.payload));
 void loadState().then(async () => handleActivation(await call<string[]>("pending_activations")));

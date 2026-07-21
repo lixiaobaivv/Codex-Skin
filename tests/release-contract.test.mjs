@@ -116,6 +116,26 @@ test("Tauri desktop uses horizontal categories and single-instance activation", 
   assert.match(rustApp, /external-activation/);
 });
 
+test("theme application uses one adaptive action and production rejects fixture trust", async () => {
+  const [frontend, styles, rustApp, dreamskin, compiler, repository] = await Promise.all([
+    readFile(new URL("../src/main.ts", import.meta.url), "utf8"),
+    readFile(new URL("../src/styles.css", import.meta.url), "utf8"),
+    readFile(new URL("../src-tauri/src/lib.rs", import.meta.url), "utf8"),
+    readFile(new URL("../src-tauri/src/dreamskin.rs", import.meta.url), "utf8"),
+    readFile(new URL("../src-tauri/src/compiler.rs", import.meta.url), "utf8"),
+    readFile(new URL("../src-tauri/src/repository.rs", import.meta.url), "utf8"),
+  ]);
+  assert.match(frontend, /id="apply" class="button primary">应用主题<\/button>/);
+  assert.doesNotMatch(frontend, /id="restart"|应用并重启 Codex<\/button>/);
+  assert.match(frontend, /call<boolean>\("theme_runtime_ready"\)/);
+  assert.match(frontend, /ready \? "apply_theme" : "restart_and_apply"/);
+  assert.match(styles, /grid-template-columns: 1fr repeat\(5, auto\)/);
+  assert.match(rustApp, /async fn theme_runtime_ready\(\) -> bool/);
+  assert.match(dreamskin, /#\[cfg\(test\)\]\s+"codex-skin\.sample\.2026-01"/);
+  assert.match(compiler, /fn font_stack\(value: &str\)/);
+  assert.match(repository, /fn validate_font_stack\(value: &str\)/);
+});
+
 test("desktop catalog uses conditional sync and on-demand persistent resources", async () => {
   const [repository, frontend] = await Promise.all([
     readFile(new URL("../src-tauri/src/repository.rs", import.meta.url), "utf8"),
